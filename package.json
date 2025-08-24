@@ -1,0 +1,27 @@
+{
+  "name": "cyberrunner",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev -w client",
+    "dev:server": "npm run dev -w server",
+    "build": "npm run build -w client && npm run build -w server",
+    "start": "npm run start -w server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raiden-02/CyberRunner.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/raiden-02/CyberRunner/issues"
+  },
+  "homepage": "https://github.com/raiden-02/CyberRunner#readme"
+}
