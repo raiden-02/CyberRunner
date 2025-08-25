@@ -4,8 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cyberpunk FPS</title>
+    <style>
+      #debug { position: fixed; top: 8px; left: 8px; color: #0f0; font: 12px monospace; background: rgba(0,0,0,0.4); padding: 6px 8px; border-radius: 4px; }
+      #players { position: fixed; top: 8px; right: 8px; color: #0ff; font: 12px monospace; background: rgba(0,0,0,0.4); padding: 6px 8px; border-radius: 4px; }
+      body { margin: 0; overflow: hidden; }
+    </style>
   </head>
   <body>
+    <div id="debug">Loading...</div>
+    <div id="players">Players: 0</div>
     <!-- canvas will be injected by main.ts -->
     <script type="module" src="/src/main.ts"></script>
   </body>

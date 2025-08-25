@@ -14,7 +14,7 @@
     "vite": "^7.1.2"
   },
   "dependencies": {
-    "colyseus.js": "^0.16.19",
+    "colyseus.js": "0.16.19",
     "three": "^0.179.1"
   }
 }

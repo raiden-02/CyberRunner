@@ -9,15 +9,15 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@colyseus/schema": "^2.0.28",
-    "colyseus": "^0.15.17",
-    "express": "^4.19.2"
+    "@colyseus/schema": "3.0.56",
+    "colyseus": "0.16.4",
+    "express": "4.19.2"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.3.0",
-    "tslib": "^2.6.3",
-    "tsx": "^4.16.2",
-    "typescript": "^5.4.5"
+    "@types/express": "5.0.3",
+    "@types/node": "24.3.0",
+    "tslib": "2.6.3",
+    "tsx": "4.16.2",
+    "typescript": "5.4.5"
   }
 }

@@ -1,13 +1,13 @@
 import http from "http";
 import express from "express";
-import colyseus from "colyseus";
+import { Server } from "colyseus";
 import { GameRoom } from "./GameRoom.js";
 
 const app = express();
 app.use(express.static("../client/dist"));
 
 const httpServer = http.createServer(app);
-const gameServer = new colyseus.Server({ server: httpServer });
+const gameServer = new Server({ server: httpServer });
 
 gameServer.define("game_room", GameRoom);
 
