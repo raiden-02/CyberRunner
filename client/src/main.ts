@@ -55,6 +55,8 @@ document.body.appendChild(crosshair);
 
 // Placeholder map for remote players meshes
 const playerMeshes = new Map<string, THREE.Object3D>();
+// Interpolation targets for remote players
+const remoteTargets = new Map<string, { pos: THREE.Vector3; rotY: number }>();
 
 // Resize handling
 function onResize() {
@@ -86,12 +88,13 @@ document.addEventListener("mousemove", (event) => {
 
 // Keyboard input
 const keys: Record<string, boolean> = {};
+let jumpQueued = false;
 document.addEventListener("keydown", (e) => {
-  // prevent page scrolling on space/arrow keys if used later
   if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
     e.preventDefault();
   }
   keys[e.code] = true;
+  if (e.code === "Space") jumpQueued = true; // queue one jump
 });
 document.addEventListener("keyup", (e) => {
   keys[e.code] = false;
@@ -138,16 +141,23 @@ function startInputLoop() {
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
     const wx = strafe * cos - forward * sin;
     const wz = -strafe * sin - forward * cos;
-    room.send("move", { x: wx, z: wz, rotate: yaw });
+    const jump = jumpQueued; // capture and clear
+    if (jumpQueued) jumpQueued = false;
+    room.send("move", { x: wx, z: wz, rotate: yaw, jump });
     if (debugEl) debugEl.textContent = `Connected: ${(room as any).sessionId} | inputLocal=(strafe:${strafe.toFixed(2)}, fwd:${forward.toFixed(2)})`;
   }, 1000 / sendRate);
 }
 
 // Movement constants (keep in sync with server)
 const MOVE_SPEED = 5; // units/sec
+const CAPSULE_HALF = 0.9;
+const CAPSULE_RADIUS = 0.4;
+const CENTER_TO_FOOT = CAPSULE_HALF + CAPSULE_RADIUS; // 1.3 (capsule center above ground)
+const EYE_HEIGHT = 1.6;
+const EYE_FROM_CENTER = EYE_HEIGHT - CENTER_TO_FOOT; // 0.3 eye above capsule center
 
 // Local prediction state
-const predictedPos = new THREE.Vector3(0, 1.6, 0);
+const predictedPos = new THREE.Vector3(0, EYE_HEIGHT, 0);
 let lastTime = performance.now();
 
 // Animation loop
@@ -186,31 +196,75 @@ function animate() {
         presentIds.add(sessionId);
         if (sessionId === myId) { me = player; return; }
         let m = playerMeshes.get(sessionId);
+        // Box height = 2, so to sit on ground, center should be at y=1.0 when ground=0.
+        // Server sends capsule center (~1.3), so offset center down by 0.3.
+        const targetPos = new THREE.Vector3(player.x, player.y - (CENTER_TO_FOOT - 1.0), player.z);
+        const targetRotY = player.rotationY || 0;
+        remoteTargets.set(sessionId, { pos: targetPos, rotY: targetRotY });
         if (!m) {
           m = new THREE.Mesh(
             new THREE.BoxGeometry(1, 2, 1),
             new THREE.MeshBasicMaterial({ color: 0x00ff88 })
           );
+          m.position.copy(targetPos);
+          (m as any).rotation.y = targetRotY;
           scene.add(m);
           playerMeshes.set(sessionId, m);
         }
-        m.position.set(player.x, player.y + 1, player.z);
-        (m as any).rotation.y = player.rotationY || 0;
       });
     } catch {}
     if (playersEl) playersEl.textContent = `Players: ${count}`;
   }
+  // remove meshes/targets for players no longer present
   for (const [sid, mesh] of playerMeshes) {
-    if (!presentIds.has(sid)) { scene.remove(mesh); playerMeshes.delete(sid); }
+    if (!presentIds.has(sid)) { scene.remove(mesh); playerMeshes.delete(sid); remoteTargets.delete(sid); }
   }
 
   if (me) {
-    const authoritative = new THREE.Vector3(me.x, me.y + 1.6, me.z);
+    const authoritative = new THREE.Vector3(me.x, me.y + EYE_FROM_CENTER, me.z);
     predictedPos.lerp(authoritative, 0.1);
-    if (debugEl) debugEl.textContent = `Connected: ${myId} | inputLocal=(strafe:${strafe.toFixed(2)}, fwd:${forward.toFixed(2)}) | pos=(${me.x.toFixed(2)}, ${me.y.toFixed(2)}, ${me.z.toFixed(2)})`;
+    if (debugEl) debugEl.textContent = `Connected: ${myId} | pos=(${me.x.toFixed(2)}, ${me.y.toFixed(2)}, ${me.z.toFixed(2)})`;
   }
 
+  // Camera follows predicted
   camera.position.copy(predictedPos);
+
+  // Interpolate remote meshes towards latest targets for smoothness
+  const alpha = Math.min(1, dt * 10); // ~100ms smoothing
+  for (const [sid, mesh] of playerMeshes) {
+    const tgt = remoteTargets.get(sid);
+    if (!tgt) continue;
+    mesh.position.lerp(tgt.pos, alpha);
+    (mesh as any).rotation.y = THREE.MathUtils.lerp((mesh as any).rotation.y || 0, tgt.rotY, alpha);
+  }
+
   renderer.render(scene, camera);
 }
 animate();
+
+// Visualize simple boundary walls to match server
+const wallMat = new THREE.MeshBasicMaterial({ color: 0x5050a0, wireframe: true });
+const halfSize = 25;
+const wallThickness = 1;
+const wallHeight = 6;
+const wallGeomX = new THREE.BoxGeometry(wallThickness, wallHeight, halfSize * 2);
+const wallGeomZ = new THREE.BoxGeometry(halfSize * 2, wallHeight, wallThickness);
+const wallPosY = wallHeight / 2;
+const wallPX = new THREE.Mesh(wallGeomX, wallMat); wallPX.position.set(halfSize + wallThickness / 2, wallPosY, 0); scene.add(wallPX);
+const wallNX = new THREE.Mesh(wallGeomX, wallMat); wallNX.position.set(-halfSize - wallThickness / 2, wallPosY, 0); scene.add(wallNX);
+const wallPZ = new THREE.Mesh(wallGeomZ, wallMat); wallPZ.position.set(0, wallPosY, halfSize + wallThickness / 2); scene.add(wallPZ);
+const wallNZ = new THREE.Mesh(wallGeomZ, wallMat); wallNZ.position.set(0, wallPosY, -halfSize - wallThickness / 2); scene.add(wallNZ);
+
+// Interior obstacles (match server positions and approx sizes)
+const obstacleMat = new THREE.MeshBasicMaterial({ color: 0xa05050, wireframe: true });
+const obstacleGeom = new THREE.BoxGeometry(4, 2, 4); // server half-extents (2,1,2)
+const obstacles = [
+  new THREE.Vector3(0, 1, -10),
+  new THREE.Vector3(10, 1, 10),
+  new THREE.Vector3(-12, 1, 6),
+];
+for (const pos of obstacles) {
+  const m = new THREE.Mesh(obstacleGeom, obstacleMat);
+  m.position.copy(pos);
+  scene.add(m);
+}

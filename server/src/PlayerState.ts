@@ -7,4 +7,5 @@ export class PlayerState extends Schema {
   @type("number") rotationY: number = 0;
   @type("number") velX: number = 0;
   @type("number") velZ: number = 0;
+  @type("boolean") canJump: boolean = false;
 }
