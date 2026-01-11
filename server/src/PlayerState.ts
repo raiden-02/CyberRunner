@@ -1,11 +1,44 @@
 import { Schema, type } from "@colyseus/schema";
 
+export enum MovementState {
+  Walking = 0,
+  Crouching = 1,
+  Sliding = 2, 
+  Prone = 3,
+  Dashing = 4,
+  WallRun = 5,
+  Mantling = 6,
+  Falling = 7
+}
+
 export class PlayerState extends Schema {
   @type("number") x: number = 0;
   @type("number") y: number = 0;
   @type("number") z: number = 0;
   @type("number") rotationY: number = 0;
+  @type("number") pitch: number = 0;  // Camera pitch for weapon aiming
   @type("number") velX: number = 0;
+  @type("number") velY: number = 0;
   @type("number") velZ: number = 0;
+  @type("uint8") movementState: MovementState = MovementState.Walking;
+  @type("boolean") isSprinting: boolean = false;
+  @type("boolean") isCrouching: boolean = false;
+  @type("boolean") isSliding: boolean = false;
   @type("boolean") canJump: boolean = false;
+  @type("boolean") wallRight: boolean = false;
+  
+  // Health state
+  @type("uint8") health: number = 100;
+  @type("uint8") maxHealth: number = 100;
+  @type("boolean") isDead: boolean = false;
+  @type("number") respawnTime: number = 0; // Time until respawn (0 if alive)
+  
+  // Weapon state
+  @type("string") equippedWeapon: string = "AR_1";
+  @type("uint8") ammoInMag: number = 30;
+  @type("uint16") ammoReserve: number = 120;
+  @type("boolean") firing: boolean = false;
+  @type("number") nextFireTime: number = 0; // Server time when next shot is allowed
+  @type("boolean") reloading: boolean = false;
+  @type("number") reloadEndTime: number = 0; // Server time when reload completes
 }

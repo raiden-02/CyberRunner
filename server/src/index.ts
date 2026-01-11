@@ -12,6 +12,8 @@ const gameServer = new Server({ server: httpServer });
 gameServer.define("game_room", GameRoom);
 
 const PORT = Number(process.env.PORT || 2567);
-httpServer.listen(PORT, () => {
-  console.log(`Server started on ws://localhost:${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0"; // Listen on all interfaces for LAN access
+
+httpServer.listen(PORT, HOST, () => {
+  console.log(`Server started on ws://${HOST}:${PORT}`);
 });

@@ -1,29 +1,29 @@
 import { Room, Client } from "colyseus";
 import { GameState } from "./GameState.js";
-import { PlayerState } from "./PlayerState.js";
+import { PlayerState, MovementState } from "./PlayerState.js";
+import { InputMsg, WeaponSwitchMsg, FireInputMsg, ReloadInputMsg, DamageMsg } from "./net/messages.js";
+import { CharacterController } from "./movement/character-controller.js";
+import { CAPSULE } from "./physics/constants.js";
+import { HealthSystem } from "./systems/health-system.js";
+import { WeaponSystem } from "./systems/weapon-system.js";
+import { getWeaponConfig, isValidWeapon } from "./weapons/weapon-config.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 const TICK_RATE = 60; // Hz
-const MOVE_SPEED = 5; // units/sec
-const CAPSULE_HALF = 0.9;
-const CAPSULE_RADIUS = 0.4;
-const JUMP_IMPULSE = 5.0;
+
+type PlayerRuntime = {
+  ctrl: CharacterController;
+  schema: PlayerState;
+};
 
 export class GameRoom extends Room<GameState> {
   private running = false;
   private world!: RAPIER.World;
-  private colliders: Map<string, RAPIER.Collider> = new Map();
-  private controllers: Map<string, RAPIER.KinematicCharacterController> = new Map();
-  private playerMovement: Map<string, {
-    verticalVelocity: number,
-    canJump: boolean,
-    inputX: number,
-    inputZ: number
-  }> = new Map();
+  private players = new Map<string, PlayerRuntime>();
 
-  async onCreate(options: any) {
+  async onCreate(_options: any) {
     this.setState(new GameState());
-    console.log("GameRoom created!", options);
+    console.log("[GameRoom] Created");
 
     await RAPIER.init();
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
@@ -73,137 +73,260 @@ export class GameRoom extends Room<GameState> {
     this.setSimulationInterval((deltaTime) => {
       if (!this.running) return;
       const dt = Math.min(100, Math.max(0, deltaTime)) / 1000;
-      this.updateGame(dt);
+      this.update(dt);
     }, 1000 / TICK_RATE);
 
-    this.onMessage(
-      "move",
-      (
-        client,
-        data: { x: number; z: number; rotate?: number; jump?: boolean }
-      ) => {
-        const collider = this.colliders.get(client.sessionId);
-        const player = this.state.players.get(client.sessionId);
-        const movement = this.playerMovement.get(client.sessionId);
-        if (!collider || !player || !movement) return;
-        
-        if (typeof data.rotate === "number") player.rotationY = data.rotate;
-        
-        // Store movement input for processing in updateGame
-        movement.inputX = data.x;
-        movement.inputZ = data.z;
+    this.onMessage("input", (client, data: InputMsg) => {
+      const player = this.players.get(client.sessionId);
+      if (!player) return;
+      
+      player.ctrl.updateInput(data);
+      player.schema.rotationY = data.lookYaw;
+      player.schema.pitch = data.lookPitch;
+    });
 
-        // Handle jumping
-        if (data.jump && movement.canJump) {
-          const controller = this.controllers.get(client.sessionId);
-          if (controller && controller.computedGrounded()) {
-            movement.verticalVelocity = JUMP_IMPULSE;
-            movement.canJump = false;
-          }
-        } else if (!data.jump) {
-          movement.canJump = true;
+    this.onMessage("weapon_switch", (client, data: WeaponSwitchMsg) => {
+      const player = this.players.get(client.sessionId);
+      if (!player) return;
+      
+      if (!isValidWeapon(data.weaponId)) return;
+      if (player.schema.reloading) return;
+      
+      player.schema.equippedWeapon = data.weaponId;
+      
+      const config = getWeaponConfig(data.weaponId);
+      if (config) {
+        player.schema.ammoInMag = config.magazineSize;
+        player.schema.ammoReserve = config.reserveMax;
+      }
+    });
+
+    this.onMessage("fire_input", (client, data: FireInputMsg) => {
+      const player = this.players.get(client.sessionId);
+      if (!player) return;
+      
+      player.schema.firing = data.firing;
+      (player as any).aimDir = data.aimDir;
+    });
+
+    this.onMessage("reload_input", (client, data: ReloadInputMsg) => {
+      const player = this.players.get(client.sessionId);
+      if (!player) return;
+      
+      if (data.weaponId !== player.schema.equippedWeapon) return;
+      
+      if (WeaponSystem.startReload(player.schema, data.weaponId)) {
+        const config = getWeaponConfig(data.weaponId);
+        if (config) {
+          const now = performance.now() / 1000;
+          player.schema.reloadEndTime = now + config.reloadTime;
         }
       }
-    );
+    });
+
+    this.onMessage("apply_damage", (client, data: DamageMsg) => {
+      // Debug-only safety: only allow damaging yourself (prevents chaos in multiplayer tests)
+      if (data.targetId !== client.sessionId) return;
+
+      const targetPlayer = this.players.get(data.targetId);
+      if (!targetPlayer) return;
+
+      const amount = Math.max(0, Math.min(100, Math.round(data.amount)));
+
+      const result = HealthSystem.applyDamage(
+        targetPlayer.schema,
+        amount,
+        client.sessionId,
+        data.weaponId,
+        data.damageType
+      );
+      
+      if (result.damaged) {
+        const healthMsg = HealthSystem.createHealthChangeMessage(data.targetId, targetPlayer.schema);
+        this.broadcast("health_change", healthMsg);
+      }
+    });
   }
 
   onJoin(client: Client) {
-    const p = new PlayerState();
-    p.x = (Math.random() - 0.5) * 4;
-    p.y = 2.0; // Spawn above ground 
-    p.z = (Math.random() - 0.5) * 4;
-    this.state.players.set(client.sessionId, p);
+    const schema = new PlayerState();
+    schema.x = (Math.random() - 0.5) * 4;
+    schema.y = 2.0;
+    schema.z = (Math.random() - 0.5) * 4;
+    schema.movementState = MovementState.Walking;
+    
+    this.state.players.set(client.sessionId, schema);
 
-    // Create kinematic character controller
+    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+      .setTranslation(schema.x, schema.y, schema.z);
+    const body = this.world.createRigidBody(bodyDesc);
+    
+    const colliderDesc = RAPIER.ColliderDesc.capsule(CAPSULE.HalfHeight, CAPSULE.Radius)
+      .setFriction(0.7)
+      .setRestitution(0.0)
+      .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DEFAULT)
+      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+    const collider = this.world.createCollider(colliderDesc, body);
+    
     const controller = this.world.createCharacterController(0.1);
-    controller.enableSnapToGround(0.1); // Keep player on ground
+    controller.enableAutostep(0.3, 0.2, true);
+    controller.enableSnapToGround(0.2);
+    controller.setApplyImpulsesToDynamicBodies(true);
     
-    // Create capsule collider (like reference Player.ts)
-    const colliderDesc = RAPIER.ColliderDesc.capsule(CAPSULE_HALF, CAPSULE_RADIUS)
-      .setTranslation(p.x, p.y, p.z)
-      .setFriction(0.7);
-    const collider = this.world.createCollider(colliderDesc);
+    const ctrl = new CharacterController(body, collider, controller);
     
-    this.colliders.set(client.sessionId, collider);
-    this.controllers.set(client.sessionId, controller);
-    this.playerMovement.set(client.sessionId, {
-      verticalVelocity: 0,
-      canJump: true,
-      inputX: 0,
-      inputZ: 0
+    this.players.set(client.sessionId, {
+      ctrl,
+      schema
     });
 
-    console.log(
-      `Player ${client.sessionId} joined at (${p.x.toFixed(1)}, ${p.y.toFixed(
-        2
-      )}, ${p.z.toFixed(1)}) - Using KinematicCharacterController`
-    );
+    console.log(`[GameRoom] Player ${client.sessionId} joined`);
   }
 
   onLeave(client: Client) {
     this.state.players.delete(client.sessionId);
-    const collider = this.colliders.get(client.sessionId);
-    if (collider) this.world.removeCollider(collider, false);
-    this.colliders.delete(client.sessionId);
-    this.controllers.delete(client.sessionId);
-    this.playerMovement.delete(client.sessionId);
-    console.log(`Player ${client.sessionId} left.`);
+    const player = this.players.get(client.sessionId);
+    if (player) {
+      this.world.removeCollider(player.ctrl.collider, false);
+      this.world.removeRigidBody(player.ctrl.body);
+    }
+    this.players.delete(client.sessionId);
+    console.log(`[GameRoom] Player ${client.sessionId} left`);
   }
 
   onDispose() {
     this.running = false;
-    console.log("GameRoom disposed.");
+    console.log("[GameRoom] Disposed");
   }
 
-  private updateGame(dt: number) {
-    // Update players
-    this.state.players.forEach((player, sessionId) => {
-      const collider = this.colliders.get(sessionId);
-      const controller = this.controllers.get(sessionId);
-      const movement = this.playerMovement.get(sessionId);
-      if (!collider || !controller || !movement) return;
+  private update(dt: number) {
+    const now = performance.now() / 1000;
 
-      // Apply gravity to vertical velocity 
-      movement.verticalVelocity -= 9.81 * dt;
+    const normalize = (v: { x: number; y: number; z: number }) => {
+      const len = Math.hypot(v.x, v.y, v.z);
+      if (len <= 1e-6) return { x: 0, y: 0, z: -1 };
+      return { x: v.x / len, y: v.y / len, z: v.z / len };
+    };
 
-      // Horizontal movement from input
-      const speed = MOVE_SPEED;
-      const moveX = movement.inputX * speed * dt;
-      const moveZ = movement.inputZ * speed * dt;
+    // Match client/server notion of eye height:
+    // - Rapier body translation is the capsule center.
+    // - Eye height is ~1.6m above ground.
+    const CENTER_TO_FOOT = CAPSULE.HalfHeight + CAPSULE.Radius;
+    const EYE_HEIGHT = 1.6;
+    const EYE_FROM_CENTER = EYE_HEIGHT - CENTER_TO_FOOT;
 
-      // Desired movement delta 
-      const desiredDelta = {
-        x: moveX,
-        y: movement.verticalVelocity * dt,
-        z: moveZ,
+    // Phase 0: timers (respawn + reload), no physics step yet
+    for (const [sessionId, player] of this.players) {
+      const spawnPosition = {
+        x: (Math.random() - 0.5) * 4,
+        y: 2.0,
+        z: (Math.random() - 0.5) * 4
       };
+      const respawnResult = HealthSystem.updateRespawn(player.schema, dt, spawnPosition);
+      if (respawnResult.respawned) {
+        player.ctrl.body.setTranslation({ x: player.schema.x, y: player.schema.y, z: player.schema.z }, true);
+        player.ctrl.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        player.ctrl.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
 
-      // Use character controller to handle collision
-      const prevPos = collider.translation();
-      controller.computeColliderMovement(collider, desiredDelta);
-      const computedMovement = controller.computedMovement();
-      
-      // Apply the computed movement
-      const newPos = {
-        x: prevPos.x + computedMovement.x,
-        y: prevPos.y + computedMovement.y,
-        z: prevPos.z + computedMovement.z,
-      };
-      collider.setTranslation(newPos);
-
-      // Update player state
-      player.x = newPos.x;
-      player.y = newPos.y;
-      player.z = newPos.z;
-      player.canJump = controller.computedGrounded();
-
-      // Reset vertical velocity if grounded
-      if (controller.computedGrounded()) {
-        movement.verticalVelocity = Math.max(0, movement.verticalVelocity);
+        const healthMsg = HealthSystem.createHealthChangeMessage(sessionId, player.schema);
+        this.broadcast("health_change", healthMsg);
       }
-    });
 
-    // Step physics world
+      if (player.schema.reloading && now >= player.schema.reloadEndTime) {
+        WeaponSystem.completeReload(player.schema, player.schema.equippedWeapon);
+      }
+    }
+
+    // Phase 1: movement updates for all players (set kinematic targets consistently)
+    for (const [, player] of this.players) {
+      if (!player.schema.isDead) {
+        player.ctrl.update(this.world, dt, now);
+      }
+    }
+
+    // Phase 2: step physics ONCE after all kinematic targets were updated
     this.world.step();
+
+    // Phase 3: sync schema from physics + handle firing against a consistent world state
+    for (const [sessionId, player] of this.players) {
+      if (!player.schema.isDead) {
+        const pos = player.ctrl.body.translation();
+        player.schema.x = pos.x;
+        player.schema.y = pos.y;
+        player.schema.z = pos.z;
+
+        player.schema.velX = 0;
+        player.schema.velY = 0;
+        player.schema.velZ = 0;
+
+        player.schema.canJump = player.ctrl.isGrounded();
+        player.schema.movementState = player.ctrl.currentState();
+        player.schema.isSprinting = player.ctrl.input.sprint;
+
+        const currentState = player.ctrl.currentState();
+        player.schema.isCrouching = (currentState === MovementState.Crouching);
+        player.schema.isSliding = (currentState === MovementState.Sliding);
+      }
+
+      if (!player.schema.isDead && player.schema.firing && !player.schema.reloading) {
+        if (WeaponSystem.canFire(player.schema, now)) {
+          const aimDir = (player as any).aimDir;
+          if (aimDir) {
+            const aim = normalize(aimDir);
+            const pos = player.ctrl.body.translation();
+
+            // Use authoritative physics body position (NOT schema) and offset forward to avoid self-hit
+            const eye = { x: pos.x, y: pos.y + EYE_FROM_CENTER, z: pos.z };
+            const origin = {
+              x: eye.x + aim.x * (CAPSULE.Radius + 0.15),
+              y: eye.y + aim.y * (CAPSULE.Radius + 0.15),
+              z: eye.z + aim.z * (CAPSULE.Radius + 0.15)
+            };
+
+            const shotResult = WeaponSystem.processShot(
+              this.world,
+              player.schema,
+              sessionId,
+              origin,
+              aim,
+              this.players,
+              now
+            );
+
+            if (shotResult.shotFired) {
+              player.schema.nextFireTime = WeaponSystem.computeNextFireTime(
+                player.schema.equippedWeapon,
+                now
+              );
+
+              if (shotResult.shotMsg) {
+                this.broadcast("shot_fired", shotResult.shotMsg);
+              }
+
+              if (shotResult.hitPlayerId && shotResult.damage !== undefined) {
+                const hitPlayer = this.players.get(shotResult.hitPlayerId);
+                if (hitPlayer) {
+                  const dmgResult = HealthSystem.applyDamage(
+                    hitPlayer.schema,
+                    shotResult.damage,
+                    sessionId,
+                    player.schema.equippedWeapon,
+                    "hitscan"
+                  );
+
+                  if (dmgResult.damaged) {
+                    const healthMsg = HealthSystem.createHealthChangeMessage(
+                      shotResult.hitPlayerId,
+                      hitPlayer.schema
+                    );
+                    this.broadcast("health_change", healthMsg);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
