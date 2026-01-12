@@ -10,6 +10,7 @@ import { getWeaponConfig, isValidWeapon } from "./weapons/weapon-config.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 const TICK_RATE = 60; // Hz
+const DEFAULT_MAX_PLAYERS = 8;
 
 type PlayerRuntime = {
   ctrl: CharacterController;
@@ -20,10 +21,26 @@ export class GameRoom extends Room<GameState> {
   private running = false;
   private world!: RAPIER.World;
   private players = new Map<string, PlayerRuntime>();
+  private maxPlayers = DEFAULT_MAX_PLAYERS;
+
+  async onAuth(_client: Client, _options: any): Promise<boolean> {
+    // Reject joins cleanly with a message BEFORE onJoin runs.
+    const max = this.maxPlayers ?? DEFAULT_MAX_PLAYERS;
+    if (this.clients.length >= max) {
+      throw new Error(`Room is full (${max}/${max}). Try again later.`);
+    }
+    return true;
+  }
 
   async onCreate(_options: any) {
     this.setState(new GameState());
     console.log("[GameRoom] Created");
+
+    this.maxPlayers = Number(process.env.MAX_PLAYERS || DEFAULT_MAX_PLAYERS);
+    if (!Number.isFinite(this.maxPlayers) || this.maxPlayers <= 0) {
+      this.maxPlayers = DEFAULT_MAX_PLAYERS;
+    }
+    this.maxClients = this.maxPlayers;
 
     await RAPIER.init();
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
@@ -149,6 +166,12 @@ export class GameRoom extends Room<GameState> {
   }
 
   onJoin(client: Client) {
+    // Safety check (in case proxy/auth ordering differs)
+    if (this.clients.length > this.maxPlayers) {
+      client.leave(4000, `Room is full (${this.maxPlayers}/${this.maxPlayers}).`);
+      return;
+    }
+
     const schema = new PlayerState();
     schema.x = (Math.random() - 0.5) * 4;
     schema.y = 2.0;

@@ -25,20 +25,27 @@ export class NetworkManager {
   public onError?: (error: any) => void;
 
   constructor() {
-    // Configurable via Vite env vars:
+    // Configurable via Vite env vars (useful for LAN/dev overrides):
     // - VITE_WS_URL="ws://192.168.1.50:2567" (full URL, recommended)
-    // or
-    // - VITE_SERVER_HOST="192.168.1.50" and VITE_SERVER_PORT="2567"
     const explicitUrl = import.meta.env.VITE_WS_URL as string | undefined;
     if (explicitUrl) {
       this.client = new Client(explicitUrl);
       return;
     }
 
-    const protocol = location.protocol === "https:" ? "wss://" : "ws://";
-    const host = (import.meta.env.VITE_SERVER_HOST as string | undefined) || (location.hostname || "localhost");
+    // Production: use same origin (Caddy will reverse-proxy both HTTPS and WSS)
+    // Dev: default to ws://<host>:2567 since client is served by Vite on a different port.
+    const wsScheme = location.protocol === "https:" ? "wss://" : "ws://";
+    if (!import.meta.env.DEV) {
+      this.client = new Client(`${wsScheme}${location.host}`);
+      return;
+    }
+
+    const host =
+      (import.meta.env.VITE_SERVER_HOST as string | undefined) ||
+      (location.hostname || "localhost");
     const port = (import.meta.env.VITE_SERVER_PORT as string | undefined) || "2567";
-    this.client = new Client(`${protocol}${host}:${port}`);
+    this.client = new Client(`${wsScheme}${host}:${port}`);
   }
 
   public async connect(): Promise<void> {

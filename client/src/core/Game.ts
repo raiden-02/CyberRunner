@@ -33,6 +33,7 @@ export class Game {
   private debugEnabled = false; // toggle with F3
   private debugRay?: THREE.Line;
   private localCapsule?: THREE.Mesh;
+  private statusEl: HTMLDivElement;
 
   constructor() {
     // Initialize core systems
@@ -45,6 +46,25 @@ export class Game {
     new Crosshair(); // Creates and attaches to DOM
     new Level(this.renderer.scene); // Creates level geometry
     this.weaponView = new WeaponView(this.renderer.camera);
+
+    // status/error overlay (for join errors, room full, etc.)
+    this.statusEl = document.createElement("div");
+    this.statusEl.style.cssText = `
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 9999;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      font-family: monospace;
+      font-size: 14px;
+      border-radius: 6px;
+      pointer-events: none;
+      white-space: pre-line;
+    `;
+    this.statusEl.textContent = "Connecting...";
+    document.body.appendChild(this.statusEl);
 
     this.setupCallbacks();
   }
@@ -79,7 +99,14 @@ export class Game {
     this.network.onConnected = (sessionId: string) => {
       this.remotePlayers.setLocalPlayerId(sessionId);
       this.remotePlayers.setDebugEnabled(this.debugEnabled);
+      this.statusEl.style.display = "none";
       this.startInputLoop();
+    };
+
+    this.network.onError = (err) => {
+      const msg = (err as any)?.message ? String((err as any).message) : String(err);
+      this.statusEl.style.display = "block";
+      this.statusEl.textContent = `Connection failed:\n${msg}`;
     };
 
     this.network.onHealthChange = (msg) => {
