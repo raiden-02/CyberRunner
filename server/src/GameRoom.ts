@@ -8,13 +8,22 @@ import { HealthSystem } from "./systems/health-system.js";
 import { WeaponSystem } from "./systems/weapon-system.js";
 import { getWeaponConfig, isValidWeapon } from "./weapons/weapon-config.js";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { THREE_LANE_MAP, isPointInsideBox } from "./world/maps/three-lane-map.js";
 
 const TICK_RATE = 60; // Hz
 const DEFAULT_MAX_PLAYERS = 8;
 
+const MIN_SPAWN_DISTANCE = 8; // meters
+
 type PlayerRuntime = {
   ctrl: CharacterController;
   schema: PlayerState;
+};
+
+type BreakableRuntime = {
+  id: number;
+  hp: number;
+  collider: RAPIER.Collider;
 };
 
 export class GameRoom extends Room<GameState> {
@@ -22,6 +31,8 @@ export class GameRoom extends Room<GameState> {
   private world!: RAPIER.World;
   private players = new Map<string, PlayerRuntime>();
   private maxPlayers = DEFAULT_MAX_PLAYERS;
+  private breakablesByHandle = new Map<number, BreakableRuntime>();
+  private breakablesById = new Map<number, BreakableRuntime>();
 
   async onAuth(_client: Client, _options: any): Promise<boolean> {
     // Reject joins cleanly with a message BEFORE onJoin runs.
@@ -47,13 +58,17 @@ export class GameRoom extends Room<GameState> {
 
     // Ground
     this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(50, 0.1, 50).setTranslation(0, -0.1, 0).setFriction(1.0)
+      RAPIER.ColliderDesc.cuboid(
+        THREE_LANE_MAP.boundsHalfSize,
+        THREE_LANE_MAP.groundThickness,
+        THREE_LANE_MAP.boundsHalfSize
+      ).setTranslation(0, -THREE_LANE_MAP.groundThickness, 0).setFriction(1.0)
     );
 
     // Boundary walls
-    const wallHalfThickness = 0.5;
-    const wallHalfHeight = 3;
-    const halfSize = 25;
+    const wallHalfThickness = THREE_LANE_MAP.wallThickness;
+    const wallHalfHeight = THREE_LANE_MAP.wallHeight / 2;
+    const halfSize = THREE_LANE_MAP.boundsHalfSize;
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(wallHalfThickness, wallHalfHeight, halfSize)
         .setTranslation(halfSize + wallHalfThickness, wallHalfHeight, 0)
@@ -76,15 +91,38 @@ export class GameRoom extends Room<GameState> {
     );
 
     // Interior obstacles
-    for (const [x, y, z] of [
-      [0, 1, -10],
-      [10, 1, 10],
-      [-12, 1, 6],
-    ] as Array<[number, number, number]>) {
+    for (const obs of THREE_LANE_MAP.obstacles) {
       this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(2, 1, 2).setTranslation(x, y, z).setFriction(0.9)
+        RAPIER.ColliderDesc.cuboid(obs.hx, obs.hy, obs.hz)
+          .setTranslation(obs.x, obs.y, obs.z)
+          .setFriction(0.9)
       );
     }
+
+    // Occluders (taller covers)
+    for (const occ of THREE_LANE_MAP.occluders) {
+      this.world.createCollider(
+        RAPIER.ColliderDesc.cuboid(occ.hx, occ.hy, occ.hz)
+          .setTranslation(occ.x, occ.y, occ.z)
+          .setFriction(0.9)
+      );
+    }
+
+    // Breakable cover
+    THREE_LANE_MAP.breakables.forEach((b, idx) => {
+      const collider = this.world.createCollider(
+        RAPIER.ColliderDesc.cuboid(b.hx, b.hy, b.hz)
+          .setTranslation(b.x, b.y, b.z)
+          .setFriction(0.9)
+      );
+      const runtime: BreakableRuntime = {
+        id: idx,
+        hp: b.hp,
+        collider
+      };
+      this.breakablesByHandle.set(collider.handle, runtime);
+      this.breakablesById.set(idx, runtime);
+    });
 
     this.running = true;
     this.setSimulationInterval((deltaTime) => {
@@ -172,11 +210,14 @@ export class GameRoom extends Room<GameState> {
       return;
     }
 
+    const spawn = this.pickSpawnPoint();
     const schema = new PlayerState();
-    schema.x = (Math.random() - 0.5) * 4;
-    schema.y = 2.0;
-    schema.z = (Math.random() - 0.5) * 4;
+    schema.x = spawn.x;
+    schema.y = spawn.y;
+    schema.z = spawn.z;
     schema.movementState = MovementState.Walking;
+    schema.isSpawnProtected = true;
+    schema.spawnProtectionTime = 2.5;
     
     this.state.players.set(client.sessionId, schema);
 
@@ -240,19 +281,33 @@ export class GameRoom extends Room<GameState> {
 
     // Phase 0: timers (respawn + reload), no physics step yet
     for (const [sessionId, player] of this.players) {
-      const spawnPosition = {
-        x: (Math.random() - 0.5) * 4,
-        y: 2.0,
-        z: (Math.random() - 0.5) * 4
-      };
-      const respawnResult = HealthSystem.updateRespawn(player.schema, dt, spawnPosition);
-      if (respawnResult.respawned) {
-        player.ctrl.body.setTranslation({ x: player.schema.x, y: player.schema.y, z: player.schema.z }, true);
-        player.ctrl.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        player.ctrl.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      // Update spawn protection timer
+      if (!player.schema.isDead && player.schema.spawnProtectionTime > 0) {
+        player.schema.spawnProtectionTime = Math.max(0, player.schema.spawnProtectionTime - dt);
+      }
 
-        const healthMsg = HealthSystem.createHealthChangeMessage(sessionId, player.schema);
-        this.broadcast("health_change", healthMsg);
+      // Keep spawn protection active only while inside spawn volumes
+      if (!player.schema.isDead && player.schema.spawnProtectionTime > 0) {
+        const inSpawnZone = this.isInSpawnProtectionZone(player.schema.x, player.schema.y, player.schema.z);
+        player.schema.isSpawnProtected = inSpawnZone;
+      } else if (!player.schema.isDead) {
+        player.schema.isSpawnProtected = false;
+      }
+
+      if (player.schema.isDead) {
+        const spawnPosition = this.pickSpawnPoint();
+        const respawnResult = HealthSystem.updateRespawn(player.schema, dt, spawnPosition);
+        if (respawnResult.respawned) {
+          player.ctrl.body.setTranslation(
+            { x: player.schema.x, y: player.schema.y, z: player.schema.z },
+            true
+          );
+          player.ctrl.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          player.ctrl.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+          const healthMsg = HealthSystem.createHealthChangeMessage(sessionId, player.schema);
+          this.broadcast("health_change", healthMsg);
+        }
       }
 
       if (player.schema.reloading && now >= player.schema.reloadEndTime) {
@@ -350,6 +405,29 @@ export class GameRoom extends Room<GameState> {
                     );
                     this.broadcast("health_change", healthMsg);
                   }
+
+                  if (dmgResult.killed) {
+                    // Victim death
+                    hitPlayer.schema.deaths += 1;
+                    hitPlayer.schema.score = Math.max(0, hitPlayer.schema.score - 50);
+
+                    // Killer gets a kill (ignore suicides)
+                    if (shotResult.hitPlayerId !== sessionId) {
+                      const killer = this.players.get(sessionId);
+                      if (killer) {
+                        killer.schema.kills += 1;
+                        killer.schema.score += 100;
+                      }
+                    }
+                  }
+                }
+              }
+
+              // Breakable cover damage
+              if (shotResult.hitColliderHandle !== undefined && !shotResult.hitPlayerId) {
+                const hitDamage = shotResult.hitDamage ?? 0;
+                if (hitDamage > 0) {
+                  this.applyBreakableDamage(shotResult.hitColliderHandle, hitDamage);
                 }
               }
             }
@@ -357,5 +435,114 @@ export class GameRoom extends Room<GameState> {
         }
       }
     }
+  }
+
+  private pickSpawnPoint(): { x: number; y: number; z: number } {
+    const alivePositions: Array<{ x: number; y: number; z: number }> = [];
+    for (const [, player] of this.players) {
+      if (!player.schema.isDead) {
+        alivePositions.push({ x: player.schema.x, y: player.schema.y, z: player.schema.z });
+      }
+    }
+
+    if (alivePositions.length === 0) {
+      const idx = Math.floor(Math.random() * THREE_LANE_MAP.spawnPoints.length);
+      return THREE_LANE_MAP.spawnPoints[idx];
+    }
+
+    let bestPoint = THREE_LANE_MAP.spawnPoints[0];
+    let bestScore = -Infinity;
+
+    for (const point of THREE_LANE_MAP.spawnPoints) {
+      // Safety: avoid any spawn inside obstacles
+      let blocked = false;
+      for (const obs of THREE_LANE_MAP.obstacles) {
+        if (isPointInsideBox(point, obs)) {
+          blocked = true;
+          break;
+        }
+      }
+      if (!blocked) {
+        for (const occ of THREE_LANE_MAP.occluders) {
+          if (isPointInsideBox(point, occ)) {
+            blocked = true;
+            break;
+          }
+        }
+      }
+      if (!blocked) {
+        for (const br of THREE_LANE_MAP.breakables) {
+          if (isPointInsideBox(point, br)) {
+            blocked = true;
+            break;
+          }
+        }
+      }
+      if (blocked) continue;
+
+      let minDistSq = Infinity;
+      for (const pos of alivePositions) {
+        const dx = point.x - pos.x;
+        const dz = point.z - pos.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < minDistSq) minDistSq = distSq;
+      }
+      if (minDistSq > bestScore) {
+        bestScore = minDistSq;
+        bestPoint = point;
+      }
+    }
+
+    if (bestScore < MIN_SPAWN_DISTANCE * MIN_SPAWN_DISTANCE) {
+      // If all spawns are close, randomize among top few to avoid predictability.
+      const sorted = [...THREE_LANE_MAP.spawnPoints].sort((a, b) => {
+        const aScore = alivePositions.reduce((min, pos) => {
+          const dx = a.x - pos.x;
+          const dz = a.z - pos.z;
+          return Math.min(min, dx * dx + dz * dz);
+        }, Infinity);
+        const bScore = alivePositions.reduce((min, pos) => {
+          const dx = b.x - pos.x;
+          const dz = b.z - pos.z;
+          return Math.min(min, dx * dx + dz * dz);
+        }, Infinity);
+        return bScore - aScore;
+      });
+      const pick = sorted[Math.floor(Math.random() * Math.min(3, sorted.length))];
+      return pick;
+    }
+
+    if (bestScore === -Infinity) {
+      const idx = Math.floor(Math.random() * THREE_LANE_MAP.spawnPoints.length);
+      return THREE_LANE_MAP.spawnPoints[idx];
+    }
+
+    return bestPoint;
+  }
+
+  private isInSpawnProtectionZone(x: number, y: number, z: number): boolean {
+    return THREE_LANE_MAP.spawnProtectionZones.some((zone) =>
+      x >= zone.x - zone.hx &&
+      x <= zone.x + zone.hx &&
+      z >= zone.z - zone.hz &&
+      z <= zone.z + zone.hz &&
+      y >= zone.y - zone.hy &&
+      y <= zone.y + zone.hy
+    );
+  }
+
+  private applyBreakableDamage(colliderHandle: number, damage: number): void {
+    const runtime = this.breakablesByHandle.get(colliderHandle);
+    if (!runtime) return;
+
+    runtime.hp -= damage;
+    if (runtime.hp > 0) return;
+
+    // Destroy breakable collider
+    this.world.removeCollider(runtime.collider, false);
+    this.breakablesByHandle.delete(colliderHandle);
+    this.breakablesById.delete(runtime.id);
+
+    this.broadcast("breakable_destroyed", { id: runtime.id });
   }
 }

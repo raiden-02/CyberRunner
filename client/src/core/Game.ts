@@ -8,6 +8,8 @@ import { HUD } from "../ui/HUD.js";
 import { Crosshair } from "../ui/Crosshair.js";
 import { Level } from "../world/Level.js";
 import { WeaponView } from "../weapons/weapon-loader.js";
+import { Scoreboard } from "../ui/Scoreboard.js";
+import { Skybox } from "../world/Skybox.js";
 
 const INPUT_SEND_RATE = 60; // Hz - how often we send inputs to server
 const DEBUG_RAY_LENGTH = 75;
@@ -26,7 +28,10 @@ export class Game {
   private localPlayer: LocalPlayer;
   private remotePlayers: RemotePlayers;
   private hud: HUD;
+  private scoreboard: Scoreboard;
   private weaponView: WeaponView;
+  private level: Level;
+  private skybox: Skybox;
 
   private currentWeaponId = "AR_1";
   private lastTime = performance.now();
@@ -48,6 +53,9 @@ export class Game {
   private debugRay?: THREE.Line;
   private localCapsule?: THREE.Mesh;
   private statusEl: HTMLDivElement;
+  private fpsEl: HTMLDivElement;
+  private fpsAccumMs = 0;
+  private fpsFrames = 0;
 
   constructor() {
     this.renderer = new GameRenderer();
@@ -56,9 +64,12 @@ export class Game {
     this.localPlayer = new LocalPlayer(this.renderer.camera);
     this.remotePlayers = new RemotePlayers(this.renderer.scene);
     this.hud = new HUD();
+    this.scoreboard = new Scoreboard();
     new Crosshair();
-    new Level(this.renderer.scene);
+    this.level = new Level(this.renderer.scene);
     this.weaponView = new WeaponView(this.renderer.camera);
+    this.skybox = new Skybox(this.renderer.scene);
+    this.skybox.loadFromFolder("/skybox/cyberpunk").catch(() => undefined);
 
     // Status overlay
     this.statusEl = document.createElement("div");
@@ -78,6 +89,24 @@ export class Game {
     `;
     this.statusEl.textContent = "Connecting...";
     document.body.appendChild(this.statusEl);
+
+    // FPS overlay
+    this.fpsEl = document.createElement("div");
+    this.fpsEl.style.cssText = `
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 9999;
+      padding: 6px 8px;
+      background: rgba(0,0,0,0.45);
+      color: #9cff9c;
+      font-family: monospace;
+      font-size: 12px;
+      border-radius: 6px;
+      pointer-events: none;
+    `;
+    this.fpsEl.textContent = "FPS: --";
+    document.body.appendChild(this.fpsEl);
 
     this.setupCallbacks();
   }
@@ -133,6 +162,10 @@ export class Game {
 
     this.network.onShotFired = (_msg) => {
       // Visual effects can be added here
+    };
+
+    this.network.onBreakableDestroyed = (msg) => {
+      this.level.destroyBreakable(msg.id);
     };
   }
 
@@ -198,6 +231,16 @@ export class Game {
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.lastTime)) / 1000;
     this.lastTime = now;
+
+    // FPS (update ~2x per second)
+    this.fpsAccumMs += dt * 1000;
+    this.fpsFrames += 1;
+    if (this.fpsAccumMs >= 500) {
+      const fps = (this.fpsFrames / this.fpsAccumMs) * 1000;
+      this.fpsEl.textContent = `FPS: ${Math.round(fps)}`;
+      this.fpsAccumMs = 0;
+      this.fpsFrames = 0;
+    }
 
     // Update camera rotation (always smooth, runs every frame)
     this.updateCameraRotation();
@@ -290,6 +333,13 @@ export class Game {
         this.localPlayer.respawnTime,
         serverPlayer.reloading
       );
+    }
+
+    // Scoreboard (hold Tab)
+    const showScoreboard = this.input.isKeyDown("Tab");
+    this.scoreboard.setVisible(showScoreboard);
+    if (showScoreboard && players) {
+      this.scoreboard.update(players, myId);
     }
 
     // Apply local player position to camera

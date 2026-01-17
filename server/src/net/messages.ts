@@ -56,3 +56,6 @@ export type HealthChangeMsg = {
   respawnTime?: number;
 };
 
+export type BreakableDestroyedMsg = {
+  id: number;
+};

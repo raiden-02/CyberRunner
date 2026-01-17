@@ -17,6 +17,9 @@ export class HealthSystem {
     if (player.isDead) {
       return { damaged: false, killed: false, newHealth: player.health };
     }
+    if (player.isSpawnProtected) {
+      return { damaged: false, killed: false, newHealth: player.health };
+    }
 
     const dmg = Math.max(0, Math.round(damage));
     const oldHealth = player.health;
@@ -69,6 +72,8 @@ export class HealthSystem {
       player.isDead = false;
       player.health = player.maxHealth;
       player.respawnTime = 0;
+      player.isSpawnProtected = true;
+      player.spawnProtectionTime = 2.5;
       
       // Reset position
       player.x = spawnPosition.x;

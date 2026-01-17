@@ -35,6 +35,13 @@ export class PlayerState extends Schema {
   @type("uint8") maxHealth: number = 100;
   @type("boolean") isDead: boolean = false;
   @type("number") respawnTime: number = 0; // Time until respawn (0 if alive)
+  @type("boolean") isSpawnProtected: boolean = false;
+  @type("number") spawnProtectionTime: number = 0;
+
+  // Scoreboard stats
+  @type("uint16") kills: number = 0;
+  @type("uint16") deaths: number = 0;
+  @type("uint32") score: number = 0;
   
   // Weapon state
   @type("string") equippedWeapon: string = "AR_1";

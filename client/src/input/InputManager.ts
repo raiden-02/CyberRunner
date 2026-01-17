@@ -97,7 +97,7 @@ export class InputManager {
   }
 
   private onKeyDown(e: KeyboardEvent): void {
-    if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
+    if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].includes(e.code)) {
       e.preventDefault();
     }
 
@@ -138,6 +138,9 @@ export class InputManager {
   }
 
   private onKeyUp(e: KeyboardEvent): void {
+    if (e.code === "Tab") {
+      e.preventDefault();
+    }
     this.keys[e.code] = false;
   }
 

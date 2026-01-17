@@ -19,10 +19,14 @@ export class GameRenderer {
     // Create renderer
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
 
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x101010);
+    this.scene.fog = new THREE.Fog(0x0d0f12, 35, 110);
 
     // Create camera
     this.camera = new THREE.PerspectiveCamera(
@@ -43,11 +47,15 @@ export class GameRenderer {
   }
 
   private setupLights(): void {
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    const ambientLight = new THREE.AmbientLight(0x20242a, 0.8);
     this.scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.4);
+    const hemiLight = new THREE.HemisphereLight(0x8aa6ff, 0x0b0f14, 0.55);
     this.scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xd9f2ff, 1.1);
+    dirLight.position.set(10, 20, -5);
+    this.scene.add(dirLight);
   }
 
   private onResize(): void {

@@ -9,6 +9,7 @@ export interface HitResult {
   distance?: number;
   point?: { x: number; y: number; z: number };
   normal?: { x: number; y: number; z: number };
+  colliderHandle?: number;
 }
 
 export class WeaponSystem {
@@ -122,7 +123,8 @@ export class WeaponSystem {
           playerId,
           distance: bestToi,
           point: { x: hitPoint.x, y: hitPoint.y, z: hitPoint.z },
-          normal: { x: normal.x, y: normal.y, z: normal.z }
+          normal: { x: normal.x, y: normal.y, z: normal.z },
+          colliderHandle: collider.handle
         };
       }
     }
@@ -132,7 +134,8 @@ export class WeaponSystem {
       hit: true,
       distance: bestToi,
       point: { x: hitPoint.x, y: hitPoint.y, z: hitPoint.z },
-      normal: { x: normal.x, y: normal.y, z: normal.z }
+      normal: { x: normal.x, y: normal.y, z: normal.z },
+      colliderHandle: collider.handle
     };
   }
 
@@ -147,7 +150,14 @@ export class WeaponSystem {
     direction: { x: number; y: number; z: number },
     players: Map<string, { schema: PlayerState; ctrl: any }>,
     serverTime: number
-  ): { shotFired: boolean; hitPlayerId?: string; damage?: number; shotMsg?: ShotFiredMsg } {
+  ): {
+    shotFired: boolean;
+    hitPlayerId?: string;
+    damage?: number;
+    hitColliderHandle?: number;
+    hitDamage?: number;
+    shotMsg?: ShotFiredMsg;
+  } {
     const config = getWeaponConfig(shooter.equippedWeapon);
     if (!config) {
       console.error(`Unknown weapon: ${shooter.equippedWeapon}`);
@@ -207,6 +217,7 @@ export class WeaponSystem {
           shotFired: true,
           hitPlayerId: hitResult.playerId,
           damage,
+          hitColliderHandle: hitResult.colliderHandle,
           shotMsg: {
             shooterId,
             weaponId: config.id,
@@ -220,6 +231,8 @@ export class WeaponSystem {
       // Shot fired but didn't hit a player
       return {
         shotFired: true,
+        hitColliderHandle: hitResult.colliderHandle,
+        hitDamage: Math.max(0, Math.round(config.damage)),
         shotMsg: {
           shooterId,
           weaponId: config.id,

@@ -15,12 +15,17 @@ export interface ShotFiredMessage {
   direction: { x: number; y: number; z: number };
 }
 
+export interface BreakableDestroyedMessage {
+  id: number;
+}
+
 export class NetworkManager {
   private client: Client;
   private room?: Room;
   
   public onHealthChange?: (msg: HealthChangeMessage) => void;
   public onShotFired?: (msg: ShotFiredMessage) => void;
+  public onBreakableDestroyed?: (msg: BreakableDestroyedMessage) => void;
   public onConnected?: (sessionId: string) => void;
   public onError?: (error: any) => void;
 
@@ -78,6 +83,12 @@ export class NetworkManager {
     this.room.onMessage("shot_fired", (msg: ShotFiredMessage) => {
       if (this.onShotFired) {
         this.onShotFired(msg);
+      }
+    });
+
+    this.room.onMessage("breakable_destroyed", (msg: BreakableDestroyedMessage) => {
+      if (this.onBreakableDestroyed) {
+        this.onBreakableDestroyed(msg);
       }
     });
   }
