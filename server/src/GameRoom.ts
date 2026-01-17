@@ -278,6 +278,12 @@ export class GameRoom extends Room<GameState> {
         player.schema.y = pos.y;
         player.schema.z = pos.z;
 
+        // Ack the latest input seq that was actually used for movement this tick.
+        // (Updating ack here avoids mismatches where onMessage updates ack asynchronously
+        // but the player's position is still from a different simulation step.)
+        player.schema.lastProcessedInputSeq =
+          (player.ctrl.input as any)?.seq ?? player.schema.lastProcessedInputSeq;
+
         player.schema.velX = 0;
         player.schema.velY = 0;
         player.schema.velZ = 0;

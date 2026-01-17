@@ -1,5 +1,8 @@
 // Network input message types
 export type InputMsg = {
+  // Client input sequence number (monotonic increasing).
+  // Used for server->client ack so the client can reconcile via rewind+replay.
+  seq: number;
   // axes in local space
   moveX: number; // strafe -1..1 (A/D keys)
   moveZ: number; // forward -1..1 (W/S keys)

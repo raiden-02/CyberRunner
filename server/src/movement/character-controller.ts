@@ -17,6 +17,7 @@ export class CharacterController implements CharacterDeps {
   private _friction = 0.5;
 
   public input: InputMsg = {
+    seq: 0,
     moveX: 0,
     moveZ: 0,
     lookYaw: 0,

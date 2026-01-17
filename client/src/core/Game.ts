@@ -9,10 +9,15 @@ import { Crosshair } from "../ui/Crosshair.js";
 import { Level } from "../world/Level.js";
 import { WeaponView } from "../weapons/weapon-loader.js";
 
-const INPUT_SEND_RATE = 20; // Hz
-const CAPSULE_HALF = 0.9; // keep in sync with server
-const CAPSULE_RADIUS = 0.35; // keep in sync with server
+const INPUT_SEND_RATE = 60; // Hz - how often we send inputs to server
 const DEBUG_RAY_LENGTH = 75;
+const CAPSULE_RADIUS = 0.35;
+const CAPSULE_HALF = 0.9;
+
+// Sprint camera effect
+const BASE_FOV = 75;
+const SPRINT_FOV = 85;
+const FOV_LERP_SPEED = 8; // How fast FOV transitions
 
 export class Game {
   private renderer: GameRenderer;
@@ -30,24 +35,32 @@ export class Game {
   private inputIntervalId: number | undefined;
   private prevFiring = false;
 
-  private debugEnabled = false; // toggle with F3
+  // Input sequence for server reconciliation
+  private inputSeq = 0;
+
+  // Track if we've received initial server position
+  private hasInitialPosition = false;
+
+  // Sprint camera effect
+  private currentFov = BASE_FOV;
+
+  private debugEnabled = false;
   private debugRay?: THREE.Line;
   private localCapsule?: THREE.Mesh;
   private statusEl: HTMLDivElement;
 
   constructor() {
-    // Initialize core systems
     this.renderer = new GameRenderer();
     this.input = new InputManager(this.renderer.canvas, this.renderer.camera);
     this.network = new NetworkManager();
     this.localPlayer = new LocalPlayer(this.renderer.camera);
     this.remotePlayers = new RemotePlayers(this.renderer.scene);
     this.hud = new HUD();
-    new Crosshair(); // Creates and attaches to DOM
-    new Level(this.renderer.scene); // Creates level geometry
+    new Crosshair();
+    new Level(this.renderer.scene);
     this.weaponView = new WeaponView(this.renderer.camera);
 
-    // status/error overlay (for join errors, room full, etc.)
+    // Status overlay
     this.statusEl = document.createElement("div");
     this.statusEl.style.cssText = `
       position: fixed;
@@ -70,7 +83,6 @@ export class Game {
   }
 
   private setupCallbacks(): void {
-    // Input callbacks
     this.input.onWeaponSwitch = (weaponId: string) => {
       this.currentWeaponId = weaponId;
       this.weaponView.switchWeapon(weaponId).catch(console.error);
@@ -95,12 +107,11 @@ export class Game {
       if (this.debugRay) this.debugRay.visible = this.debugEnabled;
     };
 
-    // Network callbacks
     this.network.onConnected = (sessionId: string) => {
       this.remotePlayers.setLocalPlayerId(sessionId);
       this.remotePlayers.setDebugEnabled(this.debugEnabled);
       this.statusEl.style.display = "none";
-      this.startInputLoop();
+      this.startInputSendLoop();
     };
 
     this.network.onError = (err) => {
@@ -121,7 +132,7 @@ export class Game {
     };
 
     this.network.onShotFired = (_msg) => {
-      // Visual effects can be added here (muzzle flash, tracer, impact)
+      // Visual effects can be added here
     };
   }
 
@@ -130,24 +141,25 @@ export class Game {
     this.running = true;
 
     // Load initial weapon
+    this.statusEl.textContent = "Loading weapons...";
     await this.weaponView.switchWeapon("AR_1");
     this.hud.setWeapon("AR_1");
     this.hud.update();
 
     // Connect to server
+    this.statusEl.textContent = "Connecting...";
     await this.network.connect();
 
-    // Apply camera rotation
     this.updateCameraRotation();
-
-    // Start game loop
     this.animate();
   }
 
-  private startInputLoop(): void {
+  /**
+   * Send inputs to server at fixed rate (separate from rendering).
+   */
+  private startInputSendLoop(): void {
     if (this.inputIntervalId !== undefined) {
       window.clearInterval(this.inputIntervalId);
-      this.inputIntervalId = undefined;
     }
 
     this.inputIntervalId = window.setInterval(() => {
@@ -155,8 +167,8 @@ export class Game {
 
       const state = this.input.getState();
 
-      // Send movement input
-      this.network.sendInput({
+      const inputMsg = {
+        seq: ++this.inputSeq,
         moveX: state.moveX,
         moveZ: state.moveZ,
         lookYaw: state.yaw,
@@ -167,22 +179,9 @@ export class Game {
         crouchHeld: state.crouchHeld,
         jumpPressed: state.jumpPressed,
         dashPressed: state.dashPressed
-      });
+      };
 
-      // Send fire input if firing
-      const canFire = !this.localPlayer.isReloading && !this.localPlayer.isDead;
-      const firingNow = state.firing && canFire;
-
-      // Send "fire start/continue" while firing, and importantly, send "fire stop" on release/unlock.
-      if (firingNow || this.prevFiring !== firingNow) {
-        this.network.sendFireInput(firingNow, {
-          x: state.aimDir.x,
-          y: state.aimDir.y,
-          z: state.aimDir.z
-        });
-      }
-
-      this.prevFiring = firingNow;
+      this.network.sendInput(inputMsg);
     }, 1000 / INPUT_SEND_RATE);
   }
 
@@ -200,12 +199,32 @@ export class Game {
     const dt = Math.min(100, Math.max(0, now - this.lastTime)) / 1000;
     this.lastTime = now;
 
-    // Update camera rotation from input
+    // Update camera rotation (always smooth, runs every frame)
     this.updateCameraRotation();
 
-    // Update local player
-    const keys = this.getKeys();
-    this.localPlayer.update(dt, keys, this.input.yaw);
+    // Get current input state for local prediction
+    const inputState = this.input.getState();
+
+    // Update local player movement EVERY FRAME (no fixed timestep!)
+    this.localPlayer.update(dt, {
+      moveX: inputState.moveX,
+      moveZ: inputState.moveZ,
+      yaw: inputState.yaw,
+      sprint: inputState.sprint,
+      jump: inputState.jumpPressed
+    });
+
+    // Handle firing (check every frame)
+    const canFire = !this.localPlayer.isReloading && !this.localPlayer.isDead;
+    const firingNow = inputState.firing && canFire;
+    if (this.network.connected && (firingNow || this.prevFiring !== firingNow)) {
+      this.network.sendFireInput(firingNow, {
+        x: inputState.aimDir.x,
+        y: inputState.aimDir.y,
+        z: inputState.aimDir.z
+      });
+    }
+    this.prevFiring = firingNow;
 
     // Update weapon view
     this.weaponView.update(dt);
@@ -216,10 +235,9 @@ export class Game {
     const players = state?.players;
     const myId = this.network.sessionId;
 
-    // Update remote players
     this.remotePlayers.update(dt, players);
 
-    // Get local player from server state
+    // Find local player in server state and reconcile
     let serverPlayer: any;
     if (players && typeof players.forEach === "function") {
       players.forEach((p: any, id: string) => {
@@ -230,21 +248,28 @@ export class Game {
       });
     }
 
-    // Server reconciliation
     if (serverPlayer) {
+      // Initialize position on first server state
+      if (!this.hasInitialPosition) {
+        this.localPlayer.setInitialPosition(serverPlayer.x, serverPlayer.y, serverPlayer.z);
+        this.hasInitialPosition = true;
+      }
+
+      // Reconcile with server (smooth blend toward authoritative position)
       this.localPlayer.reconcileWithServer(
         serverPlayer.x,
         serverPlayer.y,
-        serverPlayer.z
+        serverPlayer.z,
+        dt
       );
 
-      // Authoritative health from replicated server state (events are optional FX only)
+      // Authoritative health
       this.localPlayer.health = serverPlayer.health;
       this.localPlayer.maxHealth = serverPlayer.maxHealth;
       this.localPlayer.isDead = serverPlayer.isDead;
       this.localPlayer.respawnTime = serverPlayer.respawnTime || 0;
 
-      // Debug: show local collision capsule (server-authoritative position)
+      // Debug capsule (shows server position)
       if (this.debugEnabled) {
         this.ensureLocalCapsule();
         if (this.localCapsule) {
@@ -267,22 +292,27 @@ export class Game {
       );
     }
 
-    // Apply camera position
+    // Apply local player position to camera
     this.localPlayer.applyToCamera();
 
-    // Debug: draw raycast line (client aim ray)
-    this.updateDebugRay();
+    // Sprint FOV effect - smooth transition
+    const isSprinting = inputState.sprint && 
+      (Math.abs(inputState.moveX) > 0.1 || Math.abs(inputState.moveZ) > 0.1) && 
+      !this.localPlayer.isDead;
+    const targetFov = isSprinting ? SPRINT_FOV : BASE_FOV;
+    this.currentFov += (targetFov - this.currentFov) * Math.min(1, dt * FOV_LERP_SPEED);
+    this.renderer.camera.fov = this.currentFov;
+    this.renderer.camera.updateProjectionMatrix();
 
-    // Render
+    this.updateDebugRay();
     this.renderer.render();
   };
 
   private ensureLocalCapsule(): void {
     if (this.localCapsule) return;
-
-    const capsuleGeom = new THREE.CapsuleGeometry(CAPSULE_RADIUS, CAPSULE_HALF * 2, 6, 12);
-    const capsuleMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
-    this.localCapsule = new THREE.Mesh(capsuleGeom, capsuleMat);
+    const geom = new THREE.CapsuleGeometry(CAPSULE_RADIUS, CAPSULE_HALF * 2, 6, 12);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
+    this.localCapsule = new THREE.Mesh(geom, mat);
     this.localCapsule.visible = this.debugEnabled;
     this.renderer.scene.add(this.localCapsule);
   }
@@ -292,8 +322,6 @@ export class Game {
       if (this.debugRay) this.debugRay.visible = false;
       return;
     }
-
-    // Only show when pointer-locked (aiming)
     if (!this.input.isPointerLocked()) {
       if (this.debugRay) this.debugRay.visible = false;
       return;
@@ -319,15 +347,6 @@ export class Game {
     posAttr.setXYZ(0, origin.x, origin.y, origin.z);
     posAttr.setXYZ(1, end.x, end.y, end.z);
     posAttr.needsUpdate = true;
-  }
-
-  private getKeys(): Record<string, boolean> {
-    return {
-      KeyW: this.input.isKeyDown("KeyW"),
-      KeyS: this.input.isKeyDown("KeyS"),
-      KeyA: this.input.isKeyDown("KeyA"),
-      KeyD: this.input.isKeyDown("KeyD")
-    };
   }
 
   public stop(): void {

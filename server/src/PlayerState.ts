@@ -17,6 +17,9 @@ export class PlayerState extends Schema {
   @type("number") z: number = 0;
   @type("number") rotationY: number = 0;
   @type("number") pitch: number = 0;  // Camera pitch for weapon aiming
+  // Server ack: last input sequence number processed/accepted for this player.
+  // Client uses this to reconcile predicted movement.
+  @type("number") lastProcessedInputSeq: number = 0;
   @type("number") velX: number = 0;
   @type("number") velY: number = 0;
   @type("number") velZ: number = 0;
