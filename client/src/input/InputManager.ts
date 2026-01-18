@@ -12,6 +12,7 @@ export interface InputState {
   jumpPressed: boolean;
   dashPressed: boolean;
   firing: boolean;
+  aiming: boolean;
   aimDir: THREE.Vector3;
 }
 
@@ -22,6 +23,7 @@ export class InputManager {
   private keys: Record<string, boolean> = {};
   private sprintToggle = false;
   private isMouseDown = false;
+  private isRightMouseDown = false;
   
   public yaw = 0;
   public pitch = 0;
@@ -60,11 +62,17 @@ export class InputManager {
     if (e.button === 0 && document.pointerLockElement === this.canvas) {
       this.isMouseDown = true;
     }
+    if (e.button === 2 && document.pointerLockElement === this.canvas) {
+      this.isRightMouseDown = true;
+    }
   };
 
   private handleMouseUp = (e: MouseEvent): void => {
     if (e.button === 0) {
       this.isMouseDown = false;
+    }
+    if (e.button === 2) {
+      this.isRightMouseDown = false;
     }
   };
 
@@ -82,6 +90,7 @@ export class InputManager {
   private setupEventListeners(): void {
     // Pointer lock
     this.canvas.addEventListener("click", this.handleCanvasClick);
+    this.canvas.addEventListener("contextmenu", this.handleContextMenu);
 
     // Mouse buttons
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
@@ -96,6 +105,10 @@ export class InputManager {
     document.addEventListener("keyup", this.handleKeyUp);
   }
 
+  private handleContextMenu = (e: MouseEvent): void => {
+    e.preventDefault();
+  };
+
   private onKeyDown(e: KeyboardEvent): void {
     if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].includes(e.code)) {
       e.preventDefault();
@@ -109,12 +122,16 @@ export class InputManager {
       this.sprintToggle = !this.sprintToggle;
     }
 
-    // Weapon switching
+    // Weapon switching (8 weapon slots)
     const weaponKeys: Record<string, string> = {
-      "Digit1": "AR_1",
-      "Digit2": "Pistol_1",
-      "Digit3": "AR_2",
-      "Digit4": "Sniper_1"
+      "Digit1": "AR_1",       // Assault Rifle
+      "Digit2": "SMG_1",      // SMG
+      "Digit3": "SHOTGUN_1",  // Shotgun
+      "Digit4": "LMG_1",      // LMG
+      "Digit5": "SNIPER_1",   // Sniper
+      "Digit6": "PISTOL_1",   // Pistol
+      "Digit7": "ROCKET_1",   // Rocket Launcher
+      "Digit8": "GL_1"        // Grenade Launcher
     };
 
     if (weaponKeys[e.code] && this.onWeaponSwitch) {
@@ -188,6 +205,7 @@ export class InputManager {
       jumpPressed,
       dashPressed,
       firing: this.isMouseDown && document.pointerLockElement === this.canvas,
+      aiming: this.isRightMouseDown && document.pointerLockElement === this.canvas,
       aimDir
     };
   }
@@ -201,6 +219,7 @@ export class InputManager {
     this.disposed = true;
 
     this.canvas.removeEventListener("click", this.handleCanvasClick);
+    this.canvas.removeEventListener("contextmenu", this.handleContextMenu);
     this.canvas.removeEventListener("mousedown", this.handleMouseDown);
     this.canvas.removeEventListener("mouseup", this.handleMouseUp);
     document.removeEventListener("mousemove", this.handleMouseMove);

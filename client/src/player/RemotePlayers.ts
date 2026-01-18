@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { ThirdPersonWeaponView } from "../weapons/weapon-loader.js";
+import { ThirdPersonWeaponView } from "../weapons/third-person-view.js";
+import { resolveWeaponDefinition } from "../weapons/definitions.js";
 
 const CAPSULE_HALF = 0.9;
 const CAPSULE_RADIUS = 0.35;
@@ -93,7 +94,7 @@ export class RemotePlayers {
       // Create weapon view
       const weaponView = new ThirdPersonWeaponView(root);
       if (player.equippedWeapon) {
-        weaponView.switchWeapon(player.equippedWeapon).catch(console.error);
+        weaponView.switchWeapon(player.equippedWeapon);
       }
 
       data = { root, body, debugCapsule, weaponView, targetPos, targetRotY };
@@ -104,8 +105,11 @@ export class RemotePlayers {
       data.targetRotY = targetRotY;
 
       // Update weapon if changed
-      if (player.equippedWeapon && data.weaponView.getCurrentWeaponId() !== player.equippedWeapon) {
-        data.weaponView.switchWeapon(player.equippedWeapon).catch(console.error);
+      if (player.equippedWeapon) {
+        const resolved = resolveWeaponDefinition(player.equippedWeapon)?.id || player.equippedWeapon;
+        if (data.weaponView.getCurrentWeaponId() !== resolved) {
+          data.weaponView.switchWeapon(player.equippedWeapon);
+        }
       }
 
       // Update weapon look direction

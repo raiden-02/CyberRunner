@@ -5,21 +5,18 @@ import { NetworkManager } from "../network/NetworkManager.js";
 import { LocalPlayer } from "../player/LocalPlayer.js";
 import { RemotePlayers } from "../player/RemotePlayers.js";
 import { HUD } from "../ui/HUD.js";
-import { Crosshair } from "../ui/Crosshair.js";
 import { Level } from "../world/Level.js";
-import { WeaponView } from "../weapons/weapon-loader.js";
+import { WeaponSystem } from "../weapons/weapon-system.js";
 import { Scoreboard } from "../ui/Scoreboard.js";
 import { Skybox } from "../world/Skybox.js";
 
-const INPUT_SEND_RATE = 60; // Hz - how often we send inputs to server
+const INPUT_SEND_RATE = 60;
 const DEBUG_RAY_LENGTH = 75;
 const CAPSULE_RADIUS = 0.35;
 const CAPSULE_HALF = 0.9;
-
-// Sprint camera effect
 const BASE_FOV = 75;
 const SPRINT_FOV = 85;
-const FOV_LERP_SPEED = 8; // How fast FOV transitions
+const FOV_LERP_SPEED = 8;
 
 export class Game {
   private renderer: GameRenderer;
@@ -29,24 +26,17 @@ export class Game {
   private remotePlayers: RemotePlayers;
   private hud: HUD;
   private scoreboard: Scoreboard;
-  private weaponView: WeaponView;
+  private weaponSystem: WeaponSystem;
   private level: Level;
   private skybox: Skybox;
 
-  private currentWeaponId = "AR_1";
   private lastTime = performance.now();
   private running = false;
   private rafId: number | undefined;
   private inputIntervalId: number | undefined;
-  private prevFiring = false;
 
-  // Input sequence for server reconciliation
   private inputSeq = 0;
-
-  // Track if we've received initial server position
   private hasInitialPosition = false;
-
-  // Sprint camera effect
   private currentFov = BASE_FOV;
 
   private debugEnabled = false;
@@ -65,13 +55,23 @@ export class Game {
     this.remotePlayers = new RemotePlayers(this.renderer.scene);
     this.hud = new HUD();
     this.scoreboard = new Scoreboard();
-    new Crosshair();
     this.level = new Level(this.renderer.scene);
-    this.weaponView = new WeaponView(this.renderer.camera);
+    this.weaponSystem = new WeaponSystem(this.renderer.camera, {
+      onFireInput: (firing, aimDir) => {
+        if (this.network.connected) {
+          this.network.sendFireInput(firing, aimDir);
+        }
+      },
+      onWeaponSwitch: (weaponId) => {
+        this.network.sendWeaponSwitch(weaponId);
+      },
+      onReload: (weaponId) => {
+        this.network.sendReload(weaponId);
+      }
+    });
     this.skybox = new Skybox(this.renderer.scene);
     this.skybox.loadFromFolder("/skybox/cyberpunk").catch(() => undefined);
 
-    // Status overlay
     this.statusEl = document.createElement("div");
     this.statusEl.style.cssText = `
       position: fixed;
@@ -90,7 +90,6 @@ export class Game {
     this.statusEl.textContent = "Connecting...";
     document.body.appendChild(this.statusEl);
 
-    // FPS overlay
     this.fpsEl = document.createElement("div");
     this.fpsEl.style.cssText = `
       position: fixed;
@@ -113,14 +112,12 @@ export class Game {
 
   private setupCallbacks(): void {
     this.input.onWeaponSwitch = (weaponId: string) => {
-      this.currentWeaponId = weaponId;
-      this.weaponView.switchWeapon(weaponId).catch(console.error);
-      this.network.sendWeaponSwitch(weaponId);
+      this.weaponSystem.switchWeapon(weaponId);
       this.hud.setWeapon(weaponId);
     };
 
     this.input.onReload = () => {
-      this.network.sendReload(this.currentWeaponId);
+      this.weaponSystem.startReload(performance.now() / 1000);
     };
 
     this.input.onDebugDamage = () => {
@@ -160,9 +157,7 @@ export class Game {
       }
     };
 
-    this.network.onShotFired = (_msg) => {
-      // Visual effects can be added here
-    };
+    this.network.onShotFired = (_msg) => {};
 
     this.network.onBreakableDestroyed = (msg) => {
       this.level.destroyBreakable(msg.id);
@@ -173,13 +168,11 @@ export class Game {
     if (this.running) return;
     this.running = true;
 
-    // Load initial weapon
     this.statusEl.textContent = "Loading weapons...";
-    await this.weaponView.switchWeapon("AR_1");
+    this.weaponSystem.switchWeapon("AR_1");
     this.hud.setWeapon("AR_1");
     this.hud.update();
 
-    // Connect to server
     this.statusEl.textContent = "Connecting...";
     await this.network.connect();
 
@@ -187,9 +180,6 @@ export class Game {
     this.animate();
   }
 
-  /**
-   * Send inputs to server at fixed rate (separate from rendering).
-   */
   private startInputSendLoop(): void {
     if (this.inputIntervalId !== undefined) {
       window.clearInterval(this.inputIntervalId);
@@ -232,7 +222,6 @@ export class Game {
     const dt = Math.min(100, Math.max(0, now - this.lastTime)) / 1000;
     this.lastTime = now;
 
-    // FPS (update ~2x per second)
     this.fpsAccumMs += dt * 1000;
     this.fpsFrames += 1;
     if (this.fpsAccumMs >= 500) {
@@ -242,13 +231,9 @@ export class Game {
       this.fpsFrames = 0;
     }
 
-    // Update camera rotation (always smooth, runs every frame)
     this.updateCameraRotation();
-
-    // Get current input state for local prediction
     const inputState = this.input.getState();
 
-    // Update local player movement EVERY FRAME (no fixed timestep!)
     this.localPlayer.update(dt, {
       moveX: inputState.moveX,
       moveZ: inputState.moveZ,
@@ -257,30 +242,20 @@ export class Game {
       jump: inputState.jumpPressed
     });
 
-    // Handle firing (check every frame)
     const canFire = !this.localPlayer.isReloading && !this.localPlayer.isDead;
     const firingNow = inputState.firing && canFire;
-    if (this.network.connected && (firingNow || this.prevFiring !== firingNow)) {
-      this.network.sendFireInput(firingNow, {
-        x: inputState.aimDir.x,
-        y: inputState.aimDir.y,
-        z: inputState.aimDir.z
-      });
-    }
-    this.prevFiring = firingNow;
+    this.weaponSystem.setFiring(firingNow);
+    this.weaponSystem.setAiming(inputState.aiming);
 
-    // Update weapon view
-    this.weaponView.update(dt);
-    this.weaponView.setVisible(!this.localPlayer.isDead);
+    this.weaponSystem.update(dt, now / 1000, inputState.aimDir);
+    this.weaponSystem.setVisible(!this.localPlayer.isDead);
 
-    // Get server state
     const state = this.network.state;
     const players = state?.players;
     const myId = this.network.sessionId;
 
     this.remotePlayers.update(dt, players);
 
-    // Find local player in server state and reconcile
     let serverPlayer: any;
     if (players && typeof players.forEach === "function") {
       players.forEach((p: any, id: string) => {
@@ -292,27 +267,18 @@ export class Game {
     }
 
     if (serverPlayer) {
-      // Initialize position on first server state
       if (!this.hasInitialPosition) {
         this.localPlayer.setInitialPosition(serverPlayer.x, serverPlayer.y, serverPlayer.z);
         this.hasInitialPosition = true;
       }
 
-      // Reconcile with server (smooth blend toward authoritative position)
-      this.localPlayer.reconcileWithServer(
-        serverPlayer.x,
-        serverPlayer.y,
-        serverPlayer.z,
-        dt
-      );
+      this.localPlayer.reconcileWithServer(serverPlayer.x, serverPlayer.y, serverPlayer.z, dt);
 
-      // Authoritative health
       this.localPlayer.health = serverPlayer.health;
       this.localPlayer.maxHealth = serverPlayer.maxHealth;
       this.localPlayer.isDead = serverPlayer.isDead;
       this.localPlayer.respawnTime = serverPlayer.respawnTime || 0;
 
-      // Debug capsule (shows server position)
       if (this.debugEnabled) {
         this.ensureLocalCapsule();
         if (this.localCapsule) {
@@ -323,7 +289,6 @@ export class Game {
         this.localCapsule.visible = false;
       }
 
-      // Update HUD
       this.hud.update(
         serverPlayer.ammoInMag,
         serverPlayer.ammoReserve,
@@ -335,21 +300,19 @@ export class Game {
       );
     }
 
-    // Scoreboard (hold Tab)
     const showScoreboard = this.input.isKeyDown("Tab");
     this.scoreboard.setVisible(showScoreboard);
     if (showScoreboard && players) {
       this.scoreboard.update(players, myId);
     }
 
-    // Apply local player position to camera
     this.localPlayer.applyToCamera();
 
-    // Sprint FOV effect - smooth transition
     const isSprinting = inputState.sprint && 
       (Math.abs(inputState.moveX) > 0.1 || Math.abs(inputState.moveZ) > 0.1) && 
       !this.localPlayer.isDead;
-    const targetFov = isSprinting ? SPRINT_FOV : BASE_FOV;
+    const baseFov = isSprinting ? SPRINT_FOV : BASE_FOV;
+    const targetFov = this.weaponSystem.getTargetFov(baseFov);
     this.currentFov += (targetFov - this.currentFov) * Math.min(1, dt * FOV_LERP_SPEED);
     this.renderer.camera.fov = this.currentFov;
     this.renderer.camera.updateProjectionMatrix();
@@ -427,7 +390,7 @@ export class Game {
       this.localCapsule = undefined;
     }
 
-    this.weaponView.dispose();
+    this.weaponSystem.dispose();
     this.input.dispose();
     this.renderer.dispose();
   }
