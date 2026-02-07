@@ -26,10 +26,12 @@ export class WeaponViewModel {
   public readonly opticEye?: THREE.Object3D;
   public readonly hipOffset: THREE.Vector3;
   private opticReticle?: THREE.Object3D;
+  private ironSightEye?: THREE.Object3D;
 
   private readonly hipRotation: THREE.Euler;
   private readonly adsOffset: THREE.Vector3;
   private readonly adsRotation: THREE.Euler;
+  private computedAdsOffset: THREE.Vector3;
 
   private recoilKick = 0;
   private currentSway = 0;
@@ -44,6 +46,7 @@ export class WeaponViewModel {
     this.hipRotation = this.getHipRotation(def.family);
     this.adsOffset = this.getADSOffset(def.family);
     this.adsRotation = this.getADSRotation(def.family);
+    this.computedAdsOffset = this.adsOffset.clone();
 
     this.weaponRoot.position.copy(this.hipOffset);
     this.weaponRoot.rotation.copy(this.hipRotation);
@@ -65,11 +68,41 @@ export class WeaponViewModel {
       this.setAdsReticleAlpha(0);
     }
 
+    if (!options.thirdPerson) {
+      this.computeAdsAlignment();
+    }
+
     if (options.thirdPerson) {
       setThirdPersonMaterialFlags(this.viewRoot);
     } else {
       setFirstPersonMaterialFlags(this.viewRoot);
     }
+  }
+
+  private computeAdsAlignment(): void {
+    const eyeSocket = this.opticEye || this.ironSightEye;
+    
+    if (!eyeSocket) {
+      this.computedAdsOffset = this.adsOffset.clone();
+      return;
+    }
+
+    const eyeLocalPos = new THREE.Vector3();
+    const savedPosition = this.weaponRoot.position.clone();
+    const savedRotation = this.weaponRoot.rotation.clone();
+    this.weaponRoot.position.set(0, 0, 0);
+    this.weaponRoot.rotation.set(0, 0, 0);
+    this.weaponRoot.updateMatrixWorld(true);
+    eyeSocket.getWorldPosition(eyeLocalPos);
+    this.weaponRoot.position.copy(savedPosition);
+    this.weaponRoot.rotation.copy(savedRotation);
+    
+    const adsDepth = 0.3;
+    this.computedAdsOffset = new THREE.Vector3(
+      -eyeLocalPos.x,
+      -eyeLocalPos.y,
+      -adsDepth - eyeLocalPos.z
+    );
   }
 
   public update(dt: number, now: number, adsAlpha = 0): void {
@@ -121,7 +154,7 @@ export class WeaponViewModel {
 
   public applyADSProgress(progress: number): void {
     this.lastAdsProgress = progress;
-    this.weaponRoot.position.lerpVectors(this.hipOffset, this.adsOffset, progress);
+    this.weaponRoot.position.lerpVectors(this.hipOffset, this.computedAdsOffset, progress);
   }
 
   private getHipOffset(family: WeaponDefinition["family"]): THREE.Vector3 {
@@ -226,145 +259,118 @@ export class WeaponViewModel {
   }
 
   private buildAssaultRifle(root: THREE.Object3D, mats: MaterialSet): void {
-    // Main receiver - angular
     const receiver = createBox(new THREE.Vector3(0.2, 0.11, 0.48), mats.darkMetal);
     receiver.position.set(0, 0, -0.14);
     root.add(receiver);
 
-    // Upper receiver with chamfer look
     const upper = createBox(new THREE.Vector3(0.17, 0.06, 0.4), mats.midMetal);
     upper.position.set(0, 0.07, -0.16);
     root.add(upper);
 
-    // Barrel
     const barrel = createCylinder(0.022, 0.52, mats.midMetal);
     barrel.position.set(0, 0.02, -0.58);
     root.add(barrel);
 
-    // Barrel shroud with vents
     const shroud = createBox(new THREE.Vector3(0.08, 0.06, 0.28), mats.lightMetal);
     shroud.position.set(0, 0.02, -0.48);
     root.add(shroud);
 
-    // Stock - modern adjustable
     const stock = createBox(new THREE.Vector3(0.06, 0.1, 0.2), mats.midMetal);
     stock.position.set(0, 0, 0.2);
     root.add(stock);
 
-    // Magazine - curved
     const mag = createBox(new THREE.Vector3(0.06, 0.16, 0.1), mats.darkMetal);
     mag.position.set(0, -0.12, -0.06);
     mag.rotation.x = -0.12;
     root.add(mag);
 
-    // Grip
     const grip = createBox(new THREE.Vector3(0.055, 0.12, 0.07), mats.midMetal);
     grip.position.set(0, -0.11, 0.05);
     grip.rotation.x = 0.22;
     root.add(grip);
 
-    // Rail - positioned low so optic sits above all geometry
     const railBase = new THREE.Object3D();
     railBase.position.set(0, 0.095, -0.14);
     addRail(railBase, 0.38, mats.midMetal);
     root.add(railBase);
 
-    // Cyberpunk accents - kept below optic sight line
     addNeonStripe(root, 0.32, mats.neon, 0.03);
     addVentCuts(root, 5, 0.045);
     addAngularAccent(root, mats.neonDim);
   }
 
   private buildSMG(root: THREE.Object3D, mats: MaterialSet): void {
-    // Compact receiver - lowered to avoid blocking optic
     const receiver = createBox(new THREE.Vector3(0.16, 0.08, 0.32), mats.darkMetal);
     receiver.position.set(0, -0.01, -0.08);
     root.add(receiver);
 
-    // Upper - thin and low profile
     const upper = createBox(new THREE.Vector3(0.14, 0.035, 0.28), mats.midMetal);
     upper.position.set(0, 0.04, -0.1);
     root.add(upper);
 
-    // Short barrel
     const barrel = createCylinder(0.018, 0.32, mats.midMetal);
     barrel.position.set(0, 0.02, -0.38);
     root.add(barrel);
 
-    // Folding stock
     const stock = createBox(new THREE.Vector3(0.04, 0.08, 0.14), mats.lightMetal);
     stock.position.set(0, 0.02, 0.16);
     root.add(stock);
 
-    // Extended mag
     const mag = createBox(new THREE.Vector3(0.05, 0.18, 0.08), mats.darkMetal);
     mag.position.set(0, -0.12, -0.02);
     mag.rotation.x = -0.08;
     root.add(mag);
 
-    // Grip
     const grip = createBox(new THREE.Vector3(0.05, 0.1, 0.06), mats.midMetal);
     grip.position.set(0, -0.1, 0.06);
     grip.rotation.x = 0.25;
     root.add(grip);
 
-    // Forward grip
     const foregrip = createBox(new THREE.Vector3(0.04, 0.08, 0.04), mats.lightMetal);
     foregrip.position.set(0, -0.06, -0.22);
     root.add(foregrip);
 
-    // Rail - low profile
     const railBase = new THREE.Object3D();
     railBase.position.set(0, 0.075, -0.08);
     addRail(railBase, 0.26, mats.midMetal);
     root.add(railBase);
 
-    // Bright neon accents - below sight line
     addNeonStripe(root, 0.22, mats.neon, 0.025);
     
-    // Glowing mag indicator
     const magGlow = createBox(new THREE.Vector3(0.02, 0.12, 0.02), mats.neon);
     magGlow.position.set(0.035, -0.1, -0.02);
     root.add(magGlow);
   }
 
   private buildLMG(root: THREE.Object3D, mats: MaterialSet): void {
-    // Heavy receiver
     const receiver = createBox(new THREE.Vector3(0.24, 0.14, 0.55), mats.darkMetal);
     receiver.position.set(0, 0, -0.12);
     root.add(receiver);
 
-    // Upper
     const upper = createBox(new THREE.Vector3(0.2, 0.08, 0.48), mats.midMetal);
     upper.position.set(0, 0.09, -0.14);
     root.add(upper);
 
-    // Heavy barrel
     const barrel = createCylinder(0.032, 0.7, mats.midMetal);
     barrel.position.set(0, 0.02, -0.62);
     root.add(barrel);
 
-    // Barrel shroud
     const shroud = createBox(new THREE.Vector3(0.1, 0.08, 0.35), mats.lightMetal);
     shroud.position.set(0, 0.02, -0.52);
     root.add(shroud);
 
-    // Box magazine
     const mag = createBox(new THREE.Vector3(0.12, 0.14, 0.16), mats.darkMetal);
     mag.position.set(0, -0.14, -0.06);
     root.add(mag);
 
-    // Ammo belt hint
     const belt = createBox(new THREE.Vector3(0.08, 0.04, 0.06), mats.neonDim);
     belt.position.set(0.08, -0.1, -0.02);
     root.add(belt);
 
-    // Heavy stock
     const stock = createBox(new THREE.Vector3(0.08, 0.12, 0.24), mats.midMetal);
     stock.position.set(0, 0, 0.24);
     root.add(stock);
 
-    // Bipod hint
     const bipodL = createCylinder(0.012, 0.12, mats.lightMetal);
     bipodL.position.set(-0.06, -0.08, -0.35);
     bipodL.rotation.z = 0.3;
@@ -374,60 +380,49 @@ export class WeaponViewModel {
     bipodR.rotation.z = -0.3;
     root.add(bipodR);
 
-    // Grip
     const grip = createBox(new THREE.Vector3(0.06, 0.12, 0.08), mats.midMetal);
     grip.position.set(0, -0.11, 0.08);
     grip.rotation.x = 0.2;
     root.add(grip);
 
-    // Rail - low profile
     const railBase = new THREE.Object3D();
     railBase.position.set(0, 0.11, -0.1);
     addRail(railBase, 0.45, mats.midMetal);
     root.add(railBase);
 
-    // Heat sinks - positioned to side, not blocking optic
     addHeatSink(root, 4, mats.lightMetal);
 
-    // Warning stripes - below sight line
     const warn = createBox(new THREE.Vector3(0.22, 0.01, 0.06), mats.danger);
     warn.position.set(0, 0.1, -0.35);
     root.add(warn);
   }
 
   private buildShotgun(root: THREE.Object3D, mats: MaterialSet): void {
-    // Chunky receiver
     const receiver = createBox(new THREE.Vector3(0.18, 0.13, 0.4), mats.darkMetal);
     receiver.position.set(0, 0, -0.08);
     root.add(receiver);
 
-    // Wide barrel
     const barrel = createCylinder(0.028, 0.5, mats.midMetal);
     barrel.position.set(0, 0.02, -0.48);
     root.add(barrel);
 
-    // Magazine tube
     const magTube = createCylinder(0.024, 0.4, mats.darkMetal);
     magTube.position.set(0, -0.04, -0.4);
     root.add(magTube);
 
-    // Pump grip
     const pump = createBox(new THREE.Vector3(0.08, 0.08, 0.12), mats.lightMetal);
     pump.position.set(0, -0.02, -0.3);
     root.add(pump);
 
-    // Stock
     const stock = createBox(new THREE.Vector3(0.07, 0.1, 0.22), mats.midMetal);
     stock.position.set(0, 0, 0.2);
     root.add(stock);
 
-    // Pistol grip
     const grip = createBox(new THREE.Vector3(0.055, 0.11, 0.07), mats.midMetal);
     grip.position.set(0, -0.1, 0.06);
     grip.rotation.x = 0.25;
     root.add(grip);
 
-    // Shell holder on side
     for (let i = 0; i < 4; i++) {
       const shell = createCylinder(0.014, 0.06, mats.danger);
       shell.position.set(0.1, 0.02, 0.02 - i * 0.05);
@@ -436,49 +431,33 @@ export class WeaponViewModel {
       root.add(shell);
     }
 
-    // Neon accent - moved to side to not block optic
     const neon = createBox(new THREE.Vector3(0.01, 0.04, 0.1), mats.neon);
     neon.position.set(0.09, 0.02, -0.1);
     root.add(neon);
   }
 
   private buildSniper(root: THREE.Object3D, mats: MaterialSet): void {
-    // ═══════════════════════════════════════════════════════════════════
-    // SNIPER RIFLE - "Specter SR-X"
-    // Design: Long, sleek anti-materiel rifle with clear scope sight line
-    // Key: ALL geometry stays below Y=0.08 to not block scope at Y=0.14+
-    // ═══════════════════════════════════════════════════════════════════
-
-    // === MAIN BODY (centered around Y=0, all below scope line) ===
-    
-    // Lower receiver - main body, positioned low
+    // All geometry stays below Y=0.08 to not block scope at Y=0.14+
     const lowerReceiver = createBox(new THREE.Vector3(0.16, 0.08, 0.5), mats.darkMetal);
     lowerReceiver.position.set(0, -0.04, -0.1);
     root.add(lowerReceiver);
 
-    // Upper receiver - VERY thin rail platform (max Y = 0.06)
     const upperReceiver = createBox(new THREE.Vector3(0.12, 0.025, 0.4), mats.midMetal);
     upperReceiver.position.set(0, 0.02, -0.12);
     root.add(upperReceiver);
 
-    // Scope mount platform - thin flat surface for scope (max Y = 0.05)
     const scopeMount = createBox(new THREE.Vector3(0.08, 0.015, 0.25), mats.lightMetal);
     scopeMount.position.set(0, 0.04, -0.15);
     root.add(scopeMount);
 
-    // === BARREL ASSEMBLY (all at Y ≈ 0) ===
-    
-    // Heavy fluted barrel - long precision barrel
     const barrel = createCylinder(0.024, 0.9, mats.midMetal);
     barrel.position.set(0, 0, -0.7);
     root.add(barrel);
 
-    // Barrel shroud - vented for heat dissipation
     const shroud = createBox(new THREE.Vector3(0.065, 0.05, 0.3), mats.lightMetal);
     shroud.position.set(0, 0, -0.45);
     root.add(shroud);
 
-    // Shroud vent cuts (on sides, decorative)
     for (let i = 0; i < 5; i++) {
       const ventL = createBox(new THREE.Vector3(0.008, 0.03, 0.025), mats.darkMetal);
       ventL.position.set(-0.035, 0.01, -0.35 - i * 0.05);
@@ -488,63 +467,46 @@ export class WeaponViewModel {
       root.add(ventR);
     }
 
-    // Muzzle brake - multi-baffle design
     const muzzleBrake = createCylinder(0.032, 0.1, mats.darkMetal);
     muzzleBrake.position.set(0, 0, -1.2);
     root.add(muzzleBrake);
     
-    // Muzzle brake rings
     for (let i = 0; i < 3; i++) {
       const ring = createCylinder(0.036, 0.012, mats.lightMetal);
       ring.position.set(0, 0, -1.15 - i * 0.025);
       root.add(ring);
     }
 
-    // === STOCK ASSEMBLY ===
-    
-    // Main stock body - angular thumbhole design
     const stockMain = createBox(new THREE.Vector3(0.06, 0.09, 0.28), mats.midMetal);
     stockMain.position.set(0, -0.02, 0.26);
     root.add(stockMain);
 
-    // Stock cheek piece (on top but at rear, away from scope)
     const cheekPiece = createBox(new THREE.Vector3(0.045, 0.02, 0.1), mats.lightMetal);
     cheekPiece.position.set(0, 0.035, 0.3);
     root.add(cheekPiece);
 
-    // Buttpad
     const buttpad = createBox(new THREE.Vector3(0.05, 0.08, 0.02), mats.darkMetal);
     buttpad.position.set(0, -0.01, 0.41);
     root.add(buttpad);
 
-    // === GRIP & TRIGGER ===
-    
-    // Pistol grip - ergonomic angle
     const grip = createBox(new THREE.Vector3(0.045, 0.1, 0.06), mats.midMetal);
     grip.position.set(0, -0.1, 0.08);
     grip.rotation.x = 0.25;
     root.add(grip);
 
-    // Trigger guard
     const triggerGuard = createBox(new THREE.Vector3(0.05, 0.02, 0.08), mats.darkMetal);
     triggerGuard.position.set(0, -0.08, 0.02);
     root.add(triggerGuard);
 
-    // === MAGAZINE ===
-    
-    // Detachable box magazine
     const mag = createBox(new THREE.Vector3(0.05, 0.1, 0.08), mats.darkMetal);
     mag.position.set(0, -0.1, -0.04);
     mag.rotation.x = -0.08;
     root.add(mag);
 
-    // Magazine release button (side accent)
     const magRelease = createBox(new THREE.Vector3(0.01, 0.02, 0.02), mats.neon);
     magRelease.position.set(0.075, -0.06, -0.04);
     root.add(magRelease);
 
-    // === BIPOD (folded under, not blocking) ===
-    
     const bipodMount = createBox(new THREE.Vector3(0.04, 0.015, 0.04), mats.lightMetal);
     bipodMount.position.set(0, -0.045, -0.38);
     root.add(bipodMount);
@@ -559,7 +521,6 @@ export class WeaponViewModel {
     bipodLegR.rotation.z = -0.2;
     root.add(bipodLegR);
 
-    // Bipod feet
     const footL = createBox(new THREE.Vector3(0.015, 0.01, 0.025), mats.darkMetal);
     footL.position.set(-0.045, -0.16, -0.38);
     root.add(footL);
@@ -567,26 +528,20 @@ export class WeaponViewModel {
     footR.position.set(0.045, -0.16, -0.38);
     root.add(footR);
 
-    // === CYBERPUNK ACCENTS (all on SIDES, never blocking center) ===
-    
-    // Neon power indicator strip (left side)
     const neonStripL = createBox(new THREE.Vector3(0.008, 0.012, 0.35), mats.neon);
     neonStripL.position.set(-0.075, 0, -0.15);
     root.add(neonStripL);
 
-    // Neon accent (right side)
     const neonStripR = createBox(new THREE.Vector3(0.008, 0.012, 0.35), mats.neon);
     neonStripR.position.set(0.075, 0, -0.15);
     root.add(neonStripR);
 
-    // Status LEDs (sides of receiver)
     for (let i = 0; i < 3; i++) {
       const ledL = createBox(new THREE.Vector3(0.006, 0.006, 0.006), mats.neon);
       ledL.position.set(-0.08, -0.01, 0.02 - i * 0.04);
       root.add(ledL);
     }
 
-    // Angular accent plates (sides only)
     const accentPlateL = createBox(new THREE.Vector3(0.006, 0.025, 0.08), mats.neonDim);
     accentPlateL.position.set(-0.082, -0.02, -0.06);
     accentPlateL.rotation.z = 0.15;
@@ -597,12 +552,10 @@ export class WeaponViewModel {
     accentPlateR.rotation.z = -0.15;
     root.add(accentPlateR);
 
-    // Stabilizer fin on stock (horizontal, behind scope area)
     const stabFin = createBox(new THREE.Vector3(0.14, 0.008, 0.06), mats.neonDim);
     stabFin.position.set(0, 0.02, 0.38);
     root.add(stabFin);
 
-    // Bolt handle (side)
     const boltHandle = createCylinder(0.012, 0.04, mats.lightMetal);
     boltHandle.position.set(0.085, 0.01, -0.02);
     boltHandle.rotation.z = Math.PI / 2;
@@ -614,88 +567,72 @@ export class WeaponViewModel {
   }
 
   private buildPistol(root: THREE.Object3D, mats: MaterialSet): void {
-    // Compact slide
     const slide = createBox(new THREE.Vector3(0.09, 0.07, 0.2), mats.midMetal);
     slide.position.set(0, 0.02, -0.06);
     root.add(slide);
 
-    // Frame
     const frame = createBox(new THREE.Vector3(0.08, 0.05, 0.16), mats.darkMetal);
     frame.position.set(0, -0.02, -0.04);
     root.add(frame);
 
-    // Barrel
     const barrel = createCylinder(0.012, 0.12, mats.lightMetal);
     barrel.position.set(0, 0.015, -0.2);
     root.add(barrel);
 
-    // Grip
     const grip = createBox(new THREE.Vector3(0.065, 0.1, 0.055), mats.midMetal);
     grip.position.set(0, -0.08, 0.02);
     grip.rotation.x = 0.15;
     root.add(grip);
 
-    // Magazine
     const mag = createBox(new THREE.Vector3(0.045, 0.08, 0.04), mats.darkMetal);
     mag.position.set(0, -0.1, 0.02);
     root.add(mag);
 
-    // Trigger guard
     const guard = createBox(new THREE.Vector3(0.06, 0.025, 0.06), mats.darkMetal);
     guard.position.set(0, -0.04, -0.02);
     root.add(guard);
 
-    // Neon sight stripe
     const sight = createBox(new THREE.Vector3(0.06, 0.008, 0.008), mats.neon);
     sight.position.set(0, 0.06, -0.04);
     root.add(sight);
 
-    // Rear sight
     const rearSight = createBox(new THREE.Vector3(0.04, 0.015, 0.01), mats.lightMetal);
     rearSight.position.set(0, 0.055, 0.04);
     root.add(rearSight);
   }
 
   private buildRocketLauncher(root: THREE.Object3D, mats: MaterialSet): void {
-    // Main tube
     const tube = createCylinder(0.08, 0.7, mats.darkMetal, true);
     tube.position.set(0, 0, -0.2);
     root.add(tube);
 
-    // Inner tube (darker)
     const innerMat = mats.midMetal.clone();
     innerMat.side = THREE.BackSide;
     const inner = createCylinder(0.06, 0.68, innerMat, true);
     inner.position.set(0, 0, -0.2);
     root.add(inner);
 
-    // Front ring
     const frontRing = createCylinder(0.09, 0.04, mats.lightMetal, true);
     frontRing.position.set(0, 0, -0.58);
     root.add(frontRing);
 
-    // Rear ring
     const rearRing = createCylinder(0.09, 0.04, mats.lightMetal, true);
     rearRing.position.set(0, 0, 0.18);
     root.add(rearRing);
 
-    // Grip assembly
     const gripHousing = createBox(new THREE.Vector3(0.1, 0.12, 0.2), mats.midMetal);
     gripHousing.position.set(0, -0.1, 0.02);
     root.add(gripHousing);
 
-    // Grip
     const grip = createBox(new THREE.Vector3(0.06, 0.12, 0.07), mats.darkMetal);
     grip.position.set(0, -0.18, 0.04);
     grip.rotation.x = 0.25;
     root.add(grip);
 
-    // Trigger guard
     const guard = createBox(new THREE.Vector3(0.08, 0.03, 0.08), mats.darkMetal);
     guard.position.set(0, -0.14, -0.02);
     root.add(guard);
 
-    // Iron sights
     const frontSight = createBox(new THREE.Vector3(0.02, 0.04, 0.02), mats.neon);
     frontSight.position.set(0, 0.09, -0.45);
     root.add(frontSight);
@@ -704,7 +641,6 @@ export class WeaponViewModel {
     rearSight.position.set(0, 0.085, 0.1);
     root.add(rearSight);
 
-    // Warning stripes
     const warn1 = createBox(new THREE.Vector3(0.01, 0.02, 0.6), mats.danger);
     warn1.position.set(0.075, 0.02, -0.2);
     root.add(warn1);
@@ -712,7 +648,6 @@ export class WeaponViewModel {
     warn2.position.set(-0.075, 0.02, -0.2);
     root.add(warn2);
 
-    // Exhaust cone hint
     const exhaust = createCone(0.06, 0.08, mats.darkMetal);
     exhaust.position.set(0, 0, 0.24);
     exhaust.rotation.x = Math.PI;
@@ -720,59 +655,46 @@ export class WeaponViewModel {
   }
 
   private buildGrenadeLauncher(root: THREE.Object3D, mats: MaterialSet): void {
-    // Receiver - lowered to avoid blocking optic
     const receiver = createBox(new THREE.Vector3(0.18, 0.09, 0.38), mats.darkMetal);
     receiver.position.set(0, -0.02, -0.06);
     root.add(receiver);
 
-    // Drum magazine
     const drum = createCylinder(0.08, 0.12, mats.midMetal);
     drum.position.set(0, -0.1, -0.08);
     drum.rotation.z = 0;
     root.add(drum);
 
-    // Drum cap
     const drumCap = createCylinder(0.075, 0.02, mats.lightMetal);
     drumCap.position.set(0, -0.1, -0.02);
     drumCap.rotation.z = 0;
     root.add(drumCap);
 
-    // Wide barrel - lowered
     const barrel = createCylinder(0.035, 0.35, mats.midMetal);
     barrel.position.set(0, 0, -0.42);
     root.add(barrel);
 
-    // Stock
     const stock = createBox(new THREE.Vector3(0.06, 0.1, 0.18), mats.midMetal);
     stock.position.set(0, 0, 0.2);
     root.add(stock);
 
-    // Grip
     const grip = createBox(new THREE.Vector3(0.055, 0.11, 0.07), mats.midMetal);
     grip.position.set(0, -0.1, 0.06);
     grip.rotation.x = 0.22;
     root.add(grip);
 
-    // Rail - low profile
     const railBase = new THREE.Object3D();
     railBase.position.set(0, 0.075, -0.04);
     addRail(railBase, 0.28, mats.midMetal);
     root.add(railBase);
 
-    // Hazard accents - below sight line
     const hazard = createBox(new THREE.Vector3(0.16, 0.008, 0.04), mats.danger);
     hazard.position.set(0, 0.05, -0.06);
     root.add(hazard);
 
-    // Neon drum indicator
     const indicator = createBox(new THREE.Vector3(0.01, 0.06, 0.01), mats.neon);
     indicator.position.set(0.075, -0.08, -0.08);
     root.add(indicator);
   }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // SOCKETS
-  // ═══════════════════════════════════════════════════════════════════════
 
   private createSockets(root: THREE.Object3D, family: WeaponDefinition["family"]): void {
     const railTop = new THREE.Object3D();
@@ -784,7 +706,6 @@ export class WeaponViewModel {
     const sideLeft = new THREE.Object3D();
     const sideRight = new THREE.Object3D();
 
-    // Rail_top sockets elevated well above weapon geometry to prevent optic blockage
     switch (family) {
       case "Pistol":
         railTop.position.set(0, 0.08, -0.02);
@@ -815,7 +736,6 @@ export class WeaponViewModel {
         muzzle.position.set(0, 0.02, -0.62);
         break;
       default:
-        // AssaultRifle and others
         railTop.position.set(0, 0.14, -0.14);
         muzzle.position.set(0, 0.02, -0.86);
     }
@@ -839,11 +759,26 @@ export class WeaponViewModel {
     for (const socket of this.sockets.values()) {
       root.add(socket);
     }
-  }
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // ATTACHMENTS
-  // ═══════════════════════════════════════════════════════════════════════
+    this.ironSightEye = new THREE.Object3D();
+    switch (family) {
+      case "Pistol":
+        this.ironSightEye.position.set(0, 0.055, 0.08);
+        break;
+      case "Shotgun":
+        this.ironSightEye.position.set(0, 0.08, 0.1);
+        break;
+      case "RocketLauncher":
+        this.ironSightEye.position.set(0, 0.09, 0.16);
+        break;
+      case "GrenadeLauncher":
+        this.ironSightEye.position.set(0, 0.1, 0.08);
+        break;
+      default:
+        this.ironSightEye.position.set(0, 0.1, 0.08);
+    }
+    root.add(this.ironSightEye);
+  }
 
   private attachAttachments(
     attachments: AttachmentDefinition[],
@@ -862,10 +797,6 @@ export class WeaponViewModel {
     return { eye: opticEye, reticle: opticReticle };
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ATTACHMENT VIEWS - Cyberpunk optics with unique reticles
-// ═══════════════════════════════════════════════════════════════════════════
 
 interface AttachmentView {
   root: THREE.Object3D;
@@ -894,19 +825,16 @@ function createReticleDot(size: number, material: THREE.Material): THREE.Object3
 
 function createReticleChevron(size: number, thickness: number, material: THREE.Material): THREE.Object3D {
   const root = new THREE.Object3D();
-  // Left arm of chevron
   const left = createBox(new THREE.Vector3(size * 0.6, thickness, 0.001), material);
   left.position.set(-size * 0.2, -size * 0.15, 0);
   left.rotation.z = 0.5;
   left.userData.isReticle = true;
   root.add(left);
-  // Right arm
   const right = createBox(new THREE.Vector3(size * 0.6, thickness, 0.001), material);
   right.position.set(size * 0.2, -size * 0.15, 0);
   right.rotation.z = -0.5;
   right.userData.isReticle = true;
   root.add(right);
-  // Center dot
   const dot = createBox(new THREE.Vector3(thickness * 2, thickness * 2, 0.001), material);
   dot.userData.isReticle = true;
   root.add(dot);
@@ -915,14 +843,12 @@ function createReticleChevron(size: number, thickness: number, material: THREE.M
 
 function createReticleMildot(size: number, thickness: number, material: THREE.Material): THREE.Object3D {
   const root = new THREE.Object3D();
-  // Main cross
   const h = createBox(new THREE.Vector3(size, thickness, 0.001), material);
   h.userData.isReticle = true;
   root.add(h);
   const v = createBox(new THREE.Vector3(thickness, size, 0.001), material);
   v.userData.isReticle = true;
   root.add(v);
-  // Mil dots on horizontal
   for (let i = -2; i <= 2; i++) {
     if (i === 0) continue;
     const dot = createBox(new THREE.Vector3(thickness * 1.5, thickness * 1.5, 0.001), material);
@@ -930,7 +856,6 @@ function createReticleMildot(size: number, thickness: number, material: THREE.Ma
     dot.userData.isReticle = true;
     root.add(dot);
   }
-  // Range marks on vertical (lower half)
   for (let i = 1; i <= 3; i++) {
     const mark = createBox(new THREE.Vector3(thickness * 3, thickness, 0.001), material);
     mark.position.set(0, -i * size * 0.15, 0);
@@ -957,12 +882,10 @@ function buildAttachmentView(
 
   switch (attachment.id) {
     case "HOLO_SIGHT": {
-      // Housing - angular hood with OPEN center (no solid top blocking view)
       const base = createBox(new THREE.Vector3(0.08, 0.015, 0.08), mats.midMetal);
       base.position.set(0, 0.01, 0);
       root.add(base);
 
-      // Side posts only
       const left = createBox(new THREE.Vector3(0.006, 0.04, 0.05), mats.darkMetal);
       left.position.set(-0.035, 0.032, -0.01);
       root.add(left);
@@ -971,17 +894,14 @@ function buildAttachmentView(
       right.position.set(0.035, 0.032, -0.01);
       root.add(right);
 
-      // Top bar - thin, at the back edge only (not blocking center view)
       const topBack = createBox(new THREE.Vector3(0.076, 0.006, 0.006), mats.darkMetal);
       topBack.position.set(0, 0.054, 0.018);
       root.add(topBack);
 
-      // Front lip - thin
       const frontLip = createBox(new THREE.Vector3(0.076, 0.006, 0.004), mats.darkMetal);
       frontLip.position.set(0, 0.054, -0.032);
       root.add(frontLip);
 
-      // Neon trim on top
       const trim = createBox(new THREE.Vector3(0.06, 0.003, 0.003), mats.neon);
       trim.position.set(0, 0.058, 0.018);
       root.add(trim);
@@ -1004,12 +924,10 @@ function buildAttachmentView(
     }
     
     case "REFLEX_SIGHT": {
-      // Minimal reflex housing - HOLLOW frame (posts on sides, not solid)
       const base = createBox(new THREE.Vector3(0.06, 0.012, 0.06), mats.midMetal);
       base.position.set(0, 0.008, 0);
       root.add(base);
 
-      // Side posts only - no center blocking
       const postLeft = createBox(new THREE.Vector3(0.006, 0.032, 0.006), mats.darkMetal);
       postLeft.position.set(-0.025, 0.026, -0.02);
       root.add(postLeft);
@@ -1018,12 +936,10 @@ function buildAttachmentView(
       postRight.position.set(0.025, 0.026, -0.02);
       root.add(postRight);
 
-      // Top bar connecting posts
       const topBar = createBox(new THREE.Vector3(0.056, 0.005, 0.006), mats.darkMetal);
       topBar.position.set(0, 0.044, -0.02);
       root.add(topBar);
 
-      // Glowing rim
       const rim = createBox(new THREE.Vector3(0.05, 0.002, 0.002), mats.neon);
       rim.position.set(0, 0.048, -0.02);
       root.add(rim);
@@ -1046,32 +962,23 @@ function buildAttachmentView(
     }
     
     case "SCOPE_4X": {
-      // ═══════════════════════════════════════════════════════════════════
-      // CLEAN HOLLOW SCOPE - Simple open cylinder, nothing inside
-      // ═══════════════════════════════════════════════════════════════════
-      
-      // Main tube - completely hollow, open both ends
       const tubeOuter = createCylinder(0.038, 0.28, mats.midMetal, true);
       tubeOuter.position.set(0, 0.038, -0.02);
       root.add(tubeOuter);
 
-      // Neon ring at front (decorative, at very front edge)
       const neonRingFront = createCylinder(0.04, 0.008, mats.neon, true);
       neonRingFront.position.set(0, 0.038, -0.16);
       root.add(neonRingFront);
 
-      // Neon ring at rear (decorative, behind eye)
       const neonRingRear = createCylinder(0.04, 0.008, mats.neon, true);
       neonRingRear.position.set(0, 0.038, 0.12);
       root.add(neonRingRear);
 
-      // Eye position - inside rear of tube
       eye = new THREE.Object3D();
       eye.name = "socket_eye";
       eye.position.set(0, 0.038, 0.1);
       root.add(eye);
 
-      // First person: add reticle only
       if (!thirdPerson) {
         const reticleRoot = new THREE.Object3D();
         reticleRoot.name = "socket_reticle";
@@ -1097,14 +1004,12 @@ function buildAttachmentView(
       comp.position.set(0, 0, -0.02);
       root.add(comp);
       
-      // Vent slots
       for (let i = 0; i < 3; i++) {
         const slot = createBox(new THREE.Vector3(0.025, 0.008, 0.012), mats.darkMetal);
         slot.position.set(0, 0.018, -0.01 - i * 0.018);
         root.add(slot);
       }
       
-      // Neon accent
       const accent = createBox(new THREE.Vector3(0.01, 0.008, 0.06), mats.neon);
       accent.position.set(0.02, 0.01, -0.02);
       root.add(accent);
@@ -1116,7 +1021,6 @@ function buildAttachmentView(
       can.position.set(0, 0, -0.06);
       root.add(can);
       
-      // Rings
       const ring1 = createCylinder(0.035, 0.015, mats.midMetal);
       ring1.position.set(0, 0, 0.02);
       root.add(ring1);
@@ -1125,7 +1029,6 @@ function buildAttachmentView(
       ring2.position.set(0, 0, -0.14);
       root.add(ring2);
       
-      // Subtle neon ring
       const glow = createCylinder(0.033, 0.004, mats.neonDim);
       glow.position.set(0, 0, -0.06);
       root.add(glow);
@@ -1133,7 +1036,6 @@ function buildAttachmentView(
     }
     
     case "IRON_SIGHT": {
-      // Simple iron sights with glowing dot
       const base = createBox(new THREE.Vector3(0.04, 0.012, 0.05), mats.midMetal);
       base.position.set(0, 0.008, 0);
       root.add(base);

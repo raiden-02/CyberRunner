@@ -24,9 +24,11 @@ export abstract class BaseState implements IMovementState {
   protected desiredGroundVelocity(ctx: MovementCtx): { x: number; z: number } {
     const input = ctx.input;
     
-    // Get movement speed based on input
+    // ADS prevents sprinting and slows movement
     let maxSpeed = MOVE.WalkMaxSpeed;
-    if (input.sprint) {
+    if (input.aiming) {
+      maxSpeed = MOVE.AdsMaxSpeed;
+    } else if (input.sprint) {
       maxSpeed = MOVE.MaxSprintSpeed;
     }
 

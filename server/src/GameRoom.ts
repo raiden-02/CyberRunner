@@ -7,8 +7,9 @@ import { CAPSULE } from "./physics/constants.js";
 import { HealthSystem } from "./systems/health-system.js";
 import { WeaponSystem } from "./systems/weapon-system.js";
 import { getWeaponConfig, isValidWeapon } from "./weapons/weapon-config.js";
+import { createHitboxes, removeHitboxes, type HitboxSet } from "./physics/hitbox-system.js";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { THREE_LANE_MAP, isPointInsideBox } from "./world/maps/three-lane-map.js";
+import { calculateSpawnFacing, getCurrentMap, isPointInsideBox, setCurrentMap, type MapId } from "./world/maps/map-registry.js";
 
 const TICK_RATE = 60; // Hz
 const DEFAULT_MAX_PLAYERS = 8;
@@ -18,6 +19,7 @@ const MIN_SPAWN_DISTANCE = 8; // meters
 type PlayerRuntime = {
   ctrl: CharacterController;
   schema: PlayerState;
+  hitboxes: HitboxSet;
 };
 
 type BreakableRuntime = {
@@ -53,22 +55,28 @@ export class GameRoom extends Room<GameState> {
     }
     this.maxClients = this.maxPlayers;
 
+    // Set the active map (can be configured via options or env)
+    const mapId = (process.env.MAP_ID || "neon-pub-district") as MapId;
+    setCurrentMap(mapId);
+    const currentMap = getCurrentMap();
+    console.log(`[GameRoom] Using map: ${currentMap.name}`);
+
     await RAPIER.init();
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 
     // Ground
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(
-        THREE_LANE_MAP.boundsHalfSize,
-        THREE_LANE_MAP.groundThickness,
-        THREE_LANE_MAP.boundsHalfSize
-      ).setTranslation(0, -THREE_LANE_MAP.groundThickness, 0).setFriction(1.0)
+        currentMap.boundsHalfSize,
+        currentMap.groundThickness,
+        currentMap.boundsHalfSize
+      ).setTranslation(0, -currentMap.groundThickness, 0).setFriction(1.0)
     );
 
     // Boundary walls
-    const wallHalfThickness = THREE_LANE_MAP.wallThickness;
-    const wallHalfHeight = THREE_LANE_MAP.wallHeight / 2;
-    const halfSize = THREE_LANE_MAP.boundsHalfSize;
+    const wallHalfThickness = currentMap.wallThickness;
+    const wallHalfHeight = currentMap.wallHeight / 2;
+    const halfSize = currentMap.boundsHalfSize;
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(wallHalfThickness, wallHalfHeight, halfSize)
         .setTranslation(halfSize + wallHalfThickness, wallHalfHeight, 0)
@@ -91,7 +99,7 @@ export class GameRoom extends Room<GameState> {
     );
 
     // Interior obstacles
-    for (const obs of THREE_LANE_MAP.obstacles) {
+    for (const obs of currentMap.obstacles) {
       this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(obs.hx, obs.hy, obs.hz)
           .setTranslation(obs.x, obs.y, obs.z)
@@ -100,7 +108,7 @@ export class GameRoom extends Room<GameState> {
     }
 
     // Occluders (taller covers)
-    for (const occ of THREE_LANE_MAP.occluders) {
+    for (const occ of currentMap.occluders) {
       this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(occ.hx, occ.hy, occ.hz)
           .setTranslation(occ.x, occ.y, occ.z)
@@ -109,7 +117,7 @@ export class GameRoom extends Room<GameState> {
     }
 
     // Breakable cover
-    THREE_LANE_MAP.breakables.forEach((b, idx) => {
+    currentMap.breakables.forEach((b, idx) => {
       const collider = this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(b.hx, b.hy, b.hz)
           .setTranslation(b.x, b.y, b.z)
@@ -215,6 +223,9 @@ export class GameRoom extends Room<GameState> {
     schema.x = spawn.x;
     schema.y = spawn.y;
     schema.z = spawn.z;
+    // Orient player to face center of map
+    schema.rotationY = calculateSpawnFacing(spawn.x, spawn.z);
+    schema.pitch = 0;
     schema.movementState = MovementState.Walking;
     schema.isSpawnProtected = true;
     schema.spawnProtectionTime = 2.5;
@@ -239,9 +250,13 @@ export class GameRoom extends Room<GameState> {
     
     const ctrl = new CharacterController(body, collider, controller);
     
+    // Create hitbox colliders for body part damage detection
+    const hitboxes = createHitboxes(this.world, body, client.sessionId);
+    
     this.players.set(client.sessionId, {
       ctrl,
-      schema
+      schema,
+      hitboxes
     });
 
     console.log(`[GameRoom] Player ${client.sessionId} joined`);
@@ -251,6 +266,9 @@ export class GameRoom extends Room<GameState> {
     this.state.players.delete(client.sessionId);
     const player = this.players.get(client.sessionId);
     if (player) {
+      // Remove hitboxes from registry
+      removeHitboxes(player.hitboxes);
+      // Remove colliders and body
       this.world.removeCollider(player.ctrl.collider, false);
       this.world.removeRigidBody(player.ctrl.body);
     }
@@ -387,7 +405,44 @@ export class GameRoom extends Room<GameState> {
                 this.broadcast("shot_fired", shotResult.shotMsg);
               }
 
-              if (shotResult.hitPlayerId && shotResult.damage !== undefined) {
+              // Handle multi-hit (shotgun pellets hitting multiple players)
+              if (shotResult.multiHits && shotResult.multiHits.length > 0) {
+                for (const hit of shotResult.multiHits) {
+                  const hitPlayer = this.players.get(hit.playerId);
+                  if (hitPlayer) {
+                    const dmgResult = HealthSystem.applyDamage(
+                      hitPlayer.schema,
+                      hit.damage,
+                      sessionId,
+                      player.schema.equippedWeapon,
+                      "hitscan"
+                    );
+
+                    if (dmgResult.damaged) {
+                      const healthMsg = HealthSystem.createHealthChangeMessage(
+                        hit.playerId,
+                        hitPlayer.schema,
+                        hit.bodyPart
+                      );
+                      this.broadcast("health_change", healthMsg);
+                    }
+
+                    if (dmgResult.killed) {
+                      hitPlayer.schema.deaths += 1;
+                      hitPlayer.schema.score = Math.max(0, hitPlayer.schema.score - 50);
+
+                      if (hit.playerId !== sessionId) {
+                        const killer = this.players.get(sessionId);
+                        if (killer) {
+                          killer.schema.kills += 1;
+                          killer.schema.score += 100;
+                        }
+                      }
+                    }
+                  }
+                }
+              } else if (shotResult.hitPlayerId && shotResult.damage !== undefined) {
+                // Single hit (regular weapons)
                 const hitPlayer = this.players.get(shotResult.hitPlayerId);
                 if (hitPlayer) {
                   const dmgResult = HealthSystem.applyDamage(
@@ -401,17 +456,16 @@ export class GameRoom extends Room<GameState> {
                   if (dmgResult.damaged) {
                     const healthMsg = HealthSystem.createHealthChangeMessage(
                       shotResult.hitPlayerId,
-                      hitPlayer.schema
+                      hitPlayer.schema,
+                      shotResult.bodyPart
                     );
                     this.broadcast("health_change", healthMsg);
                   }
 
                   if (dmgResult.killed) {
-                    // Victim death
                     hitPlayer.schema.deaths += 1;
                     hitPlayer.schema.score = Math.max(0, hitPlayer.schema.score - 50);
 
-                    // Killer gets a kill (ignore suicides)
                     if (shotResult.hitPlayerId !== sessionId) {
                       const killer = this.players.get(sessionId);
                       if (killer) {
@@ -438,6 +492,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   private pickSpawnPoint(): { x: number; y: number; z: number } {
+    const currentMap = getCurrentMap();
     const alivePositions: Array<{ x: number; y: number; z: number }> = [];
     for (const [, player] of this.players) {
       if (!player.schema.isDead) {
@@ -446,24 +501,24 @@ export class GameRoom extends Room<GameState> {
     }
 
     if (alivePositions.length === 0) {
-      const idx = Math.floor(Math.random() * THREE_LANE_MAP.spawnPoints.length);
-      return THREE_LANE_MAP.spawnPoints[idx];
+      const idx = Math.floor(Math.random() * currentMap.spawnPoints.length);
+      return currentMap.spawnPoints[idx];
     }
 
-    let bestPoint = THREE_LANE_MAP.spawnPoints[0];
+    let bestPoint = currentMap.spawnPoints[0];
     let bestScore = -Infinity;
 
-    for (const point of THREE_LANE_MAP.spawnPoints) {
+    for (const point of currentMap.spawnPoints) {
       // Safety: avoid any spawn inside obstacles
       let blocked = false;
-      for (const obs of THREE_LANE_MAP.obstacles) {
+      for (const obs of currentMap.obstacles) {
         if (isPointInsideBox(point, obs)) {
           blocked = true;
           break;
         }
       }
       if (!blocked) {
-        for (const occ of THREE_LANE_MAP.occluders) {
+        for (const occ of currentMap.occluders) {
           if (isPointInsideBox(point, occ)) {
             blocked = true;
             break;
@@ -471,7 +526,7 @@ export class GameRoom extends Room<GameState> {
         }
       }
       if (!blocked) {
-        for (const br of THREE_LANE_MAP.breakables) {
+        for (const br of currentMap.breakables) {
           if (isPointInsideBox(point, br)) {
             blocked = true;
             break;
@@ -495,7 +550,7 @@ export class GameRoom extends Room<GameState> {
 
     if (bestScore < MIN_SPAWN_DISTANCE * MIN_SPAWN_DISTANCE) {
       // If all spawns are close, randomize among top few to avoid predictability.
-      const sorted = [...THREE_LANE_MAP.spawnPoints].sort((a, b) => {
+      const sorted = [...currentMap.spawnPoints].sort((a, b) => {
         const aScore = alivePositions.reduce((min, pos) => {
           const dx = a.x - pos.x;
           const dz = a.z - pos.z;
@@ -513,15 +568,16 @@ export class GameRoom extends Room<GameState> {
     }
 
     if (bestScore === -Infinity) {
-      const idx = Math.floor(Math.random() * THREE_LANE_MAP.spawnPoints.length);
-      return THREE_LANE_MAP.spawnPoints[idx];
+      const idx = Math.floor(Math.random() * currentMap.spawnPoints.length);
+      return currentMap.spawnPoints[idx];
     }
 
     return bestPoint;
   }
 
   private isInSpawnProtectionZone(x: number, y: number, z: number): boolean {
-    return THREE_LANE_MAP.spawnProtectionZones.some((zone) =>
+    const currentMap = getCurrentMap();
+    return currentMap.spawnProtectionZones.some((zone) =>
       x >= zone.x - zone.hx &&
       x <= zone.x + zone.hx &&
       z >= zone.z - zone.hz &&

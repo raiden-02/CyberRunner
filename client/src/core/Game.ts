@@ -1,14 +1,17 @@
 import * as THREE from "three";
-import { GameRenderer } from "./GameRenderer.js";
+import { GameRenderer, DEFAULT_BLOOM_CONFIG } from "./GameRenderer.js";
 import { InputManager } from "../input/InputManager.js";
 import { NetworkManager } from "../network/NetworkManager.js";
 import { LocalPlayer } from "../player/LocalPlayer.js";
 import { RemotePlayers } from "../player/RemotePlayers.js";
 import { HUD } from "../ui/HUD.js";
-import { Level } from "../world/Level.js";
+import { createLevel, type LevelInstance } from "../world/LevelFactory.js";
 import { WeaponSystem } from "../weapons/weapon-system.js";
 import { Scoreboard } from "../ui/Scoreboard.js";
 import { Skybox } from "../world/Skybox.js";
+import { WEAPON_RENDER_LAYER } from "../world/lighting/CyberpunkLighting.js";
+import { getDefaultMapId, getMapEntry, isShootHouseNeonMap } from "../world/maps/map-registry.js";
+import { SHOOT_HOUSE_NEON_LIGHTING_CONFIG } from "../world/lighting/ShootHouseNeonLighting.js";
 
 const INPUT_SEND_RATE = 60;
 const DEBUG_RAY_LENGTH = 75;
@@ -27,8 +30,9 @@ export class Game {
   private hud: HUD;
   private scoreboard: Scoreboard;
   private weaponSystem: WeaponSystem;
-  private level: Level;
+  private level: LevelInstance;
   private skybox: Skybox;
+  private currentMapId = getDefaultMapId();
 
   private lastTime = performance.now();
   private running = false;
@@ -48,14 +52,24 @@ export class Game {
   private fpsFrames = 0;
 
   constructor() {
-    this.renderer = new GameRenderer();
+    // Determine lighting config based on map
+    const lightingConfig = isShootHouseNeonMap(this.currentMapId) 
+      ? SHOOT_HOUSE_NEON_LIGHTING_CONFIG 
+      : undefined;
+    
+    this.renderer = new GameRenderer(DEFAULT_BLOOM_CONFIG, lightingConfig);
     this.input = new InputManager(this.renderer.canvas, this.renderer.camera);
     this.network = new NetworkManager();
     this.localPlayer = new LocalPlayer(this.renderer.camera);
     this.remotePlayers = new RemotePlayers(this.renderer.scene);
     this.hud = new HUD();
     this.scoreboard = new Scoreboard();
-    this.level = new Level(this.renderer.scene);
+    
+    // Create level based on current map
+    this.level = createLevel(this.renderer.scene, this.currentMapId);
+    const mapEntry = getMapEntry(this.currentMapId);
+    console.log(`[Game] Loading map: ${mapEntry?.displayName || this.currentMapId}`);
+
     this.weaponSystem = new WeaponSystem(this.renderer.camera, {
       onFireInput: (firing, aimDir) => {
         if (this.network.connected) {
@@ -69,8 +83,12 @@ export class Game {
         this.network.sendReload(weaponId);
       }
     });
+    this.renderer.camera.layers.enable(WEAPON_RENDER_LAYER);
+    
+    // Load skybox from map configuration
     this.skybox = new Skybox(this.renderer.scene);
-    this.skybox.loadFromFolder("/skybox/cyberpunk").catch(() => undefined);
+    const skyboxPath = mapEntry?.skyboxPath || "/skybox/cyberpunk";
+    this.skybox.loadFromFolder(skyboxPath).catch(() => undefined);
 
     this.statusEl = document.createElement("div");
     this.statusEl.style.cssText = `
@@ -196,7 +214,8 @@ export class Game {
         moveZ: state.moveZ,
         lookYaw: state.yaw,
         lookPitch: state.pitch,
-        sprint: state.sprint,
+        sprint: state.sprint && !state.aiming,  // Can't sprint while aiming
+        aiming: state.aiming,
         crouchPressed: state.crouchPressed,
         crouchReleased: state.crouchReleased,
         crouchHeld: state.crouchHeld,
@@ -238,7 +257,8 @@ export class Game {
       moveX: inputState.moveX,
       moveZ: inputState.moveZ,
       yaw: inputState.yaw,
-      sprint: inputState.sprint,
+      sprint: inputState.sprint && !inputState.aiming,
+      aiming: inputState.aiming,
       jump: inputState.jumpPressed
     });
 
@@ -269,6 +289,7 @@ export class Game {
     if (serverPlayer) {
       if (!this.hasInitialPosition) {
         this.localPlayer.setInitialPosition(serverPlayer.x, serverPlayer.y, serverPlayer.z);
+        this.input.setInitialRotation(serverPlayer.rotationY, serverPlayer.pitch || 0);
         this.hasInitialPosition = true;
       }
 
@@ -316,6 +337,11 @@ export class Game {
     this.currentFov += (targetFov - this.currentFov) * Math.min(1, dt * FOV_LERP_SPEED);
     this.renderer.camera.fov = this.currentFov;
     this.renderer.camera.updateProjectionMatrix();
+
+    // Update level animations (neon flickers, etc.)
+    if (this.level.update) {
+      this.level.update();
+    }
 
     this.updateDebugRay();
     this.renderer.render();
@@ -392,6 +418,9 @@ export class Game {
 
     this.weaponSystem.dispose();
     this.input.dispose();
+    if (this.level.dispose) {
+      this.level.dispose();
+    }
     this.renderer.dispose();
   }
 }

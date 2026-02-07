@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { WEAPON_RENDER_LAYER } from "../world/lighting/CyberpunkLighting.js";
 
 export type ColorVariant = "cyan" | "magenta" | "green" | "orange" | "red";
 
@@ -176,6 +177,7 @@ export function addAngularAccent(parent: THREE.Object3D, material: THREE.Materia
 
 export function setFirstPersonMaterialFlags(root: THREE.Object3D): void {
   root.traverse((child) => {
+    child.layers.enable(WEAPON_RENDER_LAYER);
     if (child instanceof THREE.Mesh) {
       const isReticle = (child as any).userData?.isReticle === true;
       child.renderOrder = isReticle ? 999 : 1;
@@ -183,6 +185,10 @@ export function setFirstPersonMaterialFlags(root: THREE.Object3D): void {
       mats.forEach((mat) => {
         mat.depthTest = !isReticle;
         mat.depthWrite = !isReticle;
+        if (mat instanceof THREE.MeshStandardMaterial && !mat.emissive) {
+          mat.emissive = new THREE.Color(0x1a1a1a);
+          mat.emissiveIntensity = 0.15;
+        }
         mat.needsUpdate = true;
       });
     }

@@ -1,8 +1,9 @@
 // Physics constants (UE values → TS)
 export const MOVE = {
-  MaxSprintSpeed: 7.5,    // UE 750 uu/s ~ 7.5 m/s
-  WalkMaxSpeed:   5.0,    // UE 500 uu/s
-  JumpImpulse:    5.5,    // tune to your mass for ~1.2–1.6m jump
+  MaxSprintSpeed: 7.5,
+  WalkMaxSpeed:   5.0,
+  AdsMaxSpeed:    3.0,    // Slower than walking when aiming
+  JumpImpulse:    5.5,
 };
 
 // Phase 3: Crouch constants
@@ -62,7 +63,7 @@ export const WALLRUN = {
   }
 };
 
-// Character capsule (approx UE defaults)
+// Character capsule (approx UE defaults) - used for movement physics
 export const CAPSULE = {
   Radius:      0.35,
   HalfHeight:  0.90,
@@ -70,6 +71,28 @@ export const CAPSULE = {
   CrouchHalf:  0.60,
 };
 
+// Collision groups for separating physics from hit detection
+export const COLLISION_GROUPS = {
+  WORLD: 0x0001,      // Static world geometry
+  PLAYER_BODY: 0x0002, // Player movement capsule (physics only)
+  HITBOX: 0x0004,      // Hitbox sensors (hit detection only)
+  PROJECTILE: 0x0008,  // Projectiles
+};
 
+// Body part hitboxes - stacked vertically relative to capsule center (Y=0)
+export const HITBOX = {
+  Head:       { radius: 0.16, offsetY: 0.50 },
+  UpperTorso: { halfExtents: { x: 0.30, y: 0.17, z: 0.18 }, offsetY: 0.17 },
+  LowerTorso: { halfExtents: { x: 0.28, y: 0.15, z: 0.16 }, offsetY: -0.15 },
+  Arm:        { radius: 0.07, halfHeight: 0.22, offsetX: 0.38, offsetY: 0.10 },
+  Leg:        { radius: 0.10, halfHeight: 0.30, offsetX: 0.12, offsetY: -0.60 },
+};
 
-
+// Damage multipliers per body part (head uses weapon-specific headshotMultiplier instead)
+export const DAMAGE_MULTIPLIERS = {
+  head: 2.0,
+  upperTorso: 1.0,
+  lowerTorso: 0.95,
+  arm: 0.9,
+  leg: 0.85,
+};

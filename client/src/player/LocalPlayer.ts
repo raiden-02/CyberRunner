@@ -3,7 +3,8 @@ import * as THREE from "three";
 // Constants - match server values
 const MOVE_SPEED = 5.0;
 const SPRINT_SPEED = 7.5;
-const AIR_CONTROL = 0.3; // Reduced control in air
+const ADS_SPEED = 3.0;
+const AIR_CONTROL = 0.3;
 const GRAVITY = 9.81;
 const JUMP_IMPULSE = 5.5;
 
@@ -60,6 +61,7 @@ export class LocalPlayer {
       moveZ: number;
       yaw: number;
       sprint: boolean;
+      aiming: boolean;
       jump: boolean;
     }
   ): void {
@@ -67,41 +69,40 @@ export class LocalPlayer {
 
     const grounded = this.capsuleCenter.y <= CENTER_TO_FOOT + 0.1;
 
-    // Calculate movement direction from input
     const forwardX = -Math.sin(input.yaw);
     const forwardZ = -Math.cos(input.yaw);
     const rightX = Math.cos(input.yaw);
     const rightZ = -Math.sin(input.yaw);
 
-    // Raw input direction (not normalized - counter-strafing cancels out)
     const inputDirX = input.moveZ * forwardX + input.moveX * rightX;
     const inputDirZ = input.moveZ * forwardZ + input.moveX * rightZ;
     const inputMag = Math.hypot(inputDirX, inputDirZ);
     this.lastGrounded = grounded;
     this.lastInputMag = inputMag;
 
-    // GROUND: Instant velocity - no acceleration, no momentum
-    // This gives CoD/CS feel: press = move, release = stop, counter-strafe = stop
+    // Determine speed: ADS < Walk < Sprint (ADS blocks sprinting)
+    const getSpeed = () => {
+      if (input.aiming) return ADS_SPEED;
+      if (input.sprint) return SPRINT_SPEED;
+      return MOVE_SPEED;
+    };
+
     if (grounded) {
       if (inputMag < 0.01) {
-        // No input or counter-strafing (A+D) = instant stop
         this.velocity.x = 0;
         this.velocity.z = 0;
       } else {
-        // Has input = instant velocity in that direction
-        const speed = input.sprint ? SPRINT_SPEED : MOVE_SPEED;
+        const speed = getSpeed();
         const normX = inputDirX / inputMag;
         const normZ = inputDirZ / inputMag;
         this.velocity.x = normX * speed;
         this.velocity.z = normZ * speed;
       }
     } else {
-      // AIR: Some momentum, reduced control
-      const speed = input.sprint ? SPRINT_SPEED : MOVE_SPEED;
+      const speed = getSpeed();
       const targetVelX = inputMag > 0.01 ? (inputDirX / inputMag) * speed : 0;
       const targetVelZ = inputMag > 0.01 ? (inputDirZ / inputMag) * speed : 0;
       
-      // Blend toward target with reduced air control
       const airBlend = AIR_CONTROL * dt * 10;
       this.velocity.x += (targetVelX - this.velocity.x) * airBlend;
       this.velocity.z += (targetVelZ - this.velocity.z) * airBlend;

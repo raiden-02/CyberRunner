@@ -23,6 +23,7 @@ export class CharacterController implements CharacterDeps {
     lookYaw: 0,
     lookPitch: 0,
     sprint: false,
+    aiming: false,
     crouchPressed: false,
     crouchReleased: false,
     crouchHeld: false,

@@ -1,14 +1,12 @@
 // Network input message types
 export type InputMsg = {
-  // Client input sequence number (monotonic increasing).
-  // Used for server->client ack so the client can reconcile via rewind+replay.
   seq: number;
-  // axes in local space
-  moveX: number; // strafe -1..1 (A/D keys)
-  moveZ: number; // forward -1..1 (W/S keys)
-  lookYaw: number; // radians/world yaw (for forward dir)
-  lookPitch: number; // radians/camera pitch (up/down look)
+  moveX: number;
+  moveZ: number;
+  lookYaw: number;
+  lookPitch: number;
   sprint: boolean;
+  aiming: boolean;
   crouchPressed: boolean;
   crouchReleased: boolean;
   crouchHeld: boolean;
@@ -31,12 +29,15 @@ export type ReloadInputMsg = {
   weaponId: string; // Weapon to reload
 };
 
+export type BodyPartHit = "head" | "upperTorso" | "lowerTorso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";
+
 export type ShotFiredMsg = {
   shooterId: string;
   weaponId: string;
   origin: { x: number; y: number; z: number };
   direction: { x: number; y: number; z: number };
   timestamp: number;
+  bodyPart?: BodyPartHit;
 };
 
 // Damage and health messages
@@ -54,6 +55,8 @@ export type HealthChangeMsg = {
   maxHealth: number;
   isDead: boolean;
   respawnTime?: number;
+  bodyPart?: BodyPartHit;
+  isHeadshot?: boolean;
 };
 
 export type BreakableDestroyedMsg = {

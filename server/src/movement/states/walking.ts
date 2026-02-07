@@ -48,7 +48,7 @@ export class WalkingState extends BaseState {
     if (input.crouchPressed) {
       const currentSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
       
-      if (input.sprint && currentSpeed >= SLIDE.MinSlideSpeed && ctx.isGrounded()) {
+      if (input.sprint && !input.aiming && currentSpeed >= SLIDE.MinSlideSpeed && ctx.isGrounded()) {
         return this.transitionToSliding(ctx);
       } else if (ctx.isGrounded()) {
         return this.transitionToCrouching(ctx);
@@ -68,7 +68,7 @@ export class WalkingState extends BaseState {
     const input = ctx.input;
     const desired = this.desiredGroundVelocity(ctx);
     
-    const acceleration = input.sprint ? 12.0 : 8.0;
+    const acceleration = input.aiming ? 6.0 : (input.sprint ? 12.0 : 8.0);
     const deceleration = 16.0;
     const maxAccel = Math.abs(input.moveX) > 0.1 || Math.abs(input.moveZ) > 0.1 ? acceleration : deceleration;
     

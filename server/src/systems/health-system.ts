@@ -1,5 +1,6 @@
 import { PlayerState } from "../PlayerState.js";
-import { DamageMsg, HealthChangeMsg } from "../net/messages.js";
+import { DamageMsg, HealthChangeMsg, BodyPartHit } from "../net/messages.js";
+import { calculateSpawnFacing } from "../world/maps/map-registry.js";
 
 export class HealthSystem {
   private static RESPAWN_DELAY = 3.0; // seconds
@@ -80,6 +81,10 @@ export class HealthSystem {
       player.y = spawnPosition.y;
       player.z = spawnPosition.z;
       
+      // Orient player to face center of map
+      player.rotationY = calculateSpawnFacing(spawnPosition.x, spawnPosition.z);
+      player.pitch = 0;
+      
       // Reset movement state
       player.velX = 0;
       player.velY = 0;
@@ -115,19 +120,19 @@ export class HealthSystem {
     };
   }
 
-  /**
-   * Create a health change message for broadcasting
-   */
   static createHealthChangeMessage(
     playerId: string,
-    player: PlayerState
+    player: PlayerState,
+    bodyPart?: BodyPartHit
   ): HealthChangeMsg {
     return {
       playerId,
       newHealth: player.health,
       maxHealth: player.maxHealth,
       isDead: player.isDead,
-      respawnTime: player.isDead ? player.respawnTime : undefined
+      respawnTime: player.isDead ? player.respawnTime : undefined,
+      bodyPart,
+      isHeadshot: bodyPart === "head"
     };
   }
 

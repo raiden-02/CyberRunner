@@ -27,6 +27,11 @@ export class InputManager {
   
   public yaw = 0;
   public pitch = 0;
+
+  public setInitialRotation(yaw: number, pitch: number = 0): void {
+    this.yaw = yaw;
+    this.pitch = pitch;
+  }
   
   // Edge detection state
   private prevCrouchState = false;
