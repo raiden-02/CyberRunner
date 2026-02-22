@@ -7,9 +7,10 @@ import { CAPSULE } from "./physics/constants.js";
 import { HealthSystem } from "./systems/health-system.js";
 import { WeaponSystem } from "./systems/weapon-system.js";
 import { getWeaponConfig, isValidWeapon } from "./weapons/weapon-config.js";
-import { createHitboxes, removeHitboxes, type HitboxSet } from "./physics/hitbox-system.js";
+import { createHitboxes, removeHitboxes, HitboxRegistry, type HitboxSet } from "./physics/hitbox-system.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { calculateSpawnFacing, getCurrentMap, isPointInsideBox, setCurrentMap, type MapId } from "./world/maps/map-registry.js";
+import { LobbyService } from "./services/lobby-service.js";
 
 const TICK_RATE = 60; // Hz
 const DEFAULT_MAX_PLAYERS = 8;
@@ -35,9 +36,11 @@ export class GameRoom extends Room<GameState> {
   private maxPlayers = DEFAULT_MAX_PLAYERS;
   private breakablesByHandle = new Map<number, BreakableRuntime>();
   private breakablesById = new Map<number, BreakableRuntime>();
+  private hitboxRegistry = new HitboxRegistry();
+
+  private joinCode: string = "";
 
   async onAuth(_client: Client, _options: any): Promise<boolean> {
-    // Reject joins cleanly with a message BEFORE onJoin runs.
     const max = this.maxPlayers ?? DEFAULT_MAX_PLAYERS;
     if (this.clients.length >= max) {
       throw new Error(`Room is full (${max}/${max}). Try again later.`);
@@ -47,7 +50,10 @@ export class GameRoom extends Room<GameState> {
 
   async onCreate(_options: any) {
     this.setState(new GameState());
-    console.log("[GameRoom] Created");
+    
+    const roomInfo = LobbyService.registerRoom(this.roomId);
+    this.joinCode = roomInfo.joinCode;
+    console.log(`[GameRoom] Created (joinCode: ${roomInfo.joinCode})`);
 
     this.maxPlayers = Number(process.env.MAX_PLAYERS || DEFAULT_MAX_PLAYERS);
     if (!Number.isFinite(this.maxPlayers) || this.maxPlayers <= 0) {
@@ -151,13 +157,31 @@ export class GameRoom extends Room<GameState> {
     this.onMessage("weapon_switch", (client, data: WeaponSwitchMsg) => {
       const player = this.players.get(client.sessionId);
       if (!player) return;
-      
-      if (!isValidWeapon(data.weaponId)) return;
       if (player.schema.reloading) return;
       
-      player.schema.equippedWeapon = data.weaponId;
+      // Only allow switching to primary or secondary weapon
+      const { primaryWeaponId, secondaryWeaponId } = player.schema;
+      let newWeapon: string | null = null;
+      let newSlot = player.schema.activeSlot;
       
-      const config = getWeaponConfig(data.weaponId);
+      if (data.weaponId === primaryWeaponId) {
+        newWeapon = primaryWeaponId;
+        newSlot = 0;
+      } else if (data.weaponId === secondaryWeaponId) {
+        newWeapon = secondaryWeaponId;
+        newSlot = 1;
+      } else if (data.weaponId === "toggle") {
+        // Toggle between slots
+        newSlot = player.schema.activeSlot === 0 ? 1 : 0;
+        newWeapon = newSlot === 0 ? primaryWeaponId : secondaryWeaponId;
+      }
+      
+      if (!newWeapon || newWeapon === player.schema.equippedWeapon) return;
+      
+      player.schema.activeSlot = newSlot;
+      player.schema.equippedWeapon = newWeapon;
+      
+      const config = getWeaponConfig(newWeapon);
       if (config) {
         player.schema.ammoInMag = config.magazineSize;
         player.schema.ammoReserve = config.reserveMax;
@@ -211,8 +235,7 @@ export class GameRoom extends Room<GameState> {
     });
   }
 
-  onJoin(client: Client) {
-    // Safety check (in case proxy/auth ordering differs)
+  onJoin(client: Client, options?: { displayName?: string; primaryWeaponId?: string; secondaryWeaponId?: string }) {
     if (this.clients.length > this.maxPlayers) {
       client.leave(4000, `Room is full (${this.maxPlayers}/${this.maxPlayers}).`);
       return;
@@ -223,12 +246,25 @@ export class GameRoom extends Room<GameState> {
     schema.x = spawn.x;
     schema.y = spawn.y;
     schema.z = spawn.z;
-    // Orient player to face center of map
     schema.rotationY = calculateSpawnFacing(spawn.x, spawn.z);
     schema.pitch = 0;
     schema.movementState = MovementState.Walking;
     schema.isSpawnProtected = true;
     schema.spawnProtectionTime = 2.5;
+    schema.displayName = options?.displayName || "Player";
+    
+    // Set loadout
+    schema.primaryWeaponId = options?.primaryWeaponId || "AR_1";
+    schema.secondaryWeaponId = options?.secondaryWeaponId || "PISTOL_1";
+    schema.activeSlot = 0;
+    schema.equippedWeapon = schema.primaryWeaponId;
+    
+    // Initialize ammo for equipped weapon
+    const config = getWeaponConfig(schema.equippedWeapon);
+    if (config) {
+      schema.ammoInMag = config.magazineSize;
+      schema.ammoReserve = config.reserveMax;
+    }
     
     this.state.players.set(client.sessionId, schema);
 
@@ -251,7 +287,7 @@ export class GameRoom extends Room<GameState> {
     const ctrl = new CharacterController(body, collider, controller);
     
     // Create hitbox colliders for body part damage detection
-    const hitboxes = createHitboxes(this.world, body, client.sessionId);
+    const hitboxes = createHitboxes(this.world, body, client.sessionId, this.hitboxRegistry);
     
     this.players.set(client.sessionId, {
       ctrl,
@@ -259,6 +295,19 @@ export class GameRoom extends Room<GameState> {
       hitboxes
     });
 
+    LobbyService.updatePlayerCount(this.roomId, this.clients.length);
+    
+    // Send room info to the client
+    const roomInfo = LobbyService.getRoomById(this.roomId);
+    if (roomInfo) {
+      client.send("room_info", {
+        roomId: this.roomId,
+        joinCode: roomInfo.joinCode,
+        playerCount: this.clients.length,
+        maxPlayers: this.maxPlayers,
+      });
+    }
+    
     console.log(`[GameRoom] Player ${client.sessionId} joined`);
   }
 
@@ -273,11 +322,13 @@ export class GameRoom extends Room<GameState> {
       this.world.removeRigidBody(player.ctrl.body);
     }
     this.players.delete(client.sessionId);
+    LobbyService.updatePlayerCount(this.roomId, this.clients.length);
     console.log(`[GameRoom] Player ${client.sessionId} left`);
   }
 
   onDispose() {
     this.running = false;
+    LobbyService.unregisterRoom(this.roomId);
     console.log("[GameRoom] Disposed");
   }
 
@@ -392,10 +443,12 @@ export class GameRoom extends Room<GameState> {
               origin,
               aim,
               this.players,
-              now
+              now,
+              this.hitboxRegistry
             );
 
             if (shotResult.shotFired) {
+              
               player.schema.nextFireTime = WeaponSystem.computeNextFireTime(
                 player.schema.equippedWeapon,
                 now

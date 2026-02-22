@@ -38,17 +38,25 @@ export class PlayerState extends Schema {
   @type("boolean") isSpawnProtected: boolean = false;
   @type("number") spawnProtectionTime: number = 0;
 
+  // Player identity
+  @type("string") displayName: string = "Player";
+
   // Scoreboard stats
   @type("uint16") kills: number = 0;
   @type("uint16") deaths: number = 0;
   @type("uint32") score: number = 0;
   
-  // Weapon state
+  // Loadout (2 weapons only)
+  @type("string") primaryWeaponId: string = "AR_1";
+  @type("string") secondaryWeaponId: string = "PISTOL_1";
+  @type("uint8") activeSlot: number = 0; // 0 = primary, 1 = secondary
+  
+  // Current weapon state
   @type("string") equippedWeapon: string = "AR_1";
   @type("uint8") ammoInMag: number = 30;
   @type("uint16") ammoReserve: number = 120;
   @type("boolean") firing: boolean = false;
-  @type("number") nextFireTime: number = 0; // Server time when next shot is allowed
+  @type("number") nextFireTime: number = 0;
   @type("boolean") reloading: boolean = false;
-  @type("number") reloadEndTime: number = 0; // Server time when reload completes
+  @type("number") reloadEndTime: number = 0;
 }

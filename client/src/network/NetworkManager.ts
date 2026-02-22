@@ -19,6 +19,13 @@ export interface BreakableDestroyedMessage {
   id: number;
 }
 
+export interface RoomInfoMessage {
+  roomId: string;
+  joinCode: string;
+  playerCount: number;
+  maxPlayers: number;
+}
+
 export class NetworkManager {
   private client: Client;
   private room?: Room;
@@ -26,6 +33,7 @@ export class NetworkManager {
   public onHealthChange?: (msg: HealthChangeMessage) => void;
   public onShotFired?: (msg: ShotFiredMessage) => void;
   public onBreakableDestroyed?: (msg: BreakableDestroyedMessage) => void;
+  public onRoomInfo?: (msg: RoomInfoMessage) => void;
   public onConnected?: (sessionId: string) => void;
   public onError?: (error: any) => void;
 
@@ -53,10 +61,26 @@ export class NetworkManager {
     this.client = new Client(`${wsScheme}${host}:${port}`);
   }
 
-  public async connect(): Promise<void> {
+  public async connect(options: {
+    roomId?: string;
+    forceCreate?: boolean;
+    displayName?: string;
+    primaryWeaponId?: string;
+    secondaryWeaponId?: string;
+  } = {}): Promise<void> {
     try {
-      this.room = await this.client.joinOrCreate("game_room");
-      console.log("Connected to game room");
+      const roomOptions: Record<string, any> = {};
+      if (options.displayName) roomOptions.displayName = options.displayName;
+      if (options.primaryWeaponId) roomOptions.primaryWeaponId = options.primaryWeaponId;
+      if (options.secondaryWeaponId) roomOptions.secondaryWeaponId = options.secondaryWeaponId;
+      
+      if (options.roomId) {
+        this.room = await this.client.joinById(options.roomId, roomOptions);
+      } else if (options.forceCreate) {
+        this.room = await this.client.create("game_room", roomOptions);
+      } else {
+        this.room = await this.client.joinOrCreate("game_room", roomOptions);
+      }
 
       if (this.onConnected) {
         this.onConnected(this.sessionId);
@@ -68,6 +92,7 @@ export class NetworkManager {
       if (this.onError) {
         this.onError(e);
       }
+      throw e; // Re-throw to allow caller to handle
     }
   }
 
@@ -89,6 +114,12 @@ export class NetworkManager {
     this.room.onMessage("breakable_destroyed", (msg: BreakableDestroyedMessage) => {
       if (this.onBreakableDestroyed) {
         this.onBreakableDestroyed(msg);
+      }
+    });
+
+    this.room.onMessage("room_info", (msg: RoomInfoMessage) => {
+      if (this.onRoomInfo) {
+        this.onRoomInfo(msg);
       }
     });
   }

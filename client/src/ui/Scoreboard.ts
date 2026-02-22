@@ -41,6 +41,7 @@ export class Scoreboard {
 
     const rows: Array<{
       id: string;
+      displayName: string;
       kills: number;
       deaths: number;
       score: number;
@@ -52,6 +53,7 @@ export class Scoreboard {
       if (!p) return;
       rows.push({
         id,
+        displayName: p.displayName || "Player",
         kills: Number(p.kills || 0),
         deaths: Number(p.deaths || 0),
         score: Number(p.score || 0),
@@ -85,7 +87,7 @@ export class Scoreboard {
     const body = rows.map((r) => {
       const isLocal = r.id === localId;
       const kd = r.deaths > 0 ? (r.kills / r.deaths).toFixed(2) : `${r.kills}.00`;
-      const name = isLocal ? "YOU" : r.id.slice(0, 6);
+      const name = isLocal ? `${r.displayName} (YOU)` : r.displayName;
       const hp = r.isDead ? "DEAD" : String(r.health);
       const rowStyle = `
         display:grid;

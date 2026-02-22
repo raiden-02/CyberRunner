@@ -12,6 +12,8 @@ import { Skybox } from "../world/Skybox.js";
 import { WEAPON_RENDER_LAYER } from "../world/lighting/CyberpunkLighting.js";
 import { getDefaultMapId, getMapEntry, isShootHouseNeonMap } from "../world/maps/map-registry.js";
 import { SHOOT_HOUSE_NEON_LIGHTING_CONFIG } from "../world/lighting/ShootHouseNeonLighting.js";
+import type { UserProfile } from "../api/client.js";
+import type { PlayAction } from "../ui/screens/LobbyScreen.js";
 
 const INPUT_SEND_RATE = 60;
 const DEBUG_RAY_LENGTH = 75;
@@ -50,6 +52,7 @@ export class Game {
   private fpsEl: HTMLDivElement;
   private fpsAccumMs = 0;
   private fpsFrames = 0;
+  private userProfile: UserProfile | null = null;
 
   constructor() {
     // Determine lighting config based on map
@@ -128,10 +131,30 @@ export class Game {
     this.setupCallbacks();
   }
 
+  private activeSlot = 0; // 0 = primary, 1 = secondary
+
   private setupCallbacks(): void {
-    this.input.onWeaponSwitch = (weaponId: string) => {
+    this.input.onWeaponSwitch = (slot: string) => {
+      const primary = this.userProfile?.primaryWeaponId || "AR_1";
+      const secondary = this.userProfile?.secondaryWeaponId || "PISTOL_1";
+      
+      let weaponId: string;
+      if (slot === "primary") {
+        this.activeSlot = 0;
+        weaponId = primary;
+      } else if (slot === "secondary") {
+        this.activeSlot = 1;
+        weaponId = secondary;
+      } else if (slot === "toggle") {
+        this.activeSlot = this.activeSlot === 0 ? 1 : 0;
+        weaponId = this.activeSlot === 0 ? primary : secondary;
+      } else {
+        return;
+      }
+      
       this.weaponSystem.switchWeapon(weaponId);
       this.hud.setWeapon(weaponId);
+      this.network.sendWeaponSwitch(weaponId);
     };
 
     this.input.onReload = () => {
@@ -158,6 +181,10 @@ export class Game {
       this.startInputSendLoop();
     };
 
+    this.network.onRoomInfo = (info) => {
+      this.hud.setRoomInfo(info.joinCode, info.playerCount, info.maxPlayers);
+    };
+
     this.network.onError = (err) => {
       const msg = (err as any)?.message ? String((err as any).message) : String(err);
       this.statusEl.style.display = "block";
@@ -182,17 +209,36 @@ export class Game {
     };
   }
 
-  public async start(): Promise<void> {
+  public setUserProfile(profile: UserProfile): void {
+    this.userProfile = profile;
+  }
+
+  public async start(action?: PlayAction): Promise<void> {
     if (this.running) return;
     this.running = true;
 
+    // Use user's primary weapon or fallback to AR_1
+    const primaryWeapon = this.userProfile?.primaryWeaponId || "AR_1";
+    this.activeSlot = 0;
+    
     this.statusEl.textContent = "Loading weapons...";
-    this.weaponSystem.switchWeapon("AR_1");
-    this.hud.setWeapon("AR_1");
+    this.weaponSystem.switchWeapon(primaryWeapon);
+    this.hud.setWeapon(primaryWeapon);
     this.hud.update();
 
     this.statusEl.textContent = "Connecting...";
-    await this.network.connect();
+    
+    const displayName = this.userProfile?.displayName || "Player";
+    const primaryWeaponId = this.userProfile?.primaryWeaponId || "AR_1";
+    const secondaryWeaponId = this.userProfile?.secondaryWeaponId || "PISTOL_1";
+    
+    await this.network.connect({
+      roomId: action?.roomId,
+      forceCreate: action?.type === "create",
+      displayName,
+      primaryWeaponId,
+      secondaryWeaponId,
+    });
 
     this.updateCameraRotation();
     this.animate();
@@ -273,6 +319,13 @@ export class Game {
     const state = this.network.state;
     const players = state?.players;
     const myId = this.network.sessionId;
+
+    // Update player count in HUD
+    if (players) {
+      let count = 0;
+      players.forEach(() => count++);
+      this.hud.updatePlayerCount(count);
+    }
 
     this.remotePlayers.update(dt, players);
 

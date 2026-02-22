@@ -7,7 +7,7 @@ import {
   generatePelletSpread 
 } from '../weapons/weapon-config.js';
 import { ShotFiredMsg } from '../net/messages.js';
-import { getHitboxInfo, getDamageMultiplier, type BodyPart } from '../physics/hitbox-system.js';
+import { getDamageMultiplier, HitboxRegistry, type BodyPart } from '../physics/hitbox-system.js';
 
 export interface HitResult {
   hit: boolean;
@@ -53,7 +53,8 @@ export class WeaponSystem {
     direction: { x: number; y: number; z: number },
     maxDistance: number,
     players: Map<string, { schema: PlayerState; ctrl: any }>,
-    shooterId: string
+    shooterId: string,
+    hitboxRegistry: HitboxRegistry
   ): HitResult {
     const len = Math.sqrt(direction.x ** 2 + direction.y ** 2 + direction.z ** 2);
     if (len === 0) return { hit: false };
@@ -99,11 +100,11 @@ export class WeaponSystem {
     // Prefer headshots within 30cm of closest hit
     const PRIORITY_TOLERANCE = 0.3;
     let bestHit = hits[0];
-    let bestHitboxInfo = getHitboxInfo(bestHit.collider.handle);
+    let bestHitboxInfo = hitboxRegistry.get(bestHit.collider.handle);
     
     for (const hit of hits) {
       if (hit.toi > closestToi + PRIORITY_TOLERANCE) break;
-      const hitboxInfo = getHitboxInfo(hit.collider.handle);
+      const hitboxInfo = hitboxRegistry.get(hit.collider.handle);
       if (hitboxInfo?.bodyPart === "head") {
         bestHit = hit;
         bestHitboxInfo = hitboxInfo;
@@ -163,7 +164,8 @@ export class WeaponSystem {
     origin: { x: number; y: number; z: number },
     direction: { x: number; y: number; z: number },
     players: Map<string, { schema: PlayerState; ctrl: any }>,
-    serverTime: number
+    serverTime: number,
+    hitboxRegistry: HitboxRegistry
   ): {
     shotFired: boolean;
     hitPlayerId?: string;
@@ -190,12 +192,12 @@ export class WeaponSystem {
     if (config.type === "hitscan") {
       if (config.pelletCount && config.pelletCount > 1) {
         return WeaponSystem.processShotgunShot(
-          world, shooterId, origin, direction, players, serverTime, config
+          world, shooterId, origin, direction, players, serverTime, config, hitboxRegistry
         );
       }
       
       const hitResult = WeaponSystem.performHitscan(
-        world, origin, direction, config.range, players, shooterId
+        world, origin, direction, config.range, players, shooterId, hitboxRegistry
       );
 
       if (hitResult.hit && hitResult.playerId) {
@@ -263,7 +265,8 @@ export class WeaponSystem {
     direction: { x: number; y: number; z: number },
     players: Map<string, { schema: PlayerState; ctrl: any }>,
     serverTime: number,
-    config: ReturnType<typeof getWeaponConfig>
+    config: ReturnType<typeof getWeaponConfig>,
+    hitboxRegistry: HitboxRegistry
   ): ReturnType<typeof WeaponSystem.processShot> {
     if (!config) return { shotFired: false };
     
@@ -274,7 +277,7 @@ export class WeaponSystem {
     
     for (const pelletDir of pelletDirs) {
       const hitResult = WeaponSystem.performHitscan(
-        world, origin, pelletDir, config.range, players, shooterId
+        world, origin, pelletDir, config.range, players, shooterId, hitboxRegistry
       );
       
       if (hitResult.hit && hitResult.playerId) {

@@ -7,12 +7,28 @@ export type BodyPart = BodyPartHit;
 export interface HitboxSet {
   bodyHandle: number;
   colliders: Map<number, BodyPart>;
+  registry: HitboxRegistry;
 }
 
-const hitboxRegistry = new Map<number, { playerId: string; bodyPart: BodyPart }>();
+// Room-scoped hitbox registry to avoid cross-room collider handle collisions
+export class HitboxRegistry {
+  private registry = new Map<number, { playerId: string; bodyPart: BodyPart }>();
 
-export function getHitboxInfo(colliderHandle: number): { playerId: string; bodyPart: BodyPart } | undefined {
-  return hitboxRegistry.get(colliderHandle);
+  get(colliderHandle: number): { playerId: string; bodyPart: BodyPart } | undefined {
+    return this.registry.get(colliderHandle);
+  }
+
+  set(colliderHandle: number, info: { playerId: string; bodyPart: BodyPart }): void {
+    this.registry.set(colliderHandle, info);
+  }
+
+  delete(colliderHandle: number): void {
+    this.registry.delete(colliderHandle);
+  }
+
+  clear(): void {
+    this.registry.clear();
+  }
 }
 
 export function getDamageMultiplier(bodyPart: BodyPart): number {
@@ -40,7 +56,8 @@ function createSensorCollider(
 export function createHitboxes(
   world: RAPIER.World,
   parentBody: RAPIER.RigidBody,
-  playerId: string
+  playerId: string,
+  registry: HitboxRegistry
 ): HitboxSet {
   const colliders = new Map<number, BodyPart>();
   const bodyHandle = parentBody.handle;
@@ -58,14 +75,14 @@ export function createHitboxes(
   for (const { desc, part } of parts) {
     const collider = createSensorCollider(world, parentBody, desc);
     colliders.set(collider.handle, part);
-    hitboxRegistry.set(collider.handle, { playerId, bodyPart: part });
+    registry.set(collider.handle, { playerId, bodyPart: part });
   }
 
-  return { bodyHandle, colliders };
+  return { bodyHandle, colliders, registry };
 }
 
 export function removeHitboxes(hitboxSet: HitboxSet): void {
   for (const handle of hitboxSet.colliders.keys()) {
-    hitboxRegistry.delete(handle);
+    hitboxSet.registry.delete(handle);
   }
 }

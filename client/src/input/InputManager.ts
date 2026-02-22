@@ -127,20 +127,16 @@ export class InputManager {
       this.sprintToggle = !this.sprintToggle;
     }
 
-    // Weapon switching (8 weapon slots)
-    const weaponKeys: Record<string, string> = {
-      "Digit1": "AR_1",       // Assault Rifle
-      "Digit2": "SMG_1",      // SMG
-      "Digit3": "SHOTGUN_1",  // Shotgun
-      "Digit4": "LMG_1",      // LMG
-      "Digit5": "SNIPER_1",   // Sniper
-      "Digit6": "PISTOL_1",   // Pistol
-      "Digit7": "ROCKET_1",   // Rocket Launcher
-      "Digit8": "GL_1"        // Grenade Launcher
-    };
-
-    if (weaponKeys[e.code] && this.onWeaponSwitch) {
-      this.onWeaponSwitch(weaponKeys[e.code]);
+    // Weapon switching (2-slot loadout)
+    // 1 = primary, 2 = secondary, Q = toggle
+    if (this.onWeaponSwitch) {
+      if (e.code === "Digit1") {
+        this.onWeaponSwitch("primary");
+      } else if (e.code === "Digit2") {
+        this.onWeaponSwitch("secondary");
+      } else if (e.code === "KeyQ") {
+        this.onWeaponSwitch("toggle");
+      }
     }
 
     // Reload

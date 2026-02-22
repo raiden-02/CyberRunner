@@ -2,7 +2,11 @@ import { WEAPON_DEFINITIONS } from "../weapons/definitions.js";
 
 export class HUD {
   private element: HTMLDivElement;
+  private roomInfoElement: HTMLDivElement;
   private currentWeaponId = "AR_1";
+  private joinCode: string | null = null;
+  private playerCount = 0;
+  private maxPlayers = 0;
 
   constructor() {
     this.element = document.createElement("div");
@@ -23,6 +27,50 @@ export class HUD {
       line-height: 1.6;
     `;
     document.body.appendChild(this.element);
+
+    // Room info display (top right)
+    this.roomInfoElement = document.createElement("div");
+    this.roomInfoElement.style.cssText = `
+      position: fixed;
+      top: 50px;
+      right: 20px;
+      color: #fff;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 12px;
+      background: linear-gradient(135deg, rgba(0,20,40,0.85) 0%, rgba(0,10,20,0.9) 100%);
+      padding: 10px 14px;
+      border-radius: 4px;
+      border-left: 3px solid #00ff88;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0,255,136,0.15);
+      display: none;
+    `;
+    document.body.appendChild(this.roomInfoElement);
+  }
+
+  public setRoomInfo(joinCode: string, playerCount: number, maxPlayers: number): void {
+    this.joinCode = joinCode;
+    this.playerCount = playerCount;
+    this.maxPlayers = maxPlayers;
+    this.updateRoomInfo();
+  }
+
+  public updatePlayerCount(count: number): void {
+    this.playerCount = count;
+    this.updateRoomInfo();
+  }
+
+  private updateRoomInfo(): void {
+    if (!this.joinCode) {
+      this.roomInfoElement.style.display = "none";
+      return;
+    }
+    this.roomInfoElement.style.display = "block";
+    this.roomInfoElement.innerHTML = `
+      <div style="color:#00ff88;font-weight:600;margin-bottom:4px;">JOIN CODE</div>
+      <div style="font-size:18px;font-weight:bold;letter-spacing:2px;margin-bottom:6px;">${this.joinCode}</div>
+      <div style="color:#888;">Players: ${this.playerCount}/${this.maxPlayers}</div>
+    `;
   }
 
   public setWeapon(weaponId: string): void {
