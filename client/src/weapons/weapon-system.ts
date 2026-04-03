@@ -130,6 +130,10 @@ export class WeaponSystem {
     return this.lastAdsAlpha;
   }
 
+  public isScopeActive(): boolean {
+    return this.scopeOverlay !== undefined && this.lastAdsAlpha > 0.1;
+  }
+
   public dispose(): void {
     this.disposeViewModel();
     this.disposeScopeOverlay();

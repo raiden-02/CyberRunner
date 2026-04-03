@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { SettingsManager, type KeybindSettings } from "../settings/SettingsManager.js";
 
 export interface InputState {
   moveX: number;
@@ -28,25 +29,31 @@ export class InputManager {
   public yaw = 0;
   public pitch = 0;
 
+  private keybinds: KeybindSettings;
+  private baseSensitivity = 0.002;
+  
+  private currentAdsAlpha = 0;
+  private isScoped = false;
+
   public setInitialRotation(yaw: number, pitch: number = 0): void {
     this.yaw = yaw;
     this.pitch = pitch;
   }
   
-  // Edge detection state
   private prevCrouchState = false;
   private prevJumpState = false;
   private prevDashState = false;
 
-  // Weapon switching callback
   public onWeaponSwitch?: (weaponId: string) => void;
   public onReload?: () => void;
   public onDebugDamage?: () => void;
   public onToggleDebug?: () => void;
+  
+  public onSpikeInteract?: () => void;
+  public onSpikeCancel?: () => void;
 
   private disposed = false;
 
-  // Expose raw key state for client-side prediction
   public isKeyDown(code: string): boolean {
     return !!this.keys[code];
   }
@@ -54,10 +61,23 @@ export class InputManager {
   constructor(canvas: HTMLCanvasElement, camera: THREE.Camera) {
     this.canvas = canvas;
     this.camera = camera;
+    this.keybinds = SettingsManager.getInstance().getKeybinds();
     this.setupEventListeners();
+    
+    SettingsManager.getInstance().addChangeListener(() => {
+      this.updateKeybinds();
+    });
   }
 
-  // Store handler refs so we can remove them in dispose()
+  updateKeybinds(): void {
+    this.keybinds = SettingsManager.getInstance().getKeybinds();
+  }
+
+  setAdsState(adsAlpha: number, isScoped: boolean): void {
+    this.currentAdsAlpha = adsAlpha;
+    this.isScoped = isScoped;
+  }
+
   private handleCanvasClick = (): void => {
     this.canvas.focus();
     this.canvas.requestPointerLock();
@@ -83,8 +103,18 @@ export class InputManager {
 
   private handleMouseMove = (e: MouseEvent): void => {
     if (document.pointerLockElement === this.canvas) {
-      this.yaw -= (e.movementX || 0) * 0.002;
-      this.pitch -= (e.movementY || 0) * 0.002;
+      const graphics = SettingsManager.getInstance().getGraphics();
+      let sensitivity = this.baseSensitivity * graphics.mouseSensitivity;
+      
+      if (this.currentAdsAlpha > 0) {
+        const adsMultiplier = this.isScoped 
+          ? graphics.scopeSensitivityMultiplier 
+          : graphics.adsSensitivityMultiplier;
+        sensitivity *= THREE.MathUtils.lerp(1, adsMultiplier, this.currentAdsAlpha);
+      }
+      
+      this.yaw -= (e.movementX || 0) * sensitivity;
+      this.pitch -= (e.movementY || 0) * sensitivity;
       this.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.pitch));
     }
   };
@@ -93,19 +123,11 @@ export class InputManager {
   private handleKeyUp = (e: KeyboardEvent): void => this.onKeyUp(e);
 
   private setupEventListeners(): void {
-    // Pointer lock
     this.canvas.addEventListener("click", this.handleCanvasClick);
     this.canvas.addEventListener("contextmenu", this.handleContextMenu);
-
-    // Mouse buttons
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
-
     this.canvas.addEventListener("mouseup", this.handleMouseUp);
-
-    // Mouse movement
     document.addEventListener("mousemove", this.handleMouseMove);
-
-    // Keyboard
     document.addEventListener("keydown", this.handleKeyDown);
     document.addEventListener("keyup", this.handleKeyUp);
   }
@@ -122,36 +144,34 @@ export class InputManager {
     const wasDown = !!this.keys[e.code];
     this.keys[e.code] = true;
 
-    // Sprint toggle
-    if ((e.code === "ShiftLeft" || e.code === "ShiftRight") && !wasDown) {
+    if ((e.code === this.keybinds.sprint || e.code === "ShiftRight") && !wasDown) {
       this.sprintToggle = !this.sprintToggle;
     }
 
-    // Weapon switching (2-slot loadout)
-    // 1 = primary, 2 = secondary, Q = toggle
     if (this.onWeaponSwitch) {
-      if (e.code === "Digit1") {
+      if (e.code === this.keybinds.primaryWeapon) {
         this.onWeaponSwitch("primary");
-      } else if (e.code === "Digit2") {
+      } else if (e.code === this.keybinds.secondaryWeapon) {
         this.onWeaponSwitch("secondary");
-      } else if (e.code === "KeyQ") {
+      } else if (e.code === this.keybinds.toggleWeapon) {
         this.onWeaponSwitch("toggle");
       }
     }
 
-    // Reload
-    if (e.code === "KeyR" && this.onReload) {
+    if (e.code === this.keybinds.reload && this.onReload) {
       this.onReload();
     }
 
-    // Debug damage
     if (e.code === "KeyT" && this.onDebugDamage) {
       this.onDebugDamage();
     }
 
-    // Toggle debug visuals
     if (e.code === "F3" && this.onToggleDebug) {
       this.onToggleDebug();
+    }
+
+    if (e.code === this.keybinds.interact && !wasDown && this.onSpikeInteract) {
+      this.onSpikeInteract();
     }
   }
 
@@ -160,15 +180,18 @@ export class InputManager {
       e.preventDefault();
     }
     this.keys[e.code] = false;
+
+    if (e.code === this.keybinds.interact && this.onSpikeCancel) {
+      this.onSpikeCancel();
+    }
   }
 
   public getState(): InputState {
-    // Movement
     let moveZ = 0, moveX = 0;
-    if (this.keys["KeyW"]) moveZ += 1;
-    if (this.keys["KeyS"]) moveZ -= 1;
-    if (this.keys["KeyD"]) moveX += 1;
-    if (this.keys["KeyA"]) moveX -= 1;
+    if (this.keys[this.keybinds.moveForward]) moveZ += 1;
+    if (this.keys[this.keybinds.moveBack]) moveZ -= 1;
+    if (this.keys[this.keybinds.moveRight]) moveX += 1;
+    if (this.keys[this.keybinds.moveLeft]) moveX -= 1;
 
     const len = Math.hypot(moveX, moveZ);
     if (len > 0) {
@@ -176,10 +199,9 @@ export class InputManager {
       moveZ /= len;
     }
 
-    // Edge detection
-    const currentCrouch = this.keys["KeyC"] || this.keys["ControlLeft"] || false;
-    const currentJump = this.keys["Space"] || false;
-    const currentDash = this.keys["KeyQ"] || false;
+    const currentCrouch = this.keys[this.keybinds.crouch] || this.keys["ControlLeft"] || false;
+    const currentJump = this.keys[this.keybinds.jump] || false;
+    const currentDash = this.keys[this.keybinds.toggleWeapon] || false;
 
     const crouchPressed = currentCrouch && !this.prevCrouchState;
     const crouchReleased = !currentCrouch && this.prevCrouchState;
@@ -190,7 +212,6 @@ export class InputManager {
     this.prevJumpState = currentJump;
     this.prevDashState = currentDash;
 
-    // Aim direction
     const aimDir = new THREE.Vector3(0, 0, -1);
     aimDir.applyQuaternion(this.camera.quaternion);
 

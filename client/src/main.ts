@@ -21,6 +21,10 @@ mainMenu.setOnGameStart(async (options) => {
   // Create and start the game
   currentGame = new Game();
   currentGame.setUserProfile(options.user);
+  currentGame.setOnReturnToMenu(() => {
+    currentGame = null;
+    mainMenu.showLobby();
+  });
   
   try {
     await currentGame.start(options.action);

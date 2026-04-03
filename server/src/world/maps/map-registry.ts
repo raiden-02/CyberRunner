@@ -11,12 +11,13 @@ import {
   type SpawnPoint,
   type BreakableCover,
   type VolumeBox,
+  type UploadTerminal,
 } from "./map-types.js";
 
 export type MapId = "shoot-house-neon";
 
 // Re-export types and utilities
-export type { ServerMapDefinition, BoxObstacle, SpawnPoint, BreakableCover, VolumeBox };
+export type { ServerMapDefinition, BoxObstacle, SpawnPoint, BreakableCover, VolumeBox, UploadTerminal };
 export { isPointInsideBox, calculateSpawnFacing };
 
 export const MAP_REGISTRY: Record<MapId, ServerMapDefinition> = {

@@ -163,4 +163,10 @@ export const SHOOT_HOUSE_NEON: ShootHouseMapDefinition = {
     north: 0x00ffff,
     south: 0xff00ff,
   },
+
+  // Upload Terminals for Search & Destroy mode
+  uploadTerminals: [
+    { id: "A", x: -16, y: 0, z: 0, radius: 2.5 },
+    { id: "B", x: 16, y: 0, z: 0, radius: 2.5 },
+  ],
 };

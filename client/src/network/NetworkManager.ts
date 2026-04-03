@@ -24,7 +24,55 @@ export interface RoomInfoMessage {
   joinCode: string;
   playerCount: number;
   maxPlayers: number;
+  gameMode: string;
+  hostId: string;
 }
+
+export interface RoundEndMessage {
+  roundNumber: number;
+  winnerId: string;
+  winnerName: string;
+  winnerTeam: string;
+  reason: string;
+}
+
+export interface RoundStartMessage {
+  roundNumber: number;
+  spikeX?: number;
+  spikeZ?: number;
+}
+
+export interface LobbyStateMessage {
+  lobbyState: "waiting" | "starting" | "playing" | "ended";
+  hostId: string;
+  ghostPlayers: string[];
+  sentinelPlayers: string[];
+  canStart: boolean;
+  ghostsRoundsWon: number;
+  sentinelsRoundsWon: number;
+}
+
+export interface GameStartedMessage {
+  roundNumber: number;
+  spikeX: number;
+  spikeZ: number;
+}
+
+export interface GameOverMessage {
+  winnerId: string | null;
+  winnerName: string;
+  winnerTeam: string;
+  gameMode: string;
+  ghostsRoundsWon: number;
+  sentinelsRoundsWon: number;
+}
+
+export interface HostChangedMessage {
+  newHostId: string;
+}
+
+export type SpikeAction = "upload" | "decrypt" | "pickup" | "cancel";
+export type TeamId = "ghosts" | "sentinels";
 
 export class NetworkManager {
   private client: Client;
@@ -36,6 +84,14 @@ export class NetworkManager {
   public onRoomInfo?: (msg: RoomInfoMessage) => void;
   public onConnected?: (sessionId: string) => void;
   public onError?: (error: any) => void;
+  public onRoundEnd?: (msg: RoundEndMessage) => void;
+  public onRoundStart?: (msg: RoundStartMessage) => void;
+  public onLobbyState?: (msg: LobbyStateMessage) => void;
+  public onGameStarted?: (msg: GameStartedMessage) => void;
+  public onGameOver?: (msg: GameOverMessage) => void;
+  public onHostChanged?: (msg: HostChangedMessage) => void;
+  public onGameRestarted?: () => void;
+  public onLobbyDisbanded?: () => void;
 
   constructor() {
     // Configurable via Vite env vars (useful for LAN/dev overrides):
@@ -67,12 +123,14 @@ export class NetworkManager {
     displayName?: string;
     primaryWeaponId?: string;
     secondaryWeaponId?: string;
+    gameMode?: string;
   } = {}): Promise<void> {
     try {
       const roomOptions: Record<string, any> = {};
       if (options.displayName) roomOptions.displayName = options.displayName;
       if (options.primaryWeaponId) roomOptions.primaryWeaponId = options.primaryWeaponId;
       if (options.secondaryWeaponId) roomOptions.secondaryWeaponId = options.secondaryWeaponId;
+      if (options.gameMode) roomOptions.gameMode = options.gameMode;
       
       if (options.roomId) {
         this.room = await this.client.joinById(options.roomId, roomOptions);
@@ -122,6 +180,54 @@ export class NetworkManager {
         this.onRoomInfo(msg);
       }
     });
+
+    this.room.onMessage("round_end", (msg: RoundEndMessage) => {
+      if (this.onRoundEnd) {
+        this.onRoundEnd(msg);
+      }
+    });
+
+    this.room.onMessage("round_start", (msg: RoundStartMessage) => {
+      if (this.onRoundStart) {
+        this.onRoundStart(msg);
+      }
+    });
+
+    this.room.onMessage("lobby_state", (msg: LobbyStateMessage) => {
+      if (this.onLobbyState) {
+        this.onLobbyState(msg);
+      }
+    });
+
+    this.room.onMessage("game_started", (msg: GameStartedMessage) => {
+      if (this.onGameStarted) {
+        this.onGameStarted(msg);
+      }
+    });
+
+    this.room.onMessage("game_over", (msg: GameOverMessage) => {
+      if (this.onGameOver) {
+        this.onGameOver(msg);
+      }
+    });
+
+    this.room.onMessage("game_restarted", () => {
+      if (this.onGameRestarted) {
+        this.onGameRestarted();
+      }
+    });
+
+    this.room.onMessage("host_changed", (msg: HostChangedMessage) => {
+      if (this.onHostChanged) {
+        this.onHostChanged(msg);
+      }
+    });
+
+    this.room.onMessage("lobby_disbanded", () => {
+      if (this.onLobbyDisbanded) {
+        this.onLobbyDisbanded();
+      }
+    });
   }
 
   public get sessionId(): string {
@@ -160,5 +266,25 @@ export class NetworkManager {
       sourceId: "test",
       weaponId: "debug"
     });
+  }
+
+  public sendSpikeAction(action: SpikeAction): void {
+    this.room?.send("spike_action", { action });
+  }
+
+  public sendTeamSelect(teamId: TeamId): void {
+    this.room?.send("team_select", { teamId });
+  }
+
+  public sendStartGame(): void {
+    this.room?.send("start_game", {});
+  }
+
+  public sendRestartGame(): void {
+    this.room?.send("restart_game", {});
+  }
+
+  public sendDisbandLobby(): void {
+    this.room?.send("disband_lobby", {});
   }
 }

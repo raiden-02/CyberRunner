@@ -46,6 +46,16 @@ export class PlayerState extends Schema {
   @type("uint16") deaths: number = 0;
   @type("uint32") score: number = 0;
   
+  // Team assignment (S&D)
+  @type("string") teamId: string = ""; // "ghosts" | "sentinels" | ""
+  
+  // Game mode stats
+  @type("uint8") livesRemaining: number = 3;
+  @type("uint8") roundsWon: number = 0;
+  @type("boolean") hasSpike: boolean = false;
+  @type("boolean") isUploading: boolean = false;
+  @type("boolean") isDecrypting: boolean = false;
+  
   // Loadout (2 weapons only)
   @type("string") primaryWeaponId: string = "AR_1";
   @type("string") secondaryWeaponId: string = "PISTOL_1";

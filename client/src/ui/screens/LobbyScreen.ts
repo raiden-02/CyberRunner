@@ -1,20 +1,30 @@
 import { BaseScreen } from "./BaseScreen.js";
 import { api, type UserProfile } from "../../api/client.js";
 
+export type GameModeId = "deathmatch" | "search_destroy";
+
 export interface PlayAction {
   type: "quickplay" | "create" | "join";
   roomId?: string;
   joinCode?: string;
+  gameMode?: GameModeId;
 }
+
+const GAME_MODES: Array<{ value: GameModeId; label: string; description: string }> = [
+  { value: "deathmatch", label: "Deathmatch", description: "FFA - First to 30 kills" },
+  { value: "search_destroy", label: "Search & Destroy", description: "3 lives per round" },
+];
 
 export class LobbyScreen extends BaseScreen {
   private user: UserProfile | null = null;
   private onPlay: (action: PlayAction) => void = () => {};
   private onLogout: () => void = () => {};
   private onEditProfile: () => void = () => {};
+  private onSettings: () => void = () => {};
   private errorDiv!: HTMLDivElement;
   private joinCodeInput!: HTMLInputElement;
   private playerInfo!: HTMLDivElement;
+  private gameModeSelect!: HTMLSelectElement;
 
   constructor() {
     super("lobby-screen");
@@ -63,6 +73,21 @@ export class LobbyScreen extends BaseScreen {
     `;
     panel.appendChild(separator);
 
+    // Game Mode selector
+    const modeLabel = document.createElement("div");
+    modeLabel.textContent = "Game Mode";
+    modeLabel.style.cssText = `
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    `;
+    panel.appendChild(modeLabel);
+    
+    this.gameModeSelect = this.createSelect(GAME_MODES.map(m => ({ value: m.value, label: `${m.label} - ${m.description}` })));
+    this.gameModeSelect.style.marginBottom = "12px";
+    panel.appendChild(this.gameModeSelect);
+
     // Create Game button
     const createBtn = this.createButton("Create Game", false);
     createBtn.onclick = () => this.handleCreate();
@@ -93,23 +118,49 @@ export class LobbyScreen extends BaseScreen {
     this.errorDiv = this.createError();
     panel.appendChild(this.errorDiv);
 
-    // Logout button at bottom
+    // Bottom buttons row
+    const bottomRow = document.createElement("div");
+    bottomRow.style.cssText = `
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 24px;
+    `;
+
+    // Settings button
+    const settingsBtn = document.createElement("button");
+    settingsBtn.textContent = "Settings";
+    settingsBtn.style.cssText = `
+      padding: 8px 16px;
+      border: 1px solid #444;
+      background: transparent;
+      color: #888;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 4px;
+    `;
+    settingsBtn.onmouseenter = () => { settingsBtn.style.borderColor = "#00ffff"; settingsBtn.style.color = "#00ffff"; };
+    settingsBtn.onmouseleave = () => { settingsBtn.style.borderColor = "#444"; settingsBtn.style.color = "#888"; };
+    settingsBtn.onclick = () => this.onSettings();
+    bottomRow.appendChild(settingsBtn);
+
+    // Logout button
     const logoutBtn = document.createElement("button");
     logoutBtn.textContent = "Sign Out";
     logoutBtn.style.cssText = `
-      margin-top: 24px;
       padding: 8px 16px;
       border: none;
       background: transparent;
       color: #666;
       font-size: 14px;
       cursor: pointer;
-      width: 100%;
     `;
     logoutBtn.onmouseenter = () => { logoutBtn.style.color = "#ff4444"; };
     logoutBtn.onmouseleave = () => { logoutBtn.style.color = "#666"; };
     logoutBtn.onclick = () => this.handleLogout();
-    panel.appendChild(logoutBtn);
+    bottomRow.appendChild(logoutBtn);
+
+    panel.appendChild(bottomRow);
 
     this.container.appendChild(panel);
   }
@@ -129,6 +180,10 @@ export class LobbyScreen extends BaseScreen {
 
   setOnEditProfile(callback: () => void): void {
     this.onEditProfile = callback;
+  }
+
+  setOnSettings(callback: () => void): void {
+    this.onSettings = callback;
   }
 
   private updatePlayerInfo(): void {
@@ -172,9 +227,10 @@ export class LobbyScreen extends BaseScreen {
 
   private async handleQuickPlay(): Promise<void> {
     this.errorDiv.textContent = "";
+    const gameMode = this.gameModeSelect.value as GameModeId;
     
     if (this.isGuest()) {
-      this.onPlay({ type: "quickplay" });
+      this.onPlay({ type: "quickplay", gameMode });
       return;
     }
     
@@ -183,7 +239,7 @@ export class LobbyScreen extends BaseScreen {
       if (result.action === "join" && result.roomId) {
         this.onPlay({ type: "join", roomId: result.roomId, joinCode: result.joinCode || undefined });
       } else {
-        this.onPlay({ type: "create" });
+        this.onPlay({ type: "create", gameMode });
       }
     } catch (err: any) {
       this.errorDiv.textContent = err.message || "Quick play failed";
@@ -192,7 +248,8 @@ export class LobbyScreen extends BaseScreen {
 
   private handleCreate(): void {
     this.errorDiv.textContent = "";
-    this.onPlay({ type: "create" });
+    const gameMode = this.gameModeSelect.value as GameModeId;
+    this.onPlay({ type: "create", gameMode });
   }
 
   private async handleJoin(): Promise<void> {

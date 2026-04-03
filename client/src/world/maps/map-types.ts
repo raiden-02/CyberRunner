@@ -28,6 +28,14 @@ export type BreakableCover = BoxObstacle & {
 
 export type VolumeBox = BoxObstacle;
 
+export type UploadTerminal = {
+  id: "A" | "B";
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // STRUCTURE TYPES
 // ═══════════════════════════════════════════════════════════════════════════
@@ -124,6 +132,7 @@ export interface MapDefinition {
   breakables: BreakableCover[];
   spawnProtectionZones: VolumeBox[];
   spawnPoints: SpawnPoint[];
+  uploadTerminals?: UploadTerminal[];
 }
 
 /**

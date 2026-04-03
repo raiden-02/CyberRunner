@@ -15,8 +15,11 @@ import type {
   Connector,
   NeonSign,
 } from "../maps/map-types.js";
+import { UploadTerminalMesh } from "../components/upload-terminal.js";
 
 export class ShootHouseNeonLevel extends BaseLevel {
+  private terminals: UploadTerminalMesh[] = [];
+
   constructor(scene: THREE.Scene) {
     super(scene);
   }
@@ -45,6 +48,9 @@ export class ShootHouseNeonLevel extends BaseLevel {
     this.createNeonSigns(map.neonSigns);
     this.createLaneLights(map.laneLights);
     this.createSpawnMarkers(map.spawnLightColors);
+
+    // S&D Objective terminals
+    this.createUploadTerminals(map);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -275,5 +281,46 @@ export class ShootHouseNeonLevel extends BaseLevel {
     const south = new THREE.Mesh(new THREE.BoxGeometry(width, h, depth), southMat);
     south.position.set(0, h / 2, 26);
     this.addMesh(south);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UPLOAD TERMINALS (S&D Objectives)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  private createUploadTerminals(map: ShootHouseMapDefinition): void {
+    if (!map.uploadTerminals || map.uploadTerminals.length === 0) return;
+
+    try {
+      for (const config of map.uploadTerminals) {
+        const terminal = new UploadTerminalMesh(config);
+        this.terminals.push(terminal);
+        this.scene.add(terminal.group);
+      }
+    } catch (error) {
+      console.error("[Level] Failed to create upload terminals:", error);
+    }
+  }
+
+  public updateTerminalState(terminalId: "A" | "B", state: "inactive" | "uploading" | "uploaded"): void {
+    const terminal = this.terminals.find(t => t.group.name === `Terminal_${terminalId}`);
+    if (terminal) {
+      terminal.setState(state);
+    }
+  }
+
+  public override update(): void {
+    super.update();
+    const dt = 1 / 60;
+    for (const terminal of this.terminals) {
+      terminal.update(dt);
+    }
+  }
+
+  public override dispose(): void {
+    for (const terminal of this.terminals) {
+      terminal.dispose();
+    }
+    this.terminals = [];
+    super.dispose();
   }
 }

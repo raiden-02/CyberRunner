@@ -2,6 +2,7 @@ import { api, type UserProfile } from "../api/client.js";
 import { AuthScreen } from "./screens/AuthScreen.js";
 import { ProfileScreen } from "./screens/ProfileScreen.js";
 import { LobbyScreen, type PlayAction } from "./screens/LobbyScreen.js";
+import { SettingsScreen } from "./screens/SettingsScreen.js";
 
 export interface GameStartOptions {
   user: UserProfile;
@@ -12,6 +13,7 @@ export class MainMenu {
   private authScreen: AuthScreen;
   private profileScreen: ProfileScreen;
   private lobbyScreen: LobbyScreen;
+  private settingsScreen: SettingsScreen;
   private currentUser: UserProfile | null = null;
   private onGameStart: (options: GameStartOptions) => void = () => {};
 
@@ -19,6 +21,7 @@ export class MainMenu {
     this.authScreen = new AuthScreen();
     this.profileScreen = new ProfileScreen();
     this.lobbyScreen = new LobbyScreen();
+    this.settingsScreen = new SettingsScreen();
 
     this.setupCallbacks();
   }
@@ -65,6 +68,14 @@ export class MainMenu {
         this.profileScreen.setEditMode(true);
         this.profileScreen.show();
       }
+    });
+
+    this.lobbyScreen.setOnSettings(() => {
+      this.settingsScreen.setOnClose(() => {
+        this.lobbyScreen.show();
+      });
+      this.lobbyScreen.hide();
+      this.settingsScreen.show();
     });
   }
 
@@ -122,6 +133,7 @@ export class MainMenu {
     this.authScreen.hide();
     this.profileScreen.hide();
     this.lobbyScreen.hide();
+    this.settingsScreen.hide();
   }
 
   showLobby(): void {
@@ -141,5 +153,6 @@ export class MainMenu {
     this.authScreen.destroy();
     this.profileScreen.destroy();
     this.lobbyScreen.destroy();
+    this.settingsScreen.destroy();
   }
 }

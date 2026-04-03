@@ -56,11 +56,13 @@ export class HealthSystem {
 
   /**
    * Update respawn countdown and handle respawn logic
+   * @param canRespawn - if false, player remains dead after timer expires
    */
   static updateRespawn(
     player: PlayerState, 
     deltaTime: number,
-    spawnPosition: { x: number, y: number, z: number } = { x: 0, y: 2, z: 0 }
+    spawnPosition: { x: number, y: number, z: number } = { x: 0, y: 2, z: 0 },
+    canRespawn: boolean = true
   ): { respawned: boolean } {
     if (!player.isDead) {
       return { respawned: false };
@@ -68,7 +70,7 @@ export class HealthSystem {
 
     player.respawnTime = Math.max(0, player.respawnTime - deltaTime);
 
-    if (player.respawnTime <= 0) {
+    if (player.respawnTime <= 0 && canRespawn) {
       // Respawn the player
       player.isDead = false;
       player.health = player.maxHealth;

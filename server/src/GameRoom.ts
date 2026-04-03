@@ -1,16 +1,22 @@
 import { Room, Client } from "colyseus";
 import { GameState } from "./GameState.js";
 import { PlayerState, MovementState } from "./PlayerState.js";
-import { InputMsg, WeaponSwitchMsg, FireInputMsg, ReloadInputMsg, DamageMsg } from "./net/messages.js";
+import { InputMsg, WeaponSwitchMsg, FireInputMsg, ReloadInputMsg, DamageMsg, SpikeActionMsg, TeamSelectMsg } from "./net/messages.js";
 import { CharacterController } from "./movement/character-controller.js";
 import { CAPSULE } from "./physics/constants.js";
 import { HealthSystem } from "./systems/health-system.js";
 import { WeaponSystem } from "./systems/weapon-system.js";
-import { getWeaponConfig, isValidWeapon } from "./weapons/weapon-config.js";
+import { getWeaponConfig } from "./weapons/weapon-config.js";
 import { createHitboxes, removeHitboxes, HitboxRegistry, type HitboxSet } from "./physics/hitbox-system.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { calculateSpawnFacing, getCurrentMap, isPointInsideBox, setCurrentMap, type MapId } from "./world/maps/map-registry.js";
 import { LobbyService } from "./services/lobby-service.js";
+import { 
+  BaseGameMode, 
+  createGameMode, 
+  SearchDestroyMode,
+  type TeamId 
+} from "./game-modes/index.js";
 
 const TICK_RATE = 60; // Hz
 const DEFAULT_MAX_PLAYERS = 8;
@@ -37,8 +43,18 @@ export class GameRoom extends Room<GameState> {
   private breakablesByHandle = new Map<number, BreakableRuntime>();
   private breakablesById = new Map<number, BreakableRuntime>();
   private hitboxRegistry = new HitboxRegistry();
+  private gameMode!: BaseGameMode;
 
   private joinCode: string = "";
+  private hostId: string = "";
+
+  private isSearchDestroyMode(): boolean {
+    return this.gameMode instanceof SearchDestroyMode;
+  }
+
+  private getSDMode(): SearchDestroyMode | null {
+    return this.gameMode instanceof SearchDestroyMode ? this.gameMode : null;
+  }
 
   async onAuth(_client: Client, _options: any): Promise<boolean> {
     const max = this.maxPlayers ?? DEFAULT_MAX_PLAYERS;
@@ -48,12 +64,11 @@ export class GameRoom extends Room<GameState> {
     return true;
   }
 
-  async onCreate(_options: any) {
+  async onCreate(options: { gameMode?: string } = {}) {
     this.setState(new GameState());
     
     const roomInfo = LobbyService.registerRoom(this.roomId);
     this.joinCode = roomInfo.joinCode;
-    console.log(`[GameRoom] Created (joinCode: ${roomInfo.joinCode})`);
 
     this.maxPlayers = Number(process.env.MAX_PLAYERS || DEFAULT_MAX_PLAYERS);
     if (!Number.isFinite(this.maxPlayers) || this.maxPlayers <= 0) {
@@ -61,16 +76,34 @@ export class GameRoom extends Room<GameState> {
     }
     this.maxClients = this.maxPlayers;
 
-    // Set the active map (can be configured via options or env)
-    const mapId = (process.env.MAP_ID || "neon-pub-district") as MapId;
+    const mapId = (process.env.MAP_ID || "shoot-house-neon") as MapId;
     setCurrentMap(mapId);
     const currentMap = getCurrentMap();
-    console.log(`[GameRoom] Using map: ${currentMap.name}`);
+
+    const modeId = options.gameMode || "deathmatch";
+    this.gameMode = createGameMode(modeId, currentMap.uploadTerminals || []);
+    const modeConfig = this.gameMode.getConfig();
+    
+    this.state.gameMode = modeConfig.id;
+    this.state.scoreLimit = modeConfig.scoreLimit;
+    this.state.timeRemaining = modeConfig.timeLimit;
+    this.state.roundsToWin = modeConfig.roundsToWin;
+    this.state.currentRound = 1;
+    
+    if (modeConfig.teamBased) {
+      this.state.lobbyState = "waiting";
+      this.state.isRoundActive = false;
+    } else {
+      this.state.lobbyState = "playing";
+      this.state.isRoundActive = true;
+      this.gameMode.startGame();
+    }
+    
+    console.log(`[GameRoom] Created (code: ${roomInfo.joinCode}, mode: ${modeConfig.name})`)
 
     await RAPIER.init();
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 
-    // Ground
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(
         currentMap.boundsHalfSize,
@@ -79,7 +112,6 @@ export class GameRoom extends Room<GameState> {
       ).setTranslation(0, -currentMap.groundThickness, 0).setFriction(1.0)
     );
 
-    // Boundary walls
     const wallHalfThickness = currentMap.wallThickness;
     const wallHalfHeight = currentMap.wallHeight / 2;
     const halfSize = currentMap.boundsHalfSize;
@@ -104,7 +136,6 @@ export class GameRoom extends Room<GameState> {
         .setFriction(0.8)
     );
 
-    // Interior obstacles
     for (const obs of currentMap.obstacles) {
       this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(obs.hx, obs.hy, obs.hz)
@@ -113,7 +144,6 @@ export class GameRoom extends Room<GameState> {
       );
     }
 
-    // Occluders (taller covers)
     for (const occ of currentMap.occluders) {
       this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(occ.hx, occ.hy, occ.hz)
@@ -122,7 +152,6 @@ export class GameRoom extends Room<GameState> {
       );
     }
 
-    // Breakable cover
     currentMap.breakables.forEach((b, idx) => {
       const collider = this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(b.hx, b.hy, b.hz)
@@ -159,7 +188,6 @@ export class GameRoom extends Room<GameState> {
       if (!player) return;
       if (player.schema.reloading) return;
       
-      // Only allow switching to primary or secondary weapon
       const { primaryWeaponId, secondaryWeaponId } = player.schema;
       let newWeapon: string | null = null;
       let newSlot = player.schema.activeSlot;
@@ -171,7 +199,6 @@ export class GameRoom extends Room<GameState> {
         newWeapon = secondaryWeaponId;
         newSlot = 1;
       } else if (data.weaponId === "toggle") {
-        // Toggle between slots
         newSlot = player.schema.activeSlot === 0 ? 1 : 0;
         newWeapon = newSlot === 0 ? primaryWeaponId : secondaryWeaponId;
       }
@@ -211,8 +238,50 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
+    this.onMessage("spike_action", (client, data: SpikeActionMsg) => {
+      if (this.state.gameMode !== "search_destroy") return;
+      if (this.state.lobbyState !== "playing") return;
+      
+      const player = this.players.get(client.sessionId);
+      if (!player || player.schema.isDead) return;
+
+      const playerTeam = player.schema.teamId;
+
+      const sdMode = this.getSDMode();
+      if (!sdMode) return;
+      const spikeManager = sdMode.getSpikeManager();
+
+      switch (data.action) {
+        case "upload": {
+          if (playerTeam !== "ghosts") return;
+          const terminal = spikeManager.getNearbyTerminal(player.schema.x, player.schema.z);
+          if (terminal) {
+            spikeManager.startUpload(client.sessionId, this.state, player.schema, terminal);
+          }
+          break;
+        }
+        case "decrypt": {
+          if (playerTeam !== "sentinels") return;
+          spikeManager.startDecrypt(client.sessionId, this.state, player.schema);
+          break;
+        }
+        case "pickup": {
+          if (playerTeam !== "ghosts") return;
+          spikeManager.pickupSpike(client.sessionId, this.state, player.schema);
+          break;
+        }
+        case "cancel": {
+          if (player.schema.isUploading) {
+            spikeManager.cancelUpload(client.sessionId, this.state, player.schema);
+          } else if (player.schema.isDecrypting) {
+            spikeManager.cancelDecrypt(client.sessionId, this.state, player.schema);
+          }
+          break;
+        }
+      }
+    });
+
     this.onMessage("apply_damage", (client, data: DamageMsg) => {
-      // Debug-only safety: only allow damaging yourself (prevents chaos in multiplayer tests)
       if (data.targetId !== client.sessionId) return;
 
       const targetPlayer = this.players.get(data.targetId);
@@ -233,6 +302,43 @@ export class GameRoom extends Room<GameState> {
         this.broadcast("health_change", healthMsg);
       }
     });
+
+    this.onMessage("team_select", (client, data: TeamSelectMsg) => {
+      if (this.state.lobbyState !== "waiting") return;
+      const sdMode = this.getSDMode();
+      if (!sdMode) return;
+      
+      const player = this.players.get(client.sessionId);
+      if (!player) return;
+      
+      const success = sdMode.getTeamManager().assignToTeam(client.sessionId, data.teamId);
+      if (success) {
+        player.schema.teamId = data.teamId;
+        this.broadcastLobbyState();
+      }
+    });
+
+    this.onMessage("start_game", (client) => {
+      if (client.sessionId !== this.hostId) return;
+      if (this.state.lobbyState !== "waiting") return;
+      const sdMode = this.getSDMode();
+      if (!sdMode || !sdMode.getTeamManager().canStartGame()) return;
+      
+      this.startTeamGame();
+    });
+
+    this.onMessage("restart_game", (client) => {
+      if (client.sessionId !== this.hostId) return;
+      if (this.state.lobbyState !== "ended") return;
+      this.restartGame();
+    });
+
+    this.onMessage("disband_lobby", (client) => {
+      if (client.sessionId !== this.hostId) return;
+      
+      this.broadcast("lobby_disbanded", {});
+      this.disconnect();
+    });
   }
 
   onJoin(client: Client, options?: { displayName?: string; primaryWeaponId?: string; secondaryWeaponId?: string }) {
@@ -241,7 +347,12 @@ export class GameRoom extends Room<GameState> {
       return;
     }
 
-    const spawn = this.pickSpawnPoint();
+    if (!this.hostId) {
+      this.hostId = client.sessionId;
+      this.state.hostId = client.sessionId;
+    }
+
+    const spawn = this.pickSpawnPoint(client.sessionId);
     const schema = new PlayerState();
     schema.x = spawn.x;
     schema.y = spawn.y;
@@ -252,18 +363,26 @@ export class GameRoom extends Room<GameState> {
     schema.isSpawnProtected = true;
     schema.spawnProtectionTime = 2.5;
     schema.displayName = options?.displayName || "Player";
-    
-    // Set loadout
     schema.primaryWeaponId = options?.primaryWeaponId || "AR_1";
     schema.secondaryWeaponId = options?.secondaryWeaponId || "PISTOL_1";
     schema.activeSlot = 0;
     schema.equippedWeapon = schema.primaryWeaponId;
     
-    // Initialize ammo for equipped weapon
-    const config = getWeaponConfig(schema.equippedWeapon);
-    if (config) {
-      schema.ammoInMag = config.magazineSize;
-      schema.ammoReserve = config.reserveMax;
+    const weaponConfig = getWeaponConfig(schema.equippedWeapon);
+    if (weaponConfig) {
+      schema.ammoInMag = weaponConfig.magazineSize;
+      schema.ammoReserve = weaponConfig.reserveMax;
+    }
+    
+    this.gameMode.addPlayer(client.sessionId);
+    const modeConfig = this.gameMode.getConfig();
+    schema.livesRemaining = modeConfig.maxLives > 0 ? modeConfig.maxLives : 99;
+    schema.roundsWon = 0;
+    
+    const sdMode = this.getSDMode();
+    if (sdMode) {
+      const teamId = sdMode.getTeamManager().autoAssignTeam(client.sessionId);
+      schema.teamId = teamId;
     }
     
     this.state.players.set(client.sessionId, schema);
@@ -286,18 +405,12 @@ export class GameRoom extends Room<GameState> {
     
     const ctrl = new CharacterController(body, collider, controller);
     
-    // Create hitbox colliders for body part damage detection
     const hitboxes = createHitboxes(this.world, body, client.sessionId, this.hitboxRegistry);
     
-    this.players.set(client.sessionId, {
-      ctrl,
-      schema,
-      hitboxes
-    });
+    this.players.set(client.sessionId, { ctrl, schema, hitboxes });
 
     LobbyService.updatePlayerCount(this.roomId, this.clients.length);
     
-    // Send room info to the client
     const roomInfo = LobbyService.getRoomById(this.roomId);
     if (roomInfo) {
       client.send("room_info", {
@@ -305,25 +418,41 @@ export class GameRoom extends Room<GameState> {
         joinCode: roomInfo.joinCode,
         playerCount: this.clients.length,
         maxPlayers: this.maxPlayers,
+        hostId: this.hostId,
+        gameMode: this.state.gameMode,
+        lobbyState: this.state.lobbyState,
       });
     }
     
-    console.log(`[GameRoom] Player ${client.sessionId} joined`);
+    if (this.isSearchDestroyMode()) {
+      this.broadcastLobbyState();
+    }
   }
 
   onLeave(client: Client) {
     this.state.players.delete(client.sessionId);
     const player = this.players.get(client.sessionId);
     if (player) {
-      // Remove hitboxes from registry
       removeHitboxes(player.hitboxes);
-      // Remove colliders and body
       this.world.removeCollider(player.ctrl.collider, false);
       this.world.removeRigidBody(player.ctrl.body);
     }
     this.players.delete(client.sessionId);
+    this.gameMode.removePlayer(client.sessionId);
+    
+    const sdMode = this.getSDMode();
+    if (sdMode) {
+      sdMode.getTeamManager().removePlayer(client.sessionId);
+    }
     LobbyService.updatePlayerCount(this.roomId, this.clients.length);
-    console.log(`[GameRoom] Player ${client.sessionId} left`);
+    
+    if (client.sessionId === this.hostId) {
+      this.transferHost();
+    }
+    
+    if (this.isSearchDestroyMode()) {
+      this.broadcastLobbyState();
+    }
   }
 
   onDispose() {
@@ -332,8 +461,155 @@ export class GameRoom extends Room<GameState> {
     console.log("[GameRoom] Disposed");
   }
 
+  private broadcastLobbyState(): void {
+    const sdMode = this.getSDMode();
+    if (!sdMode) return;
+    
+    const teamManager = sdMode.getTeamManager();
+    const lobbyState = {
+      lobbyState: this.state.lobbyState,
+      hostId: this.hostId,
+      ghostPlayers: teamManager.getTeamPlayers("ghosts"),
+      sentinelPlayers: teamManager.getTeamPlayers("sentinels"),
+      canStart: teamManager.canStartGame(),
+      ghostsRoundsWon: this.state.ghostsRoundsWon,
+      sentinelsRoundsWon: this.state.sentinelsRoundsWon,
+    };
+    this.broadcast("lobby_state", lobbyState);
+  }
+
+  private transferHost(): void {
+    const remainingClients = this.clients.filter(c => c.sessionId !== this.hostId);
+    if (remainingClients.length > 0) {
+      this.hostId = remainingClients[0].sessionId;
+      this.state.hostId = this.hostId;
+      this.broadcast("host_changed", { newHostId: this.hostId });
+    }
+  }
+
+  private startTeamGame(): void {
+    const sdMode = this.getSDMode();
+    if (!sdMode) return;
+    
+    this.state.lobbyState = "playing";
+    this.state.isRoundActive = true;
+    this.state.currentRound = 1;
+    this.state.ghostsRoundsWon = 0;
+    this.state.sentinelsRoundsWon = 0;
+    
+    sdMode.resetGame(this.state);
+    sdMode.startRound();
+    this.gameMode.startGame();
+    this.spawnSpikeOnGround();
+    
+    for (const [sessionId, player] of this.players) {
+      const spawn = this.pickSpawnPoint(sessionId);
+      player.schema.isDead = false;
+      player.schema.health = player.schema.maxHealth;
+      player.schema.x = spawn.x;
+      player.schema.y = spawn.y;
+      player.schema.z = spawn.z;
+      player.schema.rotationY = calculateSpawnFacing(spawn.x, spawn.z);
+      player.schema.livesRemaining = this.gameMode.getConfig().maxLives || 1;
+      player.schema.hasSpike = false;
+      player.schema.isUploading = false;
+      player.schema.isDecrypting = false;
+      
+      player.ctrl.body.setTranslation({ x: spawn.x, y: spawn.y, z: spawn.z }, true);
+    }
+    
+    this.broadcast("game_started", {
+      roundNumber: 1,
+      spikeX: this.state.spikeX,
+      spikeZ: this.state.spikeZ,
+    });
+    
+    this.broadcastLobbyState();
+  }
+
+  private restartGame(): void {
+    this.state.isGameOver = false;
+    this.state.winnerId = "";
+    this.state.gameWinnerTeam = "";
+    this.state.currentRound = 1;
+    this.state.ghostsRoundsWon = 0;
+    this.state.sentinelsRoundsWon = 0;
+    
+    const sdMode = this.getSDMode();
+    if (sdMode) {
+      this.state.lobbyState = "waiting";
+      this.state.isRoundActive = false;
+      sdMode.resetGame(this.state);
+    } else {
+      this.state.lobbyState = "playing";
+      this.state.isRoundActive = true;
+      this.gameMode.startGame();
+    }
+    
+    for (const [sessionId, player] of this.players) {
+      const spawn = this.pickSpawnPoint(sessionId);
+      player.schema.isDead = false;
+      player.schema.health = player.schema.maxHealth;
+      player.schema.kills = 0;
+      player.schema.deaths = 0;
+      player.schema.score = 0;
+      player.schema.roundsWon = 0;
+      player.schema.hasSpike = false;
+      player.schema.x = spawn.x;
+      player.schema.y = spawn.y;
+      player.schema.z = spawn.z;
+      player.schema.livesRemaining = this.gameMode.getConfig().maxLives || 99;
+      
+      player.ctrl.body.setTranslation({ x: spawn.x, y: spawn.y, z: spawn.z }, true);
+      
+      this.gameMode.addPlayer(sessionId);
+    }
+    
+    this.broadcast("game_restarted", {});
+    
+    if (sdMode) {
+      this.broadcastLobbyState();
+    }
+  }
+
+  private spawnSpikeOnGround(): void {
+    const currentMap = getCurrentMap();
+    if (currentMap.spikeSpawnLocation) {
+      this.state.spikeX = currentMap.spikeSpawnLocation.x;
+      this.state.spikeZ = currentMap.spikeSpawnLocation.z;
+    } else if (currentMap.ghostSpawnPoints && currentMap.ghostSpawnPoints.length > 0) {
+      const spawnIdx = Math.floor(Math.random() * currentMap.ghostSpawnPoints.length);
+      const spawnPoint = currentMap.ghostSpawnPoints[spawnIdx];
+      this.state.spikeX = spawnPoint.x;
+      this.state.spikeZ = spawnPoint.z;
+    } else {
+      this.state.spikeX = 0;
+      this.state.spikeZ = -15;
+    }
+    this.state.spikeState = "ground";
+    this.state.spikeCarrierId = "";
+  }
+
   private update(dt: number) {
+    if (this.state.isGameOver) return;
+    
     const now = performance.now() / 1000;
+
+    const result = this.gameMode.update(dt, this.state, this.players);
+    
+    const roundState = this.gameMode.getRoundState();
+    this.state.currentRound = roundState.roundNumber;
+    this.state.roundTimeRemaining = Math.max(0, Math.floor(roundState.roundTimeRemaining));
+    this.state.isRoundActive = roundState.isRoundActive;
+    
+    if (this.gameMode.isGameEnded()) {
+      this.handleGameOver(this.gameMode.getWinner());
+      return;
+    }
+
+    if (result.ended && result.winnerTeam) {
+      this.handleTeamRoundEnd(result.winnerTeam as TeamId, result.reason || "");
+    }
 
     const normalize = (v: { x: number; y: number; z: number }) => {
       const len = Math.hypot(v.x, v.y, v.z);
@@ -341,21 +617,15 @@ export class GameRoom extends Room<GameState> {
       return { x: v.x / len, y: v.y / len, z: v.z / len };
     };
 
-    // Match client/server notion of eye height:
-    // - Rapier body translation is the capsule center.
-    // - Eye height is ~1.6m above ground.
     const CENTER_TO_FOOT = CAPSULE.HalfHeight + CAPSULE.Radius;
     const EYE_HEIGHT = 1.6;
     const EYE_FROM_CENTER = EYE_HEIGHT - CENTER_TO_FOOT;
 
-    // Phase 0: timers (respawn + reload), no physics step yet
     for (const [sessionId, player] of this.players) {
-      // Update spawn protection timer
       if (!player.schema.isDead && player.schema.spawnProtectionTime > 0) {
         player.schema.spawnProtectionTime = Math.max(0, player.schema.spawnProtectionTime - dt);
       }
 
-      // Keep spawn protection active only while inside spawn volumes
       if (!player.schema.isDead && player.schema.spawnProtectionTime > 0) {
         const inSpawnZone = this.isInSpawnProtectionZone(player.schema.x, player.schema.y, player.schema.z);
         player.schema.isSpawnProtected = inSpawnZone;
@@ -364,8 +634,9 @@ export class GameRoom extends Room<GameState> {
       }
 
       if (player.schema.isDead) {
-        const spawnPosition = this.pickSpawnPoint();
-        const respawnResult = HealthSystem.updateRespawn(player.schema, dt, spawnPosition);
+        const canRespawn = this.gameMode.canRespawn(sessionId);
+        const spawnPosition = this.pickSpawnPoint(sessionId);
+        const respawnResult = HealthSystem.updateRespawn(player.schema, dt, spawnPosition, canRespawn);
         if (respawnResult.respawned) {
           player.ctrl.body.setTranslation(
             { x: player.schema.x, y: player.schema.y, z: player.schema.z },
@@ -373,6 +644,11 @@ export class GameRoom extends Room<GameState> {
           );
           player.ctrl.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
           player.ctrl.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+          const sdMode = this.getSDMode();
+          if (sdMode) {
+            sdMode.onPlayerRespawn(sessionId);
+          }
 
           const healthMsg = HealthSystem.createHealthChangeMessage(sessionId, player.schema);
           this.broadcast("health_change", healthMsg);
@@ -384,17 +660,14 @@ export class GameRoom extends Room<GameState> {
       }
     }
 
-    // Phase 1: movement updates for all players (set kinematic targets consistently)
     for (const [, player] of this.players) {
       if (!player.schema.isDead) {
         player.ctrl.update(this.world, dt, now);
       }
     }
 
-    // Phase 2: step physics ONCE after all kinematic targets were updated
     this.world.step();
 
-    // Phase 3: sync schema from physics + handle firing against a consistent world state
     for (const [sessionId, player] of this.players) {
       if (!player.schema.isDead) {
         const pos = player.ctrl.body.translation();
@@ -402,9 +675,6 @@ export class GameRoom extends Room<GameState> {
         player.schema.y = pos.y;
         player.schema.z = pos.z;
 
-        // Ack the latest input seq that was actually used for movement this tick.
-        // (Updating ack here avoids mismatches where onMessage updates ack asynchronously
-        // but the player's position is still from a different simulation step.)
         player.schema.lastProcessedInputSeq =
           (player.ctrl.input as any)?.seq ?? player.schema.lastProcessedInputSeq;
 
@@ -428,7 +698,6 @@ export class GameRoom extends Room<GameState> {
             const aim = normalize(aimDir);
             const pos = player.ctrl.body.translation();
 
-            // Use authoritative physics body position (NOT schema) and offset forward to avoid self-hit
             const eye = { x: pos.x, y: pos.y + EYE_FROM_CENTER, z: pos.z };
             const origin = {
               x: eye.x + aim.x * (CAPSULE.Radius + 0.15),
@@ -458,7 +727,6 @@ export class GameRoom extends Room<GameState> {
                 this.broadcast("shot_fired", shotResult.shotMsg);
               }
 
-              // Handle multi-hit (shotgun pellets hitting multiple players)
               if (shotResult.multiHits && shotResult.multiHits.length > 0) {
                 for (const hit of shotResult.multiHits) {
                   const hitPlayer = this.players.get(hit.playerId);
@@ -481,21 +749,11 @@ export class GameRoom extends Room<GameState> {
                     }
 
                     if (dmgResult.killed) {
-                      hitPlayer.schema.deaths += 1;
-                      hitPlayer.schema.score = Math.max(0, hitPlayer.schema.score - 50);
-
-                      if (hit.playerId !== sessionId) {
-                        const killer = this.players.get(sessionId);
-                        if (killer) {
-                          killer.schema.kills += 1;
-                          killer.schema.score += 100;
-                        }
-                      }
+                      this.handlePlayerKill(hit.playerId, sessionId);
                     }
                   }
                 }
               } else if (shotResult.hitPlayerId && shotResult.damage !== undefined) {
-                // Single hit (regular weapons)
                 const hitPlayer = this.players.get(shotResult.hitPlayerId);
                 if (hitPlayer) {
                   const dmgResult = HealthSystem.applyDamage(
@@ -516,21 +774,11 @@ export class GameRoom extends Room<GameState> {
                   }
 
                   if (dmgResult.killed) {
-                    hitPlayer.schema.deaths += 1;
-                    hitPlayer.schema.score = Math.max(0, hitPlayer.schema.score - 50);
-
-                    if (shotResult.hitPlayerId !== sessionId) {
-                      const killer = this.players.get(sessionId);
-                      if (killer) {
-                        killer.schema.kills += 1;
-                        killer.schema.score += 100;
-                      }
-                    }
+                    this.handlePlayerKill(shotResult.hitPlayerId, sessionId);
                   }
                 }
               }
 
-              // Breakable cover damage
               if (shotResult.hitColliderHandle !== undefined && !shotResult.hitPlayerId) {
                 const hitDamage = shotResult.hitDamage ?? 0;
                 if (hitDamage > 0) {
@@ -544,8 +792,236 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
-  private pickSpawnPoint(): { x: number; y: number; z: number } {
+  private handlePlayerKill(victimId: string, killerId: string): void {
+    const victim = this.players.get(victimId);
+    const killer = this.players.get(killerId);
+    
+    if (victim) {
+      victim.schema.deaths += 1;
+      victim.schema.score = Math.max(0, victim.schema.score - 50);
+      
+      const sdMode = this.getSDMode();
+      if (sdMode) {
+        const result = sdMode.onPlayerDeath(victimId, killerId, this.state, this.players);
+        victim.schema.livesRemaining = result.livesRemaining;
+        
+        if (result.roundEnd?.ended && result.roundEnd.winnerTeam) {
+          this.handleTeamRoundEnd(result.roundEnd.winnerTeam as TeamId, result.roundEnd.reason || "");
+        }
+      } else {
+        const result = this.gameMode.onPlayerDeath(victimId, killerId, this.state, this.players);
+        victim.schema.livesRemaining = result.livesRemaining;
+      }
+    }
+    
+    if (killer && killerId !== victimId) {
+      killer.schema.kills += 1;
+      killer.schema.score += 100;
+      
+      if (this.gameMode.checkScoreWin(killerId, killer.schema.kills)) {
+        this.handleGameOver(killerId);
+      }
+    }
+    
+    this.broadcast("player_killed", {
+      victimId,
+      killerId: killerId !== victimId ? killerId : null,
+      victimLivesRemaining: victim?.schema.livesRemaining ?? 0,
+    });
+    
+    const sdMode = this.getSDMode();
+    if (sdMode && this.state.isRoundActive) {
+      this.checkEliminationRoundEnd();
+    }
+  }
+  
+  private checkEliminationRoundEnd(): void {
+    if (!this.state.isRoundActive) return;
+    
+    const sdMode = this.getSDMode();
+    if (!sdMode) return;
+    
+    const teamManager = sdMode.getTeamManager();
+    
+    const getPlayerLives = (sessionId: string): number => {
+      const player = this.players.get(sessionId);
+      return player ? player.schema.livesRemaining : 0;
+    };
+    
+    const spikePlanted = this.state.spikeState === "uploaded" || 
+                         this.state.spikeState === "decrypting";
+    
+    const ghostsEliminated = teamManager.isTeamEliminated("ghosts", getPlayerLives);
+    const sentinelsEliminated = teamManager.isTeamEliminated("sentinels", getPlayerLives);
+    
+    if (sentinelsEliminated) {
+      this.handleTeamRoundEnd("ghosts", "elimination");
+      return;
+    }
+    
+    if (ghostsEliminated && !spikePlanted) {
+      this.handleTeamRoundEnd("sentinels", "elimination");
+      return;
+    }
+  }
+  
+  private checkFFAElimination(): void {
+    if (!this.state.isRoundActive) return;
+    
+    const alivePlayers: string[] = [];
+    for (const [sessionId, player] of this.players) {
+      if (!player.schema.isDead && player.schema.livesRemaining > 0) {
+        alivePlayers.push(sessionId);
+      }
+    }
+    
+    if (alivePlayers.length <= 1) {
+      this.handleRoundEnd(alivePlayers[0] || null, "elimination");
+    }
+  }
+
+  private handleGameOver(winnerId: string | null, winnerTeam?: TeamId): void {
+    this.state.isGameOver = true;
+    this.state.winnerId = winnerId || "";
+    this.state.lobbyState = "ended";
+    
+    const winner = winnerId ? this.players.get(winnerId) : null;
+    const winnerName = winner?.schema.displayName || (winnerTeam ? winnerTeam.toUpperCase() : "Unknown");
+    
+    if (winnerTeam) {
+      this.state.gameWinnerTeam = winnerTeam;
+    }
+    
+    this.broadcast("game_over", {
+      winnerId,
+      winnerName,
+      winnerTeam: winnerTeam || "",
+      gameMode: this.state.gameMode,
+      ghostsRoundsWon: this.state.ghostsRoundsWon,
+      sentinelsRoundsWon: this.state.sentinelsRoundsWon,
+    });
+    
+    this.broadcastLobbyState();
+  }
+
+  private handleTeamRoundEnd(winnerTeam: TeamId, reason: string): void {
+    if (!this.state.isRoundActive) return;
+    
+    const sdMode = this.getSDMode();
+    if (!sdMode) return;
+    
+    this.state.isRoundActive = false;
+    this.state.roundWinnerTeam = winnerTeam;
+    sdMode.stopRound();
+    
+    const teamManager = sdMode.getTeamManager();
+    const roundsWon = teamManager.awardRoundWin(winnerTeam);
+    
+    if (winnerTeam === "ghosts") {
+      this.state.ghostsRoundsWon = roundsWon;
+    } else {
+      this.state.sentinelsRoundsWon = roundsWon;
+    }
+    
+    this.broadcast("round_end", {
+      roundNumber: this.state.currentRound,
+      winnerId: null,
+      winnerName: winnerTeam === "ghosts" ? "GHOSTS" : "SENTINELS",
+      winnerTeam,
+      reason,
+    });
+    
+    if (roundsWon >= this.state.roundsToWin) {
+      this.handleGameOver(null, winnerTeam);
+      return;
+    }
+    
+    this.clock.setTimeout(() => this.startNewRound(), 5000);
+  }
+
+  private handleRoundEnd(winnerId: string | null, reason: string): void {
+    this.state.isRoundActive = false;
+    this.state.roundWinnerId = winnerId || "";
+    
+    const winner = winnerId ? this.players.get(winnerId) : null;
+    if (winner) {
+      winner.schema.roundsWon++;
+    }
+    
+    const winnerName = winner?.schema.displayName || "Unknown";
+    
+    this.broadcast("round_end", {
+      roundNumber: this.state.currentRound,
+      winnerId,
+      winnerName,
+      reason,
+    });
+    
+    if (winner && winner.schema.roundsWon >= this.state.roundsToWin) {
+      this.handleGameOver(winnerId);
+      return;
+    }
+    
+    // Start next round after delay
+    this.clock.setTimeout(() => this.startNewRound(), 5000);
+  }
+
+  private startNewRound(): void {
+    this.state.currentRound++;
+    this.state.isRoundActive = true;
+    this.state.roundWinnerId = "";
+    this.state.roundWinnerTeam = "";
+    
+    const sdMode = this.getSDMode();
+    if (sdMode) {
+      sdMode.resetForNewRound(this.state);
+    } else {
+      this.gameMode.startRound();
+    }
+    
+    for (const [sessionId, player] of this.players) {
+      const spawn = this.pickSpawnPoint(sessionId);
+      player.schema.isDead = false;
+      player.schema.health = player.schema.maxHealth;
+      player.schema.x = spawn.x;
+      player.schema.y = spawn.y;
+      player.schema.z = spawn.z;
+      player.schema.rotationY = calculateSpawnFacing(spawn.x, spawn.z);
+      player.schema.livesRemaining = this.gameMode.getConfig().maxLives || 1;
+      player.schema.hasSpike = false;
+      player.schema.isUploading = false;
+      player.schema.isDecrypting = false;
+      
+      player.ctrl.body.setTranslation({ x: spawn.x, y: spawn.y, z: spawn.z }, true);
+      
+      this.gameMode.addPlayer(sessionId);
+    }
+    
+    if (this.isSearchDestroyMode()) {
+      this.spawnSpikeOnGround();
+    }
+    
+    this.broadcast("round_start", {
+      roundNumber: this.state.currentRound,
+      spikeX: this.state.spikeX,
+      spikeZ: this.state.spikeZ,
+    });
+  }
+
+  private pickSpawnPoint(sessionId?: string): { x: number; y: number; z: number } {
     const currentMap = getCurrentMap();
+    
+    let spawnPoints = currentMap.spawnPoints;
+    const sdMode = this.getSDMode();
+    if (sdMode && sessionId) {
+      const teamId = sdMode.getTeamManager().getPlayerTeam(sessionId);
+      if (teamId === "ghosts" && currentMap.ghostSpawnPoints) {
+        spawnPoints = currentMap.ghostSpawnPoints;
+      } else if (teamId === "sentinels" && currentMap.sentinelSpawnPoints) {
+        spawnPoints = currentMap.sentinelSpawnPoints;
+      }
+    }
+    
     const alivePositions: Array<{ x: number; y: number; z: number }> = [];
     for (const [, player] of this.players) {
       if (!player.schema.isDead) {
@@ -554,14 +1030,14 @@ export class GameRoom extends Room<GameState> {
     }
 
     if (alivePositions.length === 0) {
-      const idx = Math.floor(Math.random() * currentMap.spawnPoints.length);
-      return currentMap.spawnPoints[idx];
+      const idx = Math.floor(Math.random() * spawnPoints.length);
+      return spawnPoints[idx];
     }
 
-    let bestPoint = currentMap.spawnPoints[0];
+    let bestPoint = spawnPoints[0];
     let bestScore = -Infinity;
 
-    for (const point of currentMap.spawnPoints) {
+    for (const point of spawnPoints) {
       // Safety: avoid any spawn inside obstacles
       let blocked = false;
       for (const obs of currentMap.obstacles) {
@@ -603,7 +1079,7 @@ export class GameRoom extends Room<GameState> {
 
     if (bestScore < MIN_SPAWN_DISTANCE * MIN_SPAWN_DISTANCE) {
       // If all spawns are close, randomize among top few to avoid predictability.
-      const sorted = [...currentMap.spawnPoints].sort((a, b) => {
+      const sorted = [...spawnPoints].sort((a, b) => {
         const aScore = alivePositions.reduce((min, pos) => {
           const dx = a.x - pos.x;
           const dz = a.z - pos.z;
@@ -621,8 +1097,8 @@ export class GameRoom extends Room<GameState> {
     }
 
     if (bestScore === -Infinity) {
-      const idx = Math.floor(Math.random() * currentMap.spawnPoints.length);
-      return currentMap.spawnPoints[idx];
+      const idx = Math.floor(Math.random() * spawnPoints.length);
+      return spawnPoints[idx];
     }
 
     return bestPoint;
@@ -647,7 +1123,6 @@ export class GameRoom extends Room<GameState> {
     runtime.hp -= damage;
     if (runtime.hp > 0) return;
 
-    // Destroy breakable collider
     this.world.removeCollider(runtime.collider, false);
     this.breakablesByHandle.delete(colliderHandle);
     this.breakablesById.delete(runtime.id);

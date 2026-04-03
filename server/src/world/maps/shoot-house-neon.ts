@@ -83,4 +83,30 @@ export const SHOOT_HOUSE_NEON: ServerMapDefinition = {
     { x: 8, y: 1, z: 26 },
     { x: 18, y: 1, z: 26 },
   ],
+
+  // Upload Terminals for Search & Destroy mode
+  uploadTerminals: [
+    { id: "A", x: -16, y: 0, z: 0, radius: 2.5 },  // Left lane terminal
+    { id: "B", x: 16, y: 0, z: 0, radius: 2.5 },   // Right lane terminal
+  ],
+
+  // Team spawn points for S&D mode
+  ghostSpawnPoints: [
+    // Ghosts spawn at north side (attackers)
+    { x: -18, y: 1, z: -26 },
+    { x: -8, y: 1, z: -26 },
+    { x: 0, y: 1, z: -26 },
+    { x: 8, y: 1, z: -26 },
+  ],
+
+  sentinelSpawnPoints: [
+    // Sentinels spawn at south side (defenders)
+    { x: -18, y: 1, z: 26 },
+    { x: -8, y: 1, z: 26 },
+    { x: 0, y: 1, z: 26 },
+    { x: 8, y: 1, z: 26 },
+  ],
+
+  // Spike spawns at center of Ghost spawn area
+  spikeSpawnLocation: { x: 0, y: 1, z: -24 },
 };

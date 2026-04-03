@@ -125,32 +125,32 @@ export class MaterialFactory {
  * Common material presets used across levels
  */
 export const MATERIAL_PRESETS = {
-  // Floor materials
-  floor: { color: 0x12151a, roughness: 0.92, metalness: 0.08 },
-  floorWet: { color: 0x0a0c10, roughness: 0.3, metalness: 0.7 },
-  floorDark: { color: 0x0a0c10, roughness: 0.85, metalness: 0.15 },
+  // Floor materials - dark with subtle cyan/teal tint
+  floor: { color: 0x141820, roughness: 0.85, metalness: 0.15, emissive: 0x001a1a, emissiveIntensity: 0.15 },
+  floorWet: { color: 0x0c1018, roughness: 0.2, metalness: 0.8, emissive: 0x002233, emissiveIntensity: 0.3 },
+  floorDark: { color: 0x0a0e14, roughness: 0.85, metalness: 0.15 },
   
-  // Wall materials
-  wall: { color: 0x1a1e24, roughness: 0.8, metalness: 0.2 },
-  wallDark: { color: 0x12151a, roughness: 0.85, metalness: 0.15 },
+  // Wall materials - dark blue-purple cyberpunk tint
+  wall: { color: 0x1a1824, roughness: 0.75, metalness: 0.25, emissive: 0x0a0812, emissiveIntensity: 0.2 },
+  wallDark: { color: 0x12101a, roughness: 0.8, metalness: 0.2, emissive: 0x080610, emissiveIntensity: 0.15 },
   
-  // Cover/obstacle materials
-  cover: { color: 0x1a1e24, roughness: 0.7, metalness: 0.3, emissive: 0x0a0c10, emissiveIntensity: 0.2 },
-  divider: { color: 0x181c22, roughness: 0.75, metalness: 0.25 },
-  occluder: { color: 0x141820, roughness: 0.7, metalness: 0.3, emissive: 0x080a0e, emissiveIntensity: 0.15 },
-  breakable: { color: 0x8a5a1a, roughness: 0.5, metalness: 0.2, emissive: 0xff6600, emissiveIntensity: 0.9 },
+  // Cover/obstacle materials - teal accent
+  cover: { color: 0x141a20, roughness: 0.6, metalness: 0.4, emissive: 0x003344, emissiveIntensity: 0.25 },
+  divider: { color: 0x18161e, roughness: 0.7, metalness: 0.3, emissive: 0x220033, emissiveIntensity: 0.2 },
+  occluder: { color: 0x161420, roughness: 0.65, metalness: 0.35, emissive: 0x110022, emissiveIntensity: 0.2 },
+  breakable: { color: 0x8a5a1a, roughness: 0.45, metalness: 0.25, emissive: 0xff6600, emissiveIntensity: 1.0 },
   
-  // Metal materials
-  metal: { color: 0x2a2e34, roughness: 0.4, metalness: 0.8 },
-  metalDark: { color: 0x1a1e24, roughness: 0.35, metalness: 0.85 },
-  railing: { color: 0x222630, roughness: 0.3, metalness: 0.9 },
+  // Metal materials - cool metallic with cyan reflection
+  metal: { color: 0x1e2228, roughness: 0.3, metalness: 0.9, emissive: 0x002a3a, emissiveIntensity: 0.2 },
+  metalDark: { color: 0x161a20, roughness: 0.25, metalness: 0.92, emissive: 0x001a2a, emissiveIntensity: 0.15 },
+  railing: { color: 0x1a1e26, roughness: 0.2, metalness: 0.95, emissive: 0x003355, emissiveIntensity: 0.25 },
   
-  // Building materials
-  buildingBase: { color: 0x141820, roughness: 0.85, metalness: 0.15 },
-  buildingAccent: { color: 0x1e2430, roughness: 0.75, metalness: 0.25 },
-  concrete: { color: 0x1c2028, roughness: 0.9, metalness: 0.1 },
+  // Building materials - purple/magenta undertones
+  buildingBase: { color: 0x14121a, roughness: 0.8, metalness: 0.2, emissive: 0x110018, emissiveIntensity: 0.2 },
+  buildingAccent: { color: 0x1c1828, roughness: 0.7, metalness: 0.3, emissive: 0x220033, emissiveIntensity: 0.25 },
+  concrete: { color: 0x181620, roughness: 0.85, metalness: 0.15, emissive: 0x0a0810, emissiveIntensity: 0.1 },
   
-  // Prop materials
-  prop: { color: 0x202428, roughness: 0.6, metalness: 0.4 },
-  vent: { color: 0x1a1e22, roughness: 0.5, metalness: 0.5, emissive: 0x0a0c10, emissiveIntensity: 0.3 },
+  // Prop materials - mixed neon hints
+  prop: { color: 0x1a1820, roughness: 0.5, metalness: 0.5, emissive: 0x112233, emissiveIntensity: 0.2 },
+  vent: { color: 0x161820, roughness: 0.4, metalness: 0.6, emissive: 0x004455, emissiveIntensity: 0.35 },
 } as const;

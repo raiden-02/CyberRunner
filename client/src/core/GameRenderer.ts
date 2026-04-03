@@ -4,6 +4,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { CyberpunkLighting, CYBERPUNK_LIGHTING_CONFIG, type LightingConfig } from "../world/lighting/CyberpunkLighting.js";
+import { SettingsManager, type GraphicsSettings } from "../settings/SettingsManager.js";
 
 export interface BloomConfig {
   enabled: boolean;
@@ -17,6 +18,19 @@ export const DEFAULT_BLOOM_CONFIG: BloomConfig = {
   strength: 0.35,
   radius: 0.4,
   threshold: 0.75
+};
+
+const SHADOW_MAP_SIZES: Record<GraphicsSettings["shadowQuality"], number> = {
+  low: 512,
+  medium: 1024,
+  high: 2048,
+};
+
+const PIXEL_RATIO_BY_PRESET: Record<GraphicsSettings["qualityPreset"], number> = {
+  low: 1,
+  medium: 1.5,
+  high: 2,
+  ultra: Math.min(window.devicePixelRatio, 2),
 };
 
 export class GameRenderer {
@@ -42,7 +56,12 @@ export class GameRenderer {
     this.canvas = document.createElement("canvas");
     this.canvas.id = "gameCanvas";
     this.canvas.tabIndex = 0;
-    document.body.innerHTML = "";
+    this.canvas.style.cssText = "position: fixed; top: 0; left: 0; z-index: 0;";
+    
+    const existingCanvas = document.getElementById("gameCanvas");
+    if (existingCanvas) {
+      existingCanvas.remove();
+    }
     document.body.appendChild(this.canvas);
 
     this.renderer = new THREE.WebGLRenderer({ 
@@ -142,6 +161,72 @@ export class GameRenderer {
     return this.lighting;
   }
 
+  public setFOV(fov: number): void {
+    this.camera.fov = fov;
+    this.camera.updateProjectionMatrix();
+  }
+
+  public setBloomEnabled(enabled: boolean): void {
+    if (!this.bloomPass) {
+      if (enabled) {
+        this.bloomPass = new UnrealBloomPass(
+          new THREE.Vector2(window.innerWidth, window.innerHeight),
+          this.bloomConfig.strength,
+          this.bloomConfig.radius,
+          this.bloomConfig.threshold
+        );
+        this.composer?.insertPass(this.bloomPass, 1);
+      }
+      return;
+    }
+    this.bloomConfig.enabled = enabled;
+    this.bloomPass.enabled = enabled;
+  }
+
+  public setShadowsEnabled(enabled: boolean): void {
+    this.renderer.shadowMap.enabled = enabled;
+    this.scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.castShadow = enabled;
+        obj.receiveShadow = enabled;
+      }
+    });
+  }
+
+  public setShadowQuality(quality: GraphicsSettings["shadowQuality"]): void {
+    const size = SHADOW_MAP_SIZES[quality];
+    this.scene.traverse((obj) => {
+      if (obj instanceof THREE.Light && obj.shadow) {
+        obj.shadow.mapSize.width = size;
+        obj.shadow.mapSize.height = size;
+        if (obj.shadow.map) {
+          obj.shadow.map.dispose();
+          obj.shadow.map = null;
+        }
+      }
+    });
+  }
+
+  public setPixelRatio(ratio: number): void {
+    this.renderer.setPixelRatio(Math.min(ratio, 2));
+  }
+
+  public applyGraphicsSettings(settings: GraphicsSettings): void {
+    this.setBloomEnabled(settings.bloomEnabled);
+    this.setBloomStrength(settings.bloomStrength);
+    this.setShadowsEnabled(settings.shadowsEnabled);
+    this.setShadowQuality(settings.shadowQuality);
+    this.setFOV(settings.fov);
+    
+    const pixelRatio = PIXEL_RATIO_BY_PRESET[settings.qualityPreset];
+    this.setPixelRatio(pixelRatio);
+  }
+
+  public applySettingsFromManager(): void {
+    const settings = SettingsManager.getInstance().getGraphics();
+    this.applyGraphicsSettings(settings);
+  }
+
   public render(): void {
     if (this.lighting) {
       this.lighting.updateWeaponLight(this.camera);
@@ -168,5 +253,6 @@ export class GameRenderer {
       this.composer.dispose();
     }
     this.renderer.dispose();
+    this.canvas.remove();
   }
 }

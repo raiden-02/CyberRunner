@@ -24,6 +24,14 @@ export type BreakableCover = BoxObstacle & {
 
 export type VolumeBox = BoxObstacle;
 
+export type UploadTerminal = {
+  id: "A" | "B";
+  x: number;
+  y: number;
+  z: number;
+  radius: number; // Interaction radius
+};
+
 export interface ServerMapDefinition {
   name: string;
   boundsHalfSize: number;
@@ -35,6 +43,11 @@ export interface ServerMapDefinition {
   breakables: BreakableCover[];
   spawnProtectionZones: VolumeBox[];
   spawnPoints: SpawnPoint[];
+  uploadTerminals?: UploadTerminal[];
+  // Team-based spawn points (S&D mode)
+  ghostSpawnPoints?: SpawnPoint[];
+  sentinelSpawnPoints?: SpawnPoint[];
+  spikeSpawnLocation?: SpawnPoint;
 }
 
 /**

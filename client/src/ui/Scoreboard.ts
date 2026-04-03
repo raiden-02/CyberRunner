@@ -111,4 +111,8 @@ export class Scoreboard {
 
     this.element.innerHTML = header + body;
   }
+
+  destroy(): void {
+    this.element.remove();
+  }
 }
