@@ -14,6 +14,22 @@ export interface KeybindSettings {
   scoreboard: string;
 }
 
+export interface KeybindSettingsAlt {
+  moveForward: string;
+  moveBack: string;
+  moveLeft: string;
+  moveRight: string;
+  sprint: string;
+  crouch: string;
+  jump: string;
+  reload: string;
+  interact: string;
+  primaryWeapon: string;
+  secondaryWeapon: string;
+  toggleWeapon: string;
+  scoreboard: string;
+}
+
 export interface GraphicsSettings {
   qualityPreset: "low" | "medium" | "high" | "ultra";
   bloomEnabled: boolean;
@@ -25,11 +41,15 @@ export interface GraphicsSettings {
   mouseSensitivity: number;
   adsSensitivityMultiplier: number;
   scopeSensitivityMultiplier: number;
+  masterVolume: number;
+  sfxVolume: number;
+  uiVolume: number;
 }
 
 export interface AllSettings {
   version: number;
   keybinds: KeybindSettings;
+  keybindsAlt: KeybindSettingsAlt;
   graphics: GraphicsSettings;
 }
 
@@ -45,8 +65,24 @@ export const DEFAULT_KEYBINDS: KeybindSettings = {
   interact: "KeyE",
   primaryWeapon: "Digit1",
   secondaryWeapon: "Digit2",
-  toggleWeapon: "KeyQ",
+  toggleWeapon: "WheelUp",
   scoreboard: "Tab",
+};
+
+export const DEFAULT_KEYBINDS_ALT: KeybindSettingsAlt = {
+  moveForward: "ArrowUp",
+  moveBack: "ArrowDown",
+  moveLeft: "ArrowLeft",
+  moveRight: "ArrowRight",
+  sprint: "ShiftRight",
+  crouch: "ControlLeft",
+  jump: "",
+  reload: "",
+  interact: "KeyF",
+  primaryWeapon: "",
+  secondaryWeapon: "",
+  toggleWeapon: "KeyQ",
+  scoreboard: "",
 };
 
 export const DEFAULT_GRAPHICS: GraphicsSettings = {
@@ -60,6 +96,9 @@ export const DEFAULT_GRAPHICS: GraphicsSettings = {
   mouseSensitivity: 1.0,
   adsSensitivityMultiplier: 0.8,
   scopeSensitivityMultiplier: 0.5,
+  masterVolume: 1.0,
+  sfxVolume: 0.7,
+  uiVolume: 0.5,
 };
 
 export const QUALITY_PRESETS: Record<GraphicsSettings["qualityPreset"], Partial<GraphicsSettings>> = {
@@ -124,6 +163,7 @@ export class SettingsManager {
           return {
             version: CURRENT_VERSION,
             keybinds: { ...DEFAULT_KEYBINDS, ...parsed.keybinds },
+            keybindsAlt: { ...DEFAULT_KEYBINDS_ALT, ...parsed.keybindsAlt },
             graphics: { ...DEFAULT_GRAPHICS, ...parsed.graphics },
           };
         }
@@ -146,6 +186,7 @@ export class SettingsManager {
     return {
       version: CURRENT_VERSION,
       keybinds: { ...DEFAULT_KEYBINDS },
+      keybindsAlt: { ...DEFAULT_KEYBINDS_ALT },
       graphics: { ...DEFAULT_GRAPHICS },
     };
   }
@@ -160,14 +201,30 @@ export class SettingsManager {
     return { ...this.settings.keybinds };
   }
 
+  getKeybindsAlt(): KeybindSettingsAlt {
+    return { ...this.settings.keybindsAlt };
+  }
+
   setKeybind(action: keyof KeybindSettings, key: string): void {
     this.settings.keybinds[action] = key;
     this.save();
     this.notifyListeners();
   }
 
+  setKeybindAlt(action: keyof KeybindSettingsAlt, key: string): void {
+    this.settings.keybindsAlt[action] = key;
+    this.save();
+    this.notifyListeners();
+  }
+
   setAllKeybinds(keybinds: KeybindSettings): void {
     this.settings.keybinds = { ...keybinds };
+    this.save();
+    this.notifyListeners();
+  }
+
+  setAllKeybindsAlt(keybindsAlt: KeybindSettingsAlt): void {
+    this.settings.keybindsAlt = { ...keybindsAlt };
     this.save();
     this.notifyListeners();
   }
@@ -197,12 +254,14 @@ export class SettingsManager {
     return {
       version: this.settings.version,
       keybinds: { ...this.settings.keybinds },
+      keybindsAlt: { ...this.settings.keybindsAlt },
       graphics: { ...this.settings.graphics },
     };
   }
 
   resetKeybindsToDefaults(): void {
     this.settings.keybinds = { ...DEFAULT_KEYBINDS };
+    this.settings.keybindsAlt = { ...DEFAULT_KEYBINDS_ALT };
     this.save();
     this.notifyListeners();
   }
@@ -241,6 +300,8 @@ export class SettingsManager {
   }
 
   getKeyDisplayName(code: string): string {
+    if (!code) return "—";
+    
     const displayNames: Record<string, string> = {
       KeyA: "A", KeyB: "B", KeyC: "C", KeyD: "D", KeyE: "E", KeyF: "F",
       KeyG: "G", KeyH: "H", KeyI: "I", KeyJ: "J", KeyK: "K", KeyL: "L",
@@ -262,6 +323,9 @@ export class SettingsManager {
       PageUp: "PgUp", PageDown: "PgDn",
       F1: "F1", F2: "F2", F3: "F3", F4: "F4", F5: "F5", F6: "F6",
       F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12",
+      WheelUp: "Scroll Up", WheelDown: "Scroll Down",
+      MouseLeft: "Mouse Left", MouseRight: "Mouse Right", MouseMiddle: "Mouse Middle",
+      Mouse3: "Mouse 3", Mouse4: "Mouse 4", Mouse5: "Mouse 5",
     };
     return displayNames[code] || code;
   }

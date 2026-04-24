@@ -4,6 +4,7 @@ import { PlayerState, MovementState } from "./PlayerState.js";
 import { InputMsg, WeaponSwitchMsg, FireInputMsg, ReloadInputMsg, DamageMsg, SpikeActionMsg, TeamSelectMsg } from "./net/messages.js";
 import { CharacterController } from "./movement/character-controller.js";
 import { CAPSULE } from "./physics/constants.js";
+import { COLLISION_GROUPS } from "./physics/layers.js";
 import { HealthSystem } from "./systems/health-system.js";
 import { WeaponSystem } from "./systems/weapon-system.js";
 import { getWeaponConfig } from "./weapons/weapon-config.js";
@@ -17,6 +18,8 @@ import {
   SearchDestroyMode,
   type TeamId 
 } from "./game-modes/index.js";
+import { LagCompensation } from "./systems/lag-compensation.js";
+import { ProjectileManager, type ProjectileConfig } from "./systems/projectile-system.js";
 
 const TICK_RATE = 60; // Hz
 const DEFAULT_MAX_PLAYERS = 8;
@@ -44,6 +47,8 @@ export class GameRoom extends Room<GameState> {
   private breakablesById = new Map<number, BreakableRuntime>();
   private hitboxRegistry = new HitboxRegistry();
   private gameMode!: BaseGameMode;
+  private lagCompensation = new LagCompensation();
+  private projectileManager!: ProjectileManager;
 
   private joinCode: string = "";
   private hostId: string = "";
@@ -109,7 +114,9 @@ export class GameRoom extends Room<GameState> {
         currentMap.boundsHalfSize,
         currentMap.groundThickness,
         currentMap.boundsHalfSize
-      ).setTranslation(0, -currentMap.groundThickness, 0).setFriction(1.0)
+      ).setTranslation(0, -currentMap.groundThickness, 0)
+       .setFriction(1.0)
+       .setCollisionGroups(COLLISION_GROUPS.WORLD)
     );
 
     const wallHalfThickness = currentMap.wallThickness;
@@ -119,21 +126,25 @@ export class GameRoom extends Room<GameState> {
       RAPIER.ColliderDesc.cuboid(wallHalfThickness, wallHalfHeight, halfSize)
         .setTranslation(halfSize + wallHalfThickness, wallHalfHeight, 0)
         .setFriction(0.8)
+        .setCollisionGroups(COLLISION_GROUPS.WORLD)
     );
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(wallHalfThickness, wallHalfHeight, halfSize)
         .setTranslation(-halfSize - wallHalfThickness, wallHalfHeight, 0)
         .setFriction(0.8)
+        .setCollisionGroups(COLLISION_GROUPS.WORLD)
     );
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(halfSize, wallHalfHeight, wallHalfThickness)
         .setTranslation(0, wallHalfHeight, halfSize + wallHalfThickness)
         .setFriction(0.8)
+        .setCollisionGroups(COLLISION_GROUPS.WORLD)
     );
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(halfSize, wallHalfHeight, wallHalfThickness)
         .setTranslation(0, wallHalfHeight, -halfSize - wallHalfThickness)
         .setFriction(0.8)
+        .setCollisionGroups(COLLISION_GROUPS.WORLD)
     );
 
     for (const obs of currentMap.obstacles) {
@@ -141,6 +152,7 @@ export class GameRoom extends Room<GameState> {
         RAPIER.ColliderDesc.cuboid(obs.hx, obs.hy, obs.hz)
           .setTranslation(obs.x, obs.y, obs.z)
           .setFriction(0.9)
+          .setCollisionGroups(COLLISION_GROUPS.WORLD)
       );
     }
 
@@ -149,6 +161,7 @@ export class GameRoom extends Room<GameState> {
         RAPIER.ColliderDesc.cuboid(occ.hx, occ.hy, occ.hz)
           .setTranslation(occ.x, occ.y, occ.z)
           .setFriction(0.9)
+          .setCollisionGroups(COLLISION_GROUPS.WORLD)
       );
     }
 
@@ -157,6 +170,7 @@ export class GameRoom extends Room<GameState> {
         RAPIER.ColliderDesc.cuboid(b.hx, b.hy, b.hz)
           .setTranslation(b.x, b.y, b.z)
           .setFriction(0.9)
+          .setCollisionGroups(COLLISION_GROUPS.WORLD)
       );
       const runtime: BreakableRuntime = {
         id: idx,
@@ -166,6 +180,8 @@ export class GameRoom extends Room<GameState> {
       this.breakablesByHandle.set(collider.handle, runtime);
       this.breakablesById.set(idx, runtime);
     });
+    
+    this.projectileManager = new ProjectileManager(this.world);
 
     this.running = true;
     this.setSimulationInterval((deltaTime) => {
@@ -221,6 +237,14 @@ export class GameRoom extends Room<GameState> {
       
       player.schema.firing = data.firing;
       (player as any).aimDir = data.aimDir;
+    });
+    
+    this.onMessage("ping", (client, data: { clientTime: number }) => {
+      const serverTime = Date.now();
+      const rtt = serverTime - data.clientTime;
+      const latency = Math.max(0, rtt / 2);
+      this.lagCompensation.setClientLatency(client, latency);
+      client.send("pong", { clientTime: data.clientTime, serverTime });
     });
 
     this.onMessage("reload_input", (client, data: ReloadInputMsg) => {
@@ -395,7 +419,8 @@ export class GameRoom extends Room<GameState> {
       .setFriction(0.7)
       .setRestitution(0.0)
       .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DEFAULT)
-      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
+      .setCollisionGroups(COLLISION_GROUPS.PLAYER);
     const collider = this.world.createCollider(colliderDesc, body);
     
     const controller = this.world.createCharacterController(0.1);
@@ -439,6 +464,7 @@ export class GameRoom extends Room<GameState> {
     }
     this.players.delete(client.sessionId);
     this.gameMode.removePlayer(client.sessionId);
+    this.lagCompensation.removePlayer(client.sessionId);
     
     const sdMode = this.getSDMode();
     if (sdMode) {
@@ -667,6 +693,8 @@ export class GameRoom extends Room<GameState> {
     }
 
     this.world.step();
+    
+    this.updateProjectiles(dt);
 
     for (const [sessionId, player] of this.players) {
       if (!player.schema.isDead) {
@@ -689,6 +717,14 @@ export class GameRoom extends Room<GameState> {
         const currentState = player.ctrl.currentState();
         player.schema.isCrouching = (currentState === MovementState.Crouching);
         player.schema.isSliding = (currentState === MovementState.Sliding);
+        
+        this.lagCompensation.recordPosition(
+          sessionId,
+          now * 1000,
+          player.schema.x,
+          player.schema.y,
+          player.schema.z
+        );
       }
 
       if (!player.schema.isDead && player.schema.firing && !player.schema.reloading) {
@@ -705,6 +741,16 @@ export class GameRoom extends Room<GameState> {
               z: eye.z + aim.z * (CAPSULE.Radius + 0.15)
             };
 
+            const client = this.clients.find(c => c.sessionId === sessionId);
+            const latencyMs = client ? this.lagCompensation.getEstimatedLatency(client) : 50;
+            const shotTimestamp = now * 1000 - latencyMs;
+            
+            const originalPositions = this.lagCompensation.rewindPlayers(
+              this.players,
+              sessionId,
+              shotTimestamp
+            );
+            
             const shotResult = WeaponSystem.processShot(
               this.world,
               player.schema,
@@ -715,6 +761,8 @@ export class GameRoom extends Room<GameState> {
               now,
               this.hitboxRegistry
             );
+            
+            this.lagCompensation.restorePlayers(this.players, originalPositions);
 
             if (shotResult.shotFired) {
               
@@ -725,6 +773,30 @@ export class GameRoom extends Room<GameState> {
 
               if (shotResult.shotMsg) {
                 this.broadcast("shot_fired", shotResult.shotMsg);
+              }
+              
+              const weaponConfig = getWeaponConfig(player.schema.equippedWeapon);
+              if (weaponConfig?.type === "projectile" && weaponConfig.projectileSpeed) {
+                const projectileConfig: ProjectileConfig = {
+                  speed: weaponConfig.projectileSpeed,
+                  radius: weaponConfig.projectileRadius || 0.1,
+                  length: 0.3,
+                  damage: weaponConfig.damage,
+                  lifetime: weaponConfig.range / weaponConfig.projectileSpeed,
+                  explosionRadius: weaponConfig.explosionRadius,
+                  ownerType: "player",
+                  ownerId: sessionId,
+                  weaponId: weaponConfig.id,
+                };
+                
+                const projectileId = this.projectileManager.spawnProjectile(origin, aim, projectileConfig);
+                this.broadcast("projectile_spawned", {
+                  id: projectileId,
+                  origin,
+                  direction: aim,
+                  speed: weaponConfig.projectileSpeed,
+                  weaponId: weaponConfig.id,
+                });
               }
 
               if (shotResult.multiHits && shotResult.multiHits.length > 0) {
@@ -743,7 +815,9 @@ export class GameRoom extends Room<GameState> {
                       const healthMsg = HealthSystem.createHealthChangeMessage(
                         hit.playerId,
                         hitPlayer.schema,
-                        hit.bodyPart
+                        hit.bodyPart,
+                        sessionId,
+                        hit.damage
                       );
                       this.broadcast("health_change", healthMsg);
                     }
@@ -768,7 +842,9 @@ export class GameRoom extends Room<GameState> {
                     const healthMsg = HealthSystem.createHealthChangeMessage(
                       shotResult.hitPlayerId,
                       hitPlayer.schema,
-                      shotResult.bodyPart
+                      shotResult.bodyPart,
+                      sessionId,
+                      shotResult.damage
                     );
                     this.broadcast("health_change", healthMsg);
                   }
@@ -1128,5 +1204,98 @@ export class GameRoom extends Room<GameState> {
     this.breakablesById.delete(runtime.id);
 
     this.broadcast("breakable_destroyed", { id: runtime.id });
+  }
+  
+  private updateProjectiles(dt: number): void {
+    const { activeProjectiles, expiredProjectiles } = this.projectileManager.update(dt);
+    
+    for (const id of expiredProjectiles) {
+      this.broadcast("projectile_destroyed", { id, reason: "expired" });
+    }
+    
+    for (const [id, projectile] of activeProjectiles) {
+      const pos = projectile.getPosition();
+      
+      const ray = new RAPIER.Ray(pos, { x: 0, y: -0.1, z: 0 });
+      const maxDist = projectile.config.radius * 2;
+      
+      const worldHit = this.world.castRay(ray, maxDist, true, undefined, undefined, undefined, projectile.body);
+      
+      const hasWorldCollision = worldHit !== null;
+      
+      let hasPlayerCollision = false;
+      for (const [playerId, playerData] of this.players) {
+        if (playerId === projectile.config.ownerId) continue;
+        if (playerData.schema.isDead) continue;
+        
+        const dx = playerData.schema.x - pos.x;
+        const dy = playerData.schema.y - pos.y;
+        const dz = playerData.schema.z - pos.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        if (dist < 1.5) {
+          hasPlayerCollision = true;
+          break;
+        }
+      }
+      
+      if (hasWorldCollision || hasPlayerCollision) {
+        this.handleProjectileImpact(id, projectile, pos);
+        this.projectileManager.removeProjectile(id);
+        this.broadcast("projectile_destroyed", { id, reason: "impact", position: pos });
+      }
+    }
+  }
+  
+  private handleProjectileImpact(
+    projectileId: string,
+    projectile: { config: ProjectileConfig; getPosition: () => { x: number; y: number; z: number } },
+    impactPos: { x: number; y: number; z: number }
+  ): void {
+    const config = projectile.config;
+    
+    if (config.explosionRadius && config.explosionRadius > 0) {
+      const weaponConfig = getWeaponConfig(config.weaponId);
+      const explosionHits = WeaponSystem.processExplosion(
+        impactPos,
+        config.ownerId,
+        config.weaponId,
+        this.players
+      );
+      
+      for (const hit of explosionHits) {
+        const hitPlayer = this.players.get(hit.playerId);
+        if (hitPlayer) {
+          const dmgResult = HealthSystem.applyDamage(
+            hitPlayer.schema,
+            hit.damage,
+            config.ownerId,
+            config.weaponId,
+            "explosion"
+          );
+          
+          if (dmgResult.damaged) {
+            const healthMsg = HealthSystem.createHealthChangeMessage(
+              hit.playerId,
+              hitPlayer.schema,
+              undefined,
+              config.ownerId,
+              hit.damage
+            );
+            this.broadcast("health_change", healthMsg);
+          }
+          
+          if (dmgResult.killed) {
+            this.handlePlayerKill(hit.playerId, config.ownerId);
+          }
+        }
+      }
+      
+      this.broadcast("explosion", {
+        position: impactPos,
+        radius: config.explosionRadius,
+        weaponId: config.weaponId,
+      });
+    }
   }
 }

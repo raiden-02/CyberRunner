@@ -95,16 +95,31 @@ export class WeaponSystem {
     if (hits.length === 0) return { hit: false };
 
     hits.sort((a, b) => a.toi - b.toi);
-    const closestToi = hits[0].toi;
+    const closestHit = hits[0];
+    const closestToi = closestHit.toi;
+    const closestHitboxInfo = hitboxRegistry.get(closestHit.collider.handle);
     
-    // Prefer headshots within 30cm of closest hit
+    // If closest hit is world geometry (not a player hitbox), stop here - no wall penetration
+    if (!closestHitboxInfo) {
+      const hitPoint = ray.pointAt(closestToi);
+      return {
+        hit: true,
+        distance: closestToi,
+        point: { x: hitPoint.x, y: hitPoint.y, z: hitPoint.z },
+        normal: { x: closestHit.normal.x, y: closestHit.normal.y, z: closestHit.normal.z },
+        colliderHandle: closestHit.collider.handle
+      };
+    }
+    
+    // Closest hit is a player hitbox - prefer headshots within tolerance
     const PRIORITY_TOLERANCE = 0.3;
-    let bestHit = hits[0];
-    let bestHitboxInfo = hitboxRegistry.get(bestHit.collider.handle);
+    let bestHit = closestHit;
+    let bestHitboxInfo = closestHitboxInfo;
     
     for (const hit of hits) {
       if (hit.toi > closestToi + PRIORITY_TOLERANCE) break;
       const hitboxInfo = hitboxRegistry.get(hit.collider.handle);
+      // Only consider player hitboxes, not world geometry
       if (hitboxInfo?.bodyPart === "head") {
         bestHit = hit;
         bestHitboxInfo = hitboxInfo;

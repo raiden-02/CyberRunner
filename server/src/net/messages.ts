@@ -57,6 +57,8 @@ export type HealthChangeMsg = {
   respawnTime?: number;
   bodyPart?: BodyPartHit;
   isHeadshot?: boolean;
+  attackerId?: string;
+  damage?: number;
 };
 
 export type BreakableDestroyedMsg = {

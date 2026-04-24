@@ -1,5 +1,6 @@
 import * as RAPIER from "@dimforge/rapier3d-compat";
 import { HITBOX, DAMAGE_MULTIPLIERS } from "./constants.js";
+import { COLLISION_GROUPS } from "./layers.js";
 import type { BodyPartHit } from "../net/messages.js";
 
 export type BodyPart = BodyPartHit;
@@ -49,7 +50,9 @@ function createSensorCollider(
   parentBody: RAPIER.RigidBody,
   desc: RAPIER.ColliderDesc
 ): RAPIER.Collider {
-  desc.setSensor(true).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+  desc.setSensor(true)
+      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
+      .setCollisionGroups(COLLISION_GROUPS.HITBOX);
   return world.createCollider(desc, parentBody);
 }
 

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { resolveCollisions } from "../physics/client-collision.js";
 
 // Constants - match server values
 const MOVE_SPEED = 5.0;
@@ -125,8 +126,24 @@ export class LocalPlayer {
     this.capsuleCenter.y += this.velocity.y * dt;
     this.capsuleCenter.z += this.velocity.z * dt;
 
+    // Client-side wall collision prediction
+    const resolved = resolveCollisions(
+      this.capsuleCenter.x,
+      this.capsuleCenter.y,
+      this.capsuleCenter.z,
+      CAPSULE_RADIUS
+    );
+    
+    if (resolved.x !== this.capsuleCenter.x) {
+      this.capsuleCenter.x = resolved.x;
+      this.velocity.x = 0;
+    }
+    if (resolved.z !== this.capsuleCenter.z) {
+      this.capsuleCenter.z = resolved.z;
+      this.velocity.z = 0;
+    }
+
     // Simple ground collision (y >= CENTER_TO_FOOT)
-    // Use small tolerance to avoid micro-bouncing with server
     const groundY = CENTER_TO_FOOT;
     if (this.capsuleCenter.y < groundY + 0.01) {
       this.capsuleCenter.y = groundY;

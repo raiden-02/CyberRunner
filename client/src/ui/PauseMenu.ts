@@ -63,7 +63,7 @@ export class PauseMenu {
     `;
     
     const title = document.createElement("h1");
-    title.textContent = "Paused";
+    title.textContent = "Menu";
     title.style.cssText = `
       margin: 0 0 24px 0;
       color: #00ffff;
@@ -73,7 +73,7 @@ export class PauseMenu {
     `;
     panel.appendChild(title);
     
-    const resumeBtn = this.createButton("Resume", true);
+    const resumeBtn = this.createButton("Return to Game", true);
     resumeBtn.addEventListener("click", () => this.resume());
     panel.appendChild(resumeBtn);
     

@@ -20,6 +20,11 @@ import { SpikeObject, type SpikeState } from "../world/SpikeObject.js";
 import { PlantSiteMarker, type PlantSiteState } from "../world/PlantSiteMarker.js";
 import { PauseMenu } from "../ui/PauseMenu.js";
 import { SettingsManager } from "../settings/SettingsManager.js";
+import { AudioManager, setAudioManager } from "../audio/AudioManager.js";
+import { HitMarker } from "../ui/HitMarker.js";
+import { DamageIndicator } from "../ui/DamageIndicator.js";
+import { KillFeed } from "../ui/KillFeed.js";
+import { DeathCam } from "../ui/DeathCam.js";
 import type { UserProfile } from "../api/client.js";
 import type { PlayAction } from "../ui/screens/LobbyScreen.js";
 import type { GameOverMessage } from "../network/NetworkManager.js";
@@ -51,6 +56,11 @@ export class Game {
   private plantSiteMarkers: PlantSiteMarker[] = [];
   private pauseMenu: PauseMenu;
   private pointerLockChangeHandler: () => void;
+  private audioManager: AudioManager;
+  private hitMarker: HitMarker;
+  private damageIndicator: DamageIndicator;
+  private killFeed: KillFeed;
+  private deathCam: DeathCam;
 
   private lastTime = performance.now();
   private running = false;
@@ -87,6 +97,15 @@ export class Game {
     this.actionPrompt = new ActionPrompt();
     this.teamLobbyScreen = new TeamLobbyScreen();
     this.pauseMenu = new PauseMenu();
+    
+    this.audioManager = new AudioManager(this.renderer.camera);
+    setAudioManager(this.audioManager);
+    this.audioManager.init();
+    
+    this.hitMarker = new HitMarker();
+    this.damageIndicator = new DamageIndicator();
+    this.killFeed = new KillFeed();
+    this.deathCam = new DeathCam();
     
     this.pauseMenu.setOnResume(() => {
       this.renderer.canvas.requestPointerLock();
@@ -145,6 +164,13 @@ export class Game {
       },
       onReload: (weaponId) => {
         this.network.sendReload(weaponId);
+        this.audioManager.playReload();
+      },
+      onShotRequested: (shot) => {
+        this.audioManager.playGunshot(shot.weaponId, true);
+      },
+      onRecoil: (pitch, yaw, returnSpeed) => {
+        this.input.applyRecoil(pitch, yaw, returnSpeed);
       }
     });
     this.renderer.camera.layers.enable(WEAPON_RENDER_LAYER);
@@ -316,16 +342,68 @@ export class Game {
 
     this.network.onHealthChange = (msg) => {
       if (msg.playerId === this.network.sessionId) {
+        const wasDead = this.localPlayer.isDead;
+        
         this.localPlayer.updateHealth(
           msg.newHealth,
           msg.maxHealth,
           msg.isDead,
           msg.respawnTime || 0
         );
+        
+        if (msg.attackerId && msg.damage && msg.damage > 0) {
+          const attacker = this.network.state?.players?.get(msg.attackerId);
+          if (attacker) {
+            this.damageIndicator.showDamage(
+              attacker.x,
+              attacker.z,
+              this.localPlayer.getCapsuleCenter().x,
+              this.localPlayer.getCapsuleCenter().z
+            );
+          }
+        }
+        
+        if (msg.isDead && !wasDead && msg.attackerId) {
+          const killer = this.network.state?.players?.get(msg.attackerId);
+          if (killer) {
+            this.deathCam.show(
+              killer.displayName || "Unknown",
+              killer.equippedWeapon || "Unknown Weapon",
+              msg.isHeadshot || false
+            );
+          }
+        }
+        
+        if (!msg.isDead && wasDead) {
+          this.deathCam.hide();
+        }
+      } else if (msg.attackerId === this.network.sessionId && msg.damage && msg.damage > 0) {
+        this.hitMarker.show(msg.isHeadshot || false, msg.isDead);
+      }
+      
+      if (msg.isDead && msg.attackerId) {
+        const players = this.network.state?.players;
+        const killer = players?.get(msg.attackerId);
+        const victim = players?.get(msg.playerId);
+        
+        if (killer && victim) {
+          this.killFeed.addKill(
+            killer.displayName || "Unknown",
+            victim.displayName || "Unknown",
+            killer.equippedWeapon || "AR_1",
+            msg.isHeadshot || false,
+            msg.attackerId === this.network.sessionId,
+            msg.playerId === this.network.sessionId
+          );
+        }
       }
     };
 
-    this.network.onShotFired = (_msg) => {};
+    this.network.onShotFired = (msg) => {
+      if (msg.shooterId !== this.network.sessionId) {
+        this.audioManager.playGunshot(msg.weaponId, false, msg.origin);
+      }
+    };
 
     this.network.onBreakableDestroyed = (msg) => {
       this.level.destroyBreakable(msg.id);
@@ -671,8 +749,11 @@ export class Game {
     }
 
     this.input.setAdsState(this.weaponSystem.getAdsAlpha(), this.weaponSystem.isScopeActive());
+    this.input.updateRecoil(dt);
     this.updateCameraRotation();
     const inputState = this.input.getState();
+    
+    this.damageIndicator.setPlayerYaw(inputState.yaw);
 
     this.localPlayer.update(dt, {
       moveX: inputState.moveX,
@@ -682,6 +763,14 @@ export class Game {
       aiming: inputState.aiming,
       jump: inputState.jumpPressed
     });
+    
+    const isMoving = Math.abs(inputState.moveX) > 0.1 || Math.abs(inputState.moveZ) > 0.1;
+    const isGrounded = this.localPlayer.getCapsuleCenter().y < 1.4;
+    const isSprintingNow = inputState.sprint && !inputState.aiming;
+    const isCrouching = inputState.crouchHeld;
+    if (!this.localPlayer.isDead) {
+      this.audioManager.updateFootsteps(dt, isMoving, isGrounded, isSprintingNow, isCrouching);
+    }
 
     const canFire = !this.localPlayer.isReloading && !this.localPlayer.isDead;
     const firingNow = inputState.firing && canFire;
@@ -1092,6 +1181,11 @@ export class Game {
     this.actionPrompt.dispose();
     this.weaponSystem.dispose();
     this.input.dispose();
+    this.audioManager.dispose();
+    this.hitMarker.dispose();
+    this.damageIndicator.dispose();
+    this.killFeed.dispose();
+    this.deathCam.dispose();
     this.hud.destroy();
     this.scoreboard.destroy();
     this.teamLobbyScreen.destroy();

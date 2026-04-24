@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { SettingsManager, type KeybindSettings } from "../settings/SettingsManager.js";
+import { SettingsManager, type KeybindSettings, type KeybindSettingsAlt } from "../settings/SettingsManager.js";
 
 export interface InputState {
   moveX: number;
@@ -28,8 +28,13 @@ export class InputManager {
   
   public yaw = 0;
   public pitch = 0;
+  
+  private recoilPitch = 0;
+  private recoilYaw = 0;
+  private recoilReturnSpeed = 10;
 
   private keybinds: KeybindSettings;
+  private keybindsAlt: KeybindSettingsAlt;
   private baseSensitivity = 0.002;
   
   private currentAdsAlpha = 0;
@@ -62,6 +67,7 @@ export class InputManager {
     this.canvas = canvas;
     this.camera = camera;
     this.keybinds = SettingsManager.getInstance().getKeybinds();
+    this.keybindsAlt = SettingsManager.getInstance().getKeybindsAlt();
     this.setupEventListeners();
     
     SettingsManager.getInstance().addChangeListener(() => {
@@ -71,6 +77,7 @@ export class InputManager {
 
   updateKeybinds(): void {
     this.keybinds = SettingsManager.getInstance().getKeybinds();
+    this.keybindsAlt = SettingsManager.getInstance().getKeybindsAlt();
   }
 
   setAdsState(adsAlpha: number, isScoped: boolean): void {
@@ -121,6 +128,7 @@ export class InputManager {
 
   private handleKeyDown = (e: KeyboardEvent): void => this.onKeyDown(e);
   private handleKeyUp = (e: KeyboardEvent): void => this.onKeyUp(e);
+  private handleWheel = (e: WheelEvent): void => this.onWheel(e);
 
   private setupEventListeners(): void {
     this.canvas.addEventListener("click", this.handleCanvasClick);
@@ -130,11 +138,38 @@ export class InputManager {
     document.addEventListener("mousemove", this.handleMouseMove);
     document.addEventListener("keydown", this.handleKeyDown);
     document.addEventListener("keyup", this.handleKeyUp);
+    document.addEventListener("wheel", this.handleWheel);
   }
 
   private handleContextMenu = (e: MouseEvent): void => {
     e.preventDefault();
   };
+
+  private matchesKeybind(code: string, action: keyof KeybindSettings): boolean {
+    return code === this.keybinds[action] || code === this.keybindsAlt[action];
+  }
+
+  private isActionKeyDown(action: keyof KeybindSettings): boolean {
+    const primary = this.keybinds[action];
+    const alt = this.keybindsAlt[action];
+    return !!(primary && this.keys[primary]) || !!(alt && this.keys[alt]);
+  }
+
+  private onWheel(e: WheelEvent): void {
+    if (document.pointerLockElement !== this.canvas) return;
+    
+    const wheelCode = e.deltaY < 0 ? "WheelUp" : "WheelDown";
+    
+    if (this.onWeaponSwitch) {
+      if (this.matchesKeybind(wheelCode, "toggleWeapon")) {
+        this.onWeaponSwitch("toggle");
+      } else if (this.matchesKeybind(wheelCode, "primaryWeapon")) {
+        this.onWeaponSwitch("primary");
+      } else if (this.matchesKeybind(wheelCode, "secondaryWeapon")) {
+        this.onWeaponSwitch("secondary");
+      }
+    }
+  }
 
   private onKeyDown(e: KeyboardEvent): void {
     if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].includes(e.code)) {
@@ -144,21 +179,21 @@ export class InputManager {
     const wasDown = !!this.keys[e.code];
     this.keys[e.code] = true;
 
-    if ((e.code === this.keybinds.sprint || e.code === "ShiftRight") && !wasDown) {
+    if (this.matchesKeybind(e.code, "sprint") && !wasDown) {
       this.sprintToggle = !this.sprintToggle;
     }
 
     if (this.onWeaponSwitch) {
-      if (e.code === this.keybinds.primaryWeapon) {
+      if (this.matchesKeybind(e.code, "primaryWeapon")) {
         this.onWeaponSwitch("primary");
-      } else if (e.code === this.keybinds.secondaryWeapon) {
+      } else if (this.matchesKeybind(e.code, "secondaryWeapon")) {
         this.onWeaponSwitch("secondary");
-      } else if (e.code === this.keybinds.toggleWeapon) {
+      } else if (this.matchesKeybind(e.code, "toggleWeapon")) {
         this.onWeaponSwitch("toggle");
       }
     }
 
-    if (e.code === this.keybinds.reload && this.onReload) {
+    if (this.matchesKeybind(e.code, "reload") && this.onReload) {
       this.onReload();
     }
 
@@ -170,7 +205,7 @@ export class InputManager {
       this.onToggleDebug();
     }
 
-    if (e.code === this.keybinds.interact && !wasDown && this.onSpikeInteract) {
+    if (this.matchesKeybind(e.code, "interact") && !wasDown && this.onSpikeInteract) {
       this.onSpikeInteract();
     }
   }
@@ -181,17 +216,17 @@ export class InputManager {
     }
     this.keys[e.code] = false;
 
-    if (e.code === this.keybinds.interact && this.onSpikeCancel) {
+    if (this.matchesKeybind(e.code, "interact") && this.onSpikeCancel) {
       this.onSpikeCancel();
     }
   }
 
   public getState(): InputState {
     let moveZ = 0, moveX = 0;
-    if (this.keys[this.keybinds.moveForward]) moveZ += 1;
-    if (this.keys[this.keybinds.moveBack]) moveZ -= 1;
-    if (this.keys[this.keybinds.moveRight]) moveX += 1;
-    if (this.keys[this.keybinds.moveLeft]) moveX -= 1;
+    if (this.isActionKeyDown("moveForward")) moveZ += 1;
+    if (this.isActionKeyDown("moveBack")) moveZ -= 1;
+    if (this.isActionKeyDown("moveRight")) moveX += 1;
+    if (this.isActionKeyDown("moveLeft")) moveX -= 1;
 
     const len = Math.hypot(moveX, moveZ);
     if (len > 0) {
@@ -199,9 +234,9 @@ export class InputManager {
       moveZ /= len;
     }
 
-    const currentCrouch = this.keys[this.keybinds.crouch] || this.keys["ControlLeft"] || false;
-    const currentJump = this.keys[this.keybinds.jump] || false;
-    const currentDash = this.keys[this.keybinds.toggleWeapon] || false;
+    const currentCrouch = this.isActionKeyDown("crouch");
+    const currentJump = this.isActionKeyDown("jump");
+    const currentDash = false;
 
     const crouchPressed = currentCrouch && !this.prevCrouchState;
     const crouchReleased = !currentCrouch && this.prevCrouchState;
@@ -236,6 +271,37 @@ export class InputManager {
     return document.pointerLockElement === this.canvas;
   }
 
+  public applyRecoil(pitchAmount: number, yawAmount: number = 0, returnSpeed: number = 10): void {
+    this.recoilPitch += pitchAmount;
+    this.recoilYaw += yawAmount;
+    this.recoilReturnSpeed = returnSpeed;
+    
+    this.pitch += pitchAmount;
+    this.yaw += yawAmount;
+    this.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.pitch));
+  }
+
+  public updateRecoil(dt: number): void {
+    if (Math.abs(this.recoilPitch) > 0.0001 || Math.abs(this.recoilYaw) > 0.0001) {
+      const recovery = this.recoilReturnSpeed * dt;
+      
+      const pitchRecovery = Math.min(Math.abs(this.recoilPitch), recovery);
+      this.recoilPitch -= Math.sign(this.recoilPitch) * pitchRecovery;
+      this.pitch -= Math.sign(this.recoilPitch) * pitchRecovery * 0.7;
+      
+      const yawRecovery = Math.min(Math.abs(this.recoilYaw), recovery * 0.5);
+      this.recoilYaw -= Math.sign(this.recoilYaw) * yawRecovery;
+      this.yaw -= Math.sign(this.recoilYaw) * yawRecovery * 0.5;
+      
+      this.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.pitch));
+    }
+  }
+
+  public resetRecoil(): void {
+    this.recoilPitch = 0;
+    this.recoilYaw = 0;
+  }
+
   public dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -247,5 +313,6 @@ export class InputManager {
     document.removeEventListener("mousemove", this.handleMouseMove);
     document.removeEventListener("keydown", this.handleKeyDown);
     document.removeEventListener("keyup", this.handleKeyUp);
+    document.removeEventListener("wheel", this.handleWheel);
   }
 }

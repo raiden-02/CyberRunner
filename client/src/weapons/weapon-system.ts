@@ -11,6 +11,7 @@ export interface WeaponSystemCallbacks {
   onFireInput?: (firing: boolean, aimDir: { x: number; y: number; z: number }) => void;
   onWeaponSwitch?: (weaponId: string) => void;
   onReload?: (weaponId: string) => void;
+  onRecoil?: (pitch: number, yaw: number, returnSpeed: number) => void;
 }
 
 export class WeaponSystem {
@@ -99,6 +100,12 @@ export class WeaponSystem {
       if (shot) {
         this.viewModel.applyRecoil(this.weapon.stats.recoil.kick);
         this.callbacks.onShotRequested?.(shot);
+        
+        const recoilStats = this.weapon.stats.recoil;
+        const adsMultiplier = this.isAiming ? 0.6 : 1.0;
+        const pitchRecoil = recoilStats.climb * 0.015 * adsMultiplier;
+        const yawRecoil = (Math.random() - 0.5) * recoilStats.climb * 0.005 * adsMultiplier;
+        this.callbacks.onRecoil?.(pitchRecoil, yawRecoil, recoilStats.returnSpeed);
       }
     }
   }

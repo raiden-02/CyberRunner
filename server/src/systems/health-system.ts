@@ -125,7 +125,9 @@ export class HealthSystem {
   static createHealthChangeMessage(
     playerId: string,
     player: PlayerState,
-    bodyPart?: BodyPartHit
+    bodyPart?: BodyPartHit,
+    attackerId?: string,
+    damage?: number
   ): HealthChangeMsg {
     return {
       playerId,
@@ -134,7 +136,9 @@ export class HealthSystem {
       isDead: player.isDead,
       respawnTime: player.isDead ? player.respawnTime : undefined,
       bodyPart,
-      isHeadshot: bodyPart === "head"
+      isHeadshot: bodyPart === "head",
+      attackerId,
+      damage
     };
   }
 

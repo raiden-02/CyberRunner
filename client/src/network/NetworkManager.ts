@@ -6,6 +6,10 @@ export interface HealthChangeMessage {
   maxHealth: number;
   isDead: boolean;
   respawnTime?: number;
+  bodyPart?: string;
+  isHeadshot?: boolean;
+  attackerId?: string;
+  damage?: number;
 }
 
 export interface ShotFiredMessage {
@@ -71,12 +75,34 @@ export interface HostChangedMessage {
   newHostId: string;
 }
 
+export interface ProjectileSpawnedMessage {
+  id: string;
+  origin: { x: number; y: number; z: number };
+  direction: { x: number; y: number; z: number };
+  speed: number;
+  weaponId: string;
+}
+
+export interface ProjectileDestroyedMessage {
+  id: string;
+  reason: string;
+  position?: { x: number; y: number; z: number };
+}
+
+export interface ExplosionMessage {
+  position: { x: number; y: number; z: number };
+  radius: number;
+  weaponId: string;
+}
+
 export type SpikeAction = "upload" | "decrypt" | "pickup" | "cancel";
 export type TeamId = "ghosts" | "sentinels";
 
 export class NetworkManager {
   private client: Client;
   private room?: Room;
+  private pingInterval?: number;
+  public latencyMs = 50;
   
   public onHealthChange?: (msg: HealthChangeMessage) => void;
   public onShotFired?: (msg: ShotFiredMessage) => void;
@@ -92,6 +118,9 @@ export class NetworkManager {
   public onHostChanged?: (msg: HostChangedMessage) => void;
   public onGameRestarted?: () => void;
   public onLobbyDisbanded?: () => void;
+  public onProjectileSpawned?: (msg: ProjectileSpawnedMessage) => void;
+  public onProjectileDestroyed?: (msg: ProjectileDestroyedMessage) => void;
+  public onExplosion?: (msg: ExplosionMessage) => void;
 
   constructor() {
     // Configurable via Vite env vars (useful for LAN/dev overrides):
@@ -228,6 +257,46 @@ export class NetworkManager {
         this.onLobbyDisbanded();
       }
     });
+    
+    this.room.onMessage("projectile_spawned", (msg: ProjectileSpawnedMessage) => {
+      if (this.onProjectileSpawned) {
+        this.onProjectileSpawned(msg);
+      }
+    });
+    
+    this.room.onMessage("projectile_destroyed", (msg: ProjectileDestroyedMessage) => {
+      if (this.onProjectileDestroyed) {
+        this.onProjectileDestroyed(msg);
+      }
+    });
+    
+    this.room.onMessage("explosion", (msg: ExplosionMessage) => {
+      if (this.onExplosion) {
+        this.onExplosion(msg);
+      }
+    });
+    
+    this.room.onMessage("pong", (msg: { clientTime: number; serverTime: number }) => {
+      const now = Date.now();
+      const rtt = now - msg.clientTime;
+      this.latencyMs = Math.max(0, rtt / 2);
+    });
+    
+    this.startPingInterval();
+  }
+  
+  private startPingInterval(): void {
+    this.stopPingInterval();
+    this.pingInterval = window.setInterval(() => {
+      this.room?.send("ping", { clientTime: Date.now() });
+    }, 2000);
+  }
+  
+  private stopPingInterval(): void {
+    if (this.pingInterval !== undefined) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = undefined;
+    }
   }
 
   public get sessionId(): string {
@@ -286,5 +355,11 @@ export class NetworkManager {
 
   public sendDisbandLobby(): void {
     this.room?.send("disband_lobby", {});
+  }
+  
+  public disconnect(): void {
+    this.stopPingInterval();
+    this.room?.leave();
+    this.room = undefined;
   }
 }

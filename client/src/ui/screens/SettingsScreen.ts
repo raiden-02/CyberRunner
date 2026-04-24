@@ -2,11 +2,14 @@ import { BaseScreen } from "./BaseScreen.js";
 import {
   SettingsManager,
   type KeybindSettings,
+  type KeybindSettingsAlt,
   type GraphicsSettings,
   DEFAULT_KEYBINDS,
+  DEFAULT_KEYBINDS_ALT,
 } from "../../settings/SettingsManager.js";
 
 type TabId = "controls" | "graphics";
+type RebindSlot = "primary" | "secondary";
 
 export class SettingsScreen extends BaseScreen {
   private panel: HTMLDivElement;
@@ -17,21 +20,25 @@ export class SettingsScreen extends BaseScreen {
   private graphicsContent: HTMLDivElement;
   
   private rebindingAction: keyof KeybindSettings | null = null;
+  private rebindingSlot: RebindSlot = "primary";
   private rebindingElement: HTMLDivElement | null = null;
   private pendingKeybinds: KeybindSettings;
+  private pendingKeybindsAlt: KeybindSettingsAlt;
   private pendingGraphics: GraphicsSettings;
   
   private onClose: (() => void) | null = null;
   private keydownHandler: (e: KeyboardEvent) => void;
+  private wheelHandler: (e: WheelEvent) => void;
 
   constructor() {
     super("settings-screen");
     
     const settings = SettingsManager.getInstance();
     this.pendingKeybinds = settings.getKeybinds();
+    this.pendingKeybindsAlt = settings.getKeybindsAlt();
     this.pendingGraphics = settings.getGraphics();
     
-    this.panel = this.createPanel("600px");
+    this.panel = this.createPanel("700px");
     this.panel.style.maxHeight = "80vh";
     this.panel.style.overflow = "hidden";
     this.panel.style.display = "flex";
@@ -65,6 +72,7 @@ export class SettingsScreen extends BaseScreen {
     this.showTab("controls");
     
     this.keydownHandler = this.handleKeydown.bind(this);
+    this.wheelHandler = this.handleWheel.bind(this);
   }
 
   private createTabBar(): HTMLDivElement {
@@ -125,6 +133,30 @@ export class SettingsScreen extends BaseScreen {
     keybindsHeader.style.cssText = "color: #00ffff; margin: 0 0 12px 0; font-size: 16px;";
     content.appendChild(keybindsHeader);
     
+    const headerRow = document.createElement("div");
+    headerRow.style.cssText = `
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 12px;
+      margin-bottom: 4px;
+      color: #888;
+      font-size: 12px;
+    `;
+    const actionLabel = document.createElement("span");
+    actionLabel.textContent = "Action";
+    actionLabel.style.flex = "1";
+    const primaryLabel = document.createElement("span");
+    primaryLabel.textContent = "Primary";
+    primaryLabel.style.cssText = "width: 100px; text-align: center;";
+    const secondaryLabel = document.createElement("span");
+    secondaryLabel.textContent = "Secondary";
+    secondaryLabel.style.cssText = "width: 100px; text-align: center;";
+    headerRow.appendChild(actionLabel);
+    headerRow.appendChild(primaryLabel);
+    headerRow.appendChild(secondaryLabel);
+    content.appendChild(headerRow);
+    
     const actions: (keyof KeybindSettings)[] = [
       "moveForward", "moveBack", "moveLeft", "moveRight",
       "sprint", "crouch", "jump",
@@ -142,6 +174,7 @@ export class SettingsScreen extends BaseScreen {
     resetKeybindsBtn.style.marginTop = "12px";
     resetKeybindsBtn.addEventListener("click", () => {
       this.pendingKeybinds = { ...DEFAULT_KEYBINDS };
+      this.pendingKeybindsAlt = { ...DEFAULT_KEYBINDS_ALT };
       this.refreshKeybindsDisplay();
     });
     content.appendChild(resetKeybindsBtn);
@@ -179,45 +212,54 @@ export class SettingsScreen extends BaseScreen {
     
     const label = document.createElement("span");
     label.textContent = settings.getActionDisplayName(action);
-    label.style.color = "#fff";
+    label.style.cssText = "color: #fff; flex: 1;";
     
-    const keyDisplay = document.createElement("div");
-    keyDisplay.className = "key-display";
-    keyDisplay.style.cssText = `
-      min-width: 80px;
-      padding: 8px 16px;
-      background: rgba(0, 255, 255, 0.1);
-      border: 1px solid #00ffff;
-      border-radius: 4px;
-      color: #00ffff;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-    `;
-    keyDisplay.textContent = settings.getKeyDisplayName(this.pendingKeybinds[action]);
-    
-    keyDisplay.addEventListener("click", () => this.startRebinding(action, row, keyDisplay));
-    keyDisplay.addEventListener("mouseenter", () => {
-      keyDisplay.style.background = "rgba(0, 255, 255, 0.2)";
-    });
-    keyDisplay.addEventListener("mouseleave", () => {
-      if (this.rebindingAction !== action) {
-        keyDisplay.style.background = "rgba(0, 255, 255, 0.1)";
-      }
-    });
+    const createKeyDisplay = (slot: RebindSlot): HTMLDivElement => {
+      const keyDisplay = document.createElement("div");
+      keyDisplay.className = `key-display key-display-${slot}`;
+      keyDisplay.style.cssText = `
+        width: 90px;
+        padding: 8px 12px;
+        background: rgba(0, 255, 255, 0.1);
+        border: 1px solid #00ffff;
+        border-radius: 4px;
+        color: #00ffff;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-left: 8px;
+        font-size: 13px;
+      `;
+      const keyValue = slot === "primary" ? this.pendingKeybinds[action] : this.pendingKeybindsAlt[action];
+      keyDisplay.textContent = settings.getKeyDisplayName(keyValue);
+      
+      keyDisplay.addEventListener("click", () => this.startRebinding(action, row, keyDisplay, slot));
+      keyDisplay.addEventListener("mouseenter", () => {
+        keyDisplay.style.background = "rgba(0, 255, 255, 0.2)";
+      });
+      keyDisplay.addEventListener("mouseleave", () => {
+        if (!(this.rebindingAction === action && this.rebindingSlot === slot)) {
+          keyDisplay.style.background = "rgba(0, 255, 255, 0.1)";
+        }
+      });
+      
+      return keyDisplay;
+    };
     
     row.appendChild(label);
-    row.appendChild(keyDisplay);
+    row.appendChild(createKeyDisplay("primary"));
+    row.appendChild(createKeyDisplay("secondary"));
     
     return row;
   }
 
-  private startRebinding(action: keyof KeybindSettings, row: HTMLDivElement, keyDisplay: HTMLDivElement): void {
+  private startRebinding(action: keyof KeybindSettings, row: HTMLDivElement, keyDisplay: HTMLDivElement, slot: RebindSlot = "primary"): void {
     if (this.rebindingAction) {
       this.cancelRebinding();
     }
     
     this.rebindingAction = action;
+    this.rebindingSlot = slot;
     this.rebindingElement = keyDisplay;
     
     keyDisplay.textContent = "Press key...";
@@ -227,6 +269,17 @@ export class SettingsScreen extends BaseScreen {
     row.style.borderColor = "#ffff00";
     
     document.addEventListener("keydown", this.keydownHandler);
+    document.addEventListener("wheel", this.wheelHandler);
+  }
+
+  private handleWheel(e: WheelEvent): void {
+    if (!this.rebindingAction || !this.rebindingElement) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const wheelCode = e.deltaY < 0 ? "WheelUp" : "WheelDown";
+    this.applyRebind(wheelCode);
   }
 
   private handleKeydown(e: KeyboardEvent): void {
@@ -235,26 +288,30 @@ export class SettingsScreen extends BaseScreen {
     
     if (!this.rebindingAction || !this.rebindingElement) return;
     
-    const settings = SettingsManager.getInstance();
-    const action = this.rebindingAction;
-    const keyDisplay = this.rebindingElement;
-    const row = keyDisplay.parentElement as HTMLDivElement;
-    
     if (e.code === "Escape") {
       this.cancelRebinding();
       return;
     }
     
-    const conflicts = settings.getKeybindConflicts(action, e.code);
-    if (conflicts.length > 0) {
-      for (const conflict of conflicts) {
-        this.pendingKeybinds[conflict] = "";
-      }
+    this.applyRebind(e.code);
+  }
+
+  private applyRebind(code: string): void {
+    if (!this.rebindingAction || !this.rebindingElement) return;
+    
+    const settings = SettingsManager.getInstance();
+    const action = this.rebindingAction;
+    const slot = this.rebindingSlot;
+    const keyDisplay = this.rebindingElement;
+    const row = keyDisplay.parentElement as HTMLDivElement;
+    
+    if (slot === "primary") {
+      this.pendingKeybinds[action] = code;
+    } else {
+      this.pendingKeybindsAlt[action] = code;
     }
     
-    this.pendingKeybinds[action] = e.code;
-    
-    keyDisplay.textContent = settings.getKeyDisplayName(e.code);
+    keyDisplay.textContent = settings.getKeyDisplayName(code);
     keyDisplay.style.background = "rgba(0, 255, 255, 0.1)";
     keyDisplay.style.borderColor = "#00ffff";
     keyDisplay.style.color = "#00ffff";
@@ -263,6 +320,7 @@ export class SettingsScreen extends BaseScreen {
     this.rebindingAction = null;
     this.rebindingElement = null;
     document.removeEventListener("keydown", this.keydownHandler);
+    document.removeEventListener("wheel", this.wheelHandler);
     
     this.refreshKeybindsDisplay();
   }
@@ -272,10 +330,12 @@ export class SettingsScreen extends BaseScreen {
     
     const settings = SettingsManager.getInstance();
     const action = this.rebindingAction;
+    const slot = this.rebindingSlot;
     const keyDisplay = this.rebindingElement;
     const row = keyDisplay.parentElement as HTMLDivElement;
     
-    keyDisplay.textContent = settings.getKeyDisplayName(this.pendingKeybinds[action]);
+    const keyValue = slot === "primary" ? this.pendingKeybinds[action] : this.pendingKeybindsAlt[action];
+    keyDisplay.textContent = settings.getKeyDisplayName(keyValue);
     keyDisplay.style.background = "rgba(0, 255, 255, 0.1)";
     keyDisplay.style.borderColor = "#00ffff";
     keyDisplay.style.color = "#00ffff";
@@ -284,6 +344,7 @@ export class SettingsScreen extends BaseScreen {
     this.rebindingAction = null;
     this.rebindingElement = null;
     document.removeEventListener("keydown", this.keydownHandler);
+    document.removeEventListener("wheel", this.wheelHandler);
   }
 
   private refreshKeybindsDisplay(): void {
@@ -292,18 +353,21 @@ export class SettingsScreen extends BaseScreen {
     
     for (const row of rows) {
       const action = row.getAttribute("data-action") as keyof KeybindSettings;
-      const keyDisplay = row.querySelector(".key-display") as HTMLDivElement;
-      if (keyDisplay && action) {
+      const primaryDisplay = row.querySelector(".key-display-primary") as HTMLDivElement;
+      const secondaryDisplay = row.querySelector(".key-display-secondary") as HTMLDivElement;
+      
+      if (primaryDisplay && action) {
         const key = this.pendingKeybinds[action];
-        keyDisplay.textContent = key ? settings.getKeyDisplayName(key) : "None";
-        
-        if (!key) {
-          keyDisplay.style.borderColor = "#ff4444";
-          keyDisplay.style.color = "#ff4444";
-        } else {
-          keyDisplay.style.borderColor = "#00ffff";
-          keyDisplay.style.color = "#00ffff";
-        }
+        primaryDisplay.textContent = settings.getKeyDisplayName(key);
+        primaryDisplay.style.borderColor = "#00ffff";
+        primaryDisplay.style.color = "#00ffff";
+      }
+      
+      if (secondaryDisplay && action) {
+        const key = this.pendingKeybindsAlt[action];
+        secondaryDisplay.textContent = settings.getKeyDisplayName(key);
+        secondaryDisplay.style.borderColor = "#00ffff";
+        secondaryDisplay.style.color = "#00ffff";
       }
     }
   }
@@ -591,6 +655,7 @@ export class SettingsScreen extends BaseScreen {
   private applySettings(): void {
     const settings = SettingsManager.getInstance();
     settings.setAllKeybinds(this.pendingKeybinds);
+    settings.setAllKeybindsAlt(this.pendingKeybindsAlt);
     settings.setGraphics(this.pendingGraphics);
     this.hide();
   }
