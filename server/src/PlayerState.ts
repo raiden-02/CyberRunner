@@ -37,6 +37,9 @@ export class PlayerState extends Schema {
   @type("number") respawnTime: number = 0; // Time until respawn (0 if alive)
   @type("boolean") isSpawnProtected: boolean = false;
   @type("number") spawnProtectionTime: number = 0;
+  
+  // Slow effect when taking damage (0-1, decays over time)
+  @type("number") slowEffect: number = 0;
 
   // Player identity
   @type("string") displayName: string = "Player";

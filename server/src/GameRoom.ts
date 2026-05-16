@@ -239,11 +239,12 @@ export class GameRoom extends Room<GameState> {
       (player as any).aimDir = data.aimDir;
     });
     
-    this.onMessage("ping", (client, data: { clientTime: number }) => {
+    this.onMessage("ping", (client, data: { clientTime: number; measuredLatency?: number; jitter?: number }) => {
       const serverTime = Date.now();
-      const rtt = serverTime - data.clientTime;
-      const latency = Math.max(0, rtt / 2);
-      this.lagCompensation.setClientLatency(client, latency);
+      // Use client's measured latency and jitter for dynamic lag compensation
+      if (data.measuredLatency !== undefined && data.measuredLatency > 0) {
+        this.lagCompensation.setClientLatency(client, data.measuredLatency, data.jitter);
+      }
       client.send("pong", { clientTime: data.clientTime, serverTime });
     });
 
@@ -303,6 +304,43 @@ export class GameRoom extends Room<GameState> {
           break;
         }
       }
+    });
+
+    this.onMessage("toggle_god_mode", (client) => {
+      const player = this.players.get(client.sessionId);
+      if (!player) return;
+      
+      // Toggle god mode flag
+      (player as any).godMode = !(player as any).godMode;
+      const enabled = (player as any).godMode;
+      
+      // Restore health if enabling
+      if (enabled) {
+        player.schema.health = player.schema.maxHealth;
+        player.schema.isDead = false;
+      }
+      
+      console.log(`[Debug] God mode ${enabled ? "ON" : "OFF"} for ${player.schema.displayName}`);
+      client.send("god_mode_changed", { enabled });
+    });
+
+    this.onMessage("toggle_unlimited_ammo", (client) => {
+      const player = this.players.get(client.sessionId);
+      if (!player) return;
+      
+      // Toggle unlimited ammo flag
+      (player as any).unlimitedAmmo = !(player as any).unlimitedAmmo;
+      const enabled = (player as any).unlimitedAmmo;
+      
+      // Refill ammo if enabling
+      if (enabled) {
+        const weaponCfg = getWeaponConfig(player.schema.equippedWeapon);
+        player.schema.ammoInMag = weaponCfg?.magazineSize ?? 30;
+        player.schema.ammoReserve = 999;
+      }
+      
+      console.log(`[Debug] Unlimited ammo ${enabled ? "ON" : "OFF"} for ${player.schema.displayName}`);
+      client.send("unlimited_ammo_changed", { enabled });
     });
 
     this.onMessage("apply_damage", (client, data: DamageMsg) => {
@@ -688,6 +726,8 @@ export class GameRoom extends Room<GameState> {
 
     for (const [, player] of this.players) {
       if (!player.schema.isDead) {
+        HealthSystem.updateSlowEffect(player.schema, dt);
+        player.ctrl.setSpeedMultiplier(1 - player.schema.slowEffect);
         player.ctrl.update(this.world, dt, now);
       }
     }
@@ -718,12 +758,14 @@ export class GameRoom extends Room<GameState> {
         player.schema.isCrouching = (currentState === MovementState.Crouching);
         player.schema.isSliding = (currentState === MovementState.Sliding);
         
+        // Record from physics body directly, not schema (schema may be 1 frame behind)
+        const bodyPos = player.ctrl.body.translation();
         this.lagCompensation.recordPosition(
           sessionId,
           now * 1000,
-          player.schema.x,
-          player.schema.y,
-          player.schema.z
+          bodyPos.x,
+          bodyPos.y,
+          bodyPos.z
         );
       }
 
@@ -742,13 +784,15 @@ export class GameRoom extends Room<GameState> {
             };
 
             const client = this.clients.find(c => c.sessionId === sessionId);
-            const latencyMs = client ? this.lagCompensation.getEstimatedLatency(client) : 50;
-            const shotTimestamp = now * 1000 - latencyMs;
+            // Use full compensation time (network latency + client interpolation delay)
+            const compensationMs = client ? this.lagCompensation.getFullCompensationTime(client) : 100;
+            const shotTimestamp = now * 1000 - compensationMs;
             
             const originalPositions = this.lagCompensation.rewindPlayers(
               this.players,
               sessionId,
-              shotTimestamp
+              shotTimestamp,
+              this.world
             );
             
             const shotResult = WeaponSystem.processShot(
@@ -762,7 +806,13 @@ export class GameRoom extends Room<GameState> {
               this.hitboxRegistry
             );
             
-            this.lagCompensation.restorePlayers(this.players, originalPositions);
+            this.lagCompensation.restorePlayers(this.players, originalPositions, this.world);
+
+            // Restore ammo if unlimited ammo is enabled
+            if ((player as any).unlimitedAmmo && shotResult.shotFired) {
+              const weaponCfg = getWeaponConfig(player.schema.equippedWeapon);
+              player.schema.ammoInMag = weaponCfg?.magazineSize ?? 30;
+            }
 
             if (shotResult.shotFired) {
               
@@ -803,6 +853,7 @@ export class GameRoom extends Room<GameState> {
                 for (const hit of shotResult.multiHits) {
                   const hitPlayer = this.players.get(hit.playerId);
                   if (hitPlayer) {
+                    const isGodMode = this.isGodModeEnabled(hit.playerId);
                     const dmgResult = HealthSystem.applyDamage(
                       hitPlayer.schema,
                       hit.damage,
@@ -810,6 +861,12 @@ export class GameRoom extends Room<GameState> {
                       player.schema.equippedWeapon,
                       "hitscan"
                     );
+
+                    // Restore health if god mode (but still send hit feedback)
+                    if (isGodMode) {
+                      hitPlayer.schema.health = hitPlayer.schema.maxHealth;
+                      hitPlayer.schema.isDead = false;
+                    }
 
                     if (dmgResult.damaged) {
                       const healthMsg = HealthSystem.createHealthChangeMessage(
@@ -822,7 +879,7 @@ export class GameRoom extends Room<GameState> {
                       this.broadcast("health_change", healthMsg);
                     }
 
-                    if (dmgResult.killed) {
+                    if (dmgResult.killed && !isGodMode) {
                       this.handlePlayerKill(hit.playerId, sessionId);
                     }
                   }
@@ -830,6 +887,7 @@ export class GameRoom extends Room<GameState> {
               } else if (shotResult.hitPlayerId && shotResult.damage !== undefined) {
                 const hitPlayer = this.players.get(shotResult.hitPlayerId);
                 if (hitPlayer) {
+                  const isGodMode = this.isGodModeEnabled(shotResult.hitPlayerId);
                   const dmgResult = HealthSystem.applyDamage(
                     hitPlayer.schema,
                     shotResult.damage,
@@ -837,6 +895,12 @@ export class GameRoom extends Room<GameState> {
                     player.schema.equippedWeapon,
                     "hitscan"
                   );
+
+                  // Restore health if god mode (but still send hit feedback)
+                  if (isGodMode) {
+                    hitPlayer.schema.health = hitPlayer.schema.maxHealth;
+                    hitPlayer.schema.isDead = false;
+                  }
 
                   if (dmgResult.damaged) {
                     const healthMsg = HealthSystem.createHealthChangeMessage(
@@ -849,7 +913,7 @@ export class GameRoom extends Room<GameState> {
                     this.broadcast("health_change", healthMsg);
                   }
 
-                  if (dmgResult.killed) {
+                  if (dmgResult.killed && !isGodMode) {
                     this.handlePlayerKill(shotResult.hitPlayerId, sessionId);
                   }
                 }
@@ -866,6 +930,11 @@ export class GameRoom extends Room<GameState> {
         }
       }
     }
+  }
+
+  private isGodModeEnabled(playerId: string): boolean {
+    const player = this.players.get(playerId);
+    return player ? !!(player as any).godMode : false;
   }
 
   private handlePlayerKill(victimId: string, killerId: string): void {
@@ -1266,6 +1335,7 @@ export class GameRoom extends Room<GameState> {
       for (const hit of explosionHits) {
         const hitPlayer = this.players.get(hit.playerId);
         if (hitPlayer) {
+          const isGodMode = this.isGodModeEnabled(hit.playerId);
           const dmgResult = HealthSystem.applyDamage(
             hitPlayer.schema,
             hit.damage,
@@ -1273,6 +1343,12 @@ export class GameRoom extends Room<GameState> {
             config.weaponId,
             "explosion"
           );
+          
+          // Restore health if god mode (but still send hit feedback)
+          if (isGodMode) {
+            hitPlayer.schema.health = hitPlayer.schema.maxHealth;
+            hitPlayer.schema.isDead = false;
+          }
           
           if (dmgResult.damaged) {
             const healthMsg = HealthSystem.createHealthChangeMessage(
@@ -1285,7 +1361,7 @@ export class GameRoom extends Room<GameState> {
             this.broadcast("health_change", healthMsg);
           }
           
-          if (dmgResult.killed) {
+          if (dmgResult.killed && !isGodMode) {
             this.handlePlayerKill(hit.playerId, config.ownerId);
           }
         }

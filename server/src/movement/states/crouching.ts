@@ -141,7 +141,8 @@ export class CrouchingState extends BaseState {
 
   private desiredCrouchVelocity(ctx: MovementCtx): { x: number; z: number } {
     const input = ctx.input;
-    const maxSpeed = CROUCH.MaxSpeed;
+    // Apply damage slow effect
+    const maxSpeed = CROUCH.MaxSpeed * ctx.speedMultiplier;
 
     const forwardX = -Math.sin(input.lookYaw);
     const forwardZ = -Math.cos(input.lookYaw);

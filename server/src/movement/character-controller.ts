@@ -15,6 +15,7 @@ export class CharacterController implements CharacterDeps {
   private _isGrounded = false;
   private _gravityScale = 1;
   private _friction = 0.5;
+  private _speedMultiplier = 1.0;
 
   public input: InputMsg = {
     seq: 0,
@@ -80,6 +81,10 @@ export class CharacterController implements CharacterDeps {
     this._gravityScale = scale;
   }
 
+  setSpeedMultiplier(mult: number): void {
+    this._speedMultiplier = Math.max(0, Math.min(1, mult));
+  }
+
   update(world: RAPIER.World, dt: number, now: number) {
     const ctx: MovementCtx = {
       // CharacterDeps
@@ -98,7 +103,8 @@ export class CharacterController implements CharacterDeps {
       env: { world, dt, now },
       input: this.input,
       lastDashTime: this.lastDashTime,
-      flags: this.flags
+      flags: this.flags,
+      speedMultiplier: this._speedMultiplier
     };
 
     // Update state machine - this handles all movement computation

@@ -145,15 +145,32 @@ export class RemotePlayers {
     }
   }
 
+  /**
+   * Interpolate remote player positions for smooth visuals.
+   * 
+   * Uses fast interpolation (dt*50) to minimize visual delay while preventing jitter.
+   * At 60fps, this catches up to target position in ~1-2 frames (~17-33ms).
+   * 
+   * IMPORTANT: This delay must be accounted for in server-side lag compensation.
+   * See: server/src/systems/lag-compensation.ts (CLIENT_INTERPOLATION_DELAY_MS)
+   */
   private interpolate(dt: number): void {
-    const alpha = Math.min(1, dt * 10);
+    const alpha = Math.min(1, dt * 50);
 
     for (const data of this.players.values()) {
-      data.root.position.lerp(data.targetPos, alpha);
+      const distance = data.root.position.distanceTo(data.targetPos);
+      if (distance < 0.05) {
+        // Snap to position if within 5cm to eliminate micro-jitter
+        data.root.position.copy(data.targetPos);
+      } else {
+        data.root.position.lerp(data.targetPos, alpha);
+      }
+      
+      const rotAlpha = Math.min(1, dt * 40);
       data.root.rotation.y = THREE.MathUtils.lerp(
         data.root.rotation.y,
         data.targetRotY,
-        alpha
+        rotAlpha
       );
     }
   }

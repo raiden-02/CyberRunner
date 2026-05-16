@@ -267,18 +267,15 @@ export class Game {
       this.weaponSystem.startReload(performance.now() / 1000);
     };
 
-    this.input.onDebugDamage = () => {
-      if (this.network.connected) {
-        this.network.sendDebugDamage(this.network.sessionId);
-      }
-    };
-
     this.input.onToggleDebug = () => {
       this.debugEnabled = !this.debugEnabled;
       this.remotePlayers.setDebugEnabled(this.debugEnabled);
       if (this.localCapsule) this.localCapsule.visible = this.debugEnabled;
       if (this.debugRay) this.debugRay.visible = this.debugEnabled;
     };
+
+    // Expose debug commands on window for Chrome DevTools console access
+    this.exposeDebugCommands();
 
     // Spike interaction (S&D mode)
     this.input.onSpikeInteract = () => {
@@ -489,6 +486,49 @@ export class Game {
         }
       },
     });
+  }
+
+  /**
+   * Expose debug commands on window object for Chrome DevTools console.
+   * Usage in console:
+   *   debug.godMode()      - Toggle invincibility
+   *   debug.unlimitedAmmo() - Toggle infinite ammo
+   *   debug.autoRun()      - Toggle auto-run for hit reg testing
+   */
+  private exposeDebugCommands(): void {
+    const debugCommands = {
+      godMode: () => {
+        if (this.network.connected) {
+          this.network.sendToggleGodMode();
+          console.log("[Debug] God mode toggled (check server console for status)");
+        } else {
+          console.log("[Debug] Not connected to server");
+        }
+      },
+      unlimitedAmmo: () => {
+        if (this.network.connected) {
+          this.network.sendToggleUnlimitedAmmo();
+          console.log("[Debug] Unlimited ammo toggled (check server console for status)");
+        } else {
+          console.log("[Debug] Not connected to server");
+        }
+      },
+      autoRun: () => {
+        this.input.toggleAutoRun();
+      },
+      help: () => {
+        console.log(`
+=== CyberRunner Debug Commands ===
+debug.godMode()       - Toggle invincibility (health won't decrease)
+debug.unlimitedAmmo() - Toggle infinite ammo
+debug.autoRun()       - Toggle auto-run (player runs back and forth)
+debug.help()          - Show this help message
+        `);
+      }
+    };
+
+    (window as any).debug = debugCommands;
+    console.log("[CyberRunner] Debug commands available. Type debug.help() for usage.");
   }
 
   private handleGameOver(msg: GameOverMessage): void {
@@ -750,6 +790,7 @@ export class Game {
 
     this.input.setAdsState(this.weaponSystem.getAdsAlpha(), this.weaponSystem.isScopeActive());
     this.input.updateRecoil(dt);
+    this.input.updateAutoRun(dt);
     this.updateCameraRotation();
     const inputState = this.input.getState();
     

@@ -32,6 +32,9 @@ export abstract class BaseState implements IMovementState {
       maxSpeed = MOVE.MaxSprintSpeed;
     }
 
+    // Apply damage slow effect (reduces speed when taking damage)
+    maxSpeed *= ctx.speedMultiplier;
+
     // Calculate desired velocity (Three.js coordinate system)
     // Three.js: +X = right, +Z = towards camera (backward), -Z = away from camera (forward)
     // rotationY = 0 means facing -Z (forward)

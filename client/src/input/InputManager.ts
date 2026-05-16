@@ -51,7 +51,6 @@ export class InputManager {
 
   public onWeaponSwitch?: (weaponId: string) => void;
   public onReload?: () => void;
-  public onDebugDamage?: () => void;
   public onToggleDebug?: () => void;
   
   public onSpikeInteract?: () => void;
@@ -59,8 +58,21 @@ export class InputManager {
 
   private disposed = false;
 
+  // Debug auto-run for testing hit registration (enabled via console)
+  private autoRunEnabled = false;
+  private autoRunDirection = 1;
+  private autoRunTimer = 0;
+
   public isKeyDown(code: string): boolean {
     return !!this.keys[code];
+  }
+
+  /** Toggle auto-run for testing hit registration (call from console) */
+  public toggleAutoRun(): void {
+    this.autoRunEnabled = !this.autoRunEnabled;
+    this.autoRunTimer = 0;
+    this.autoRunDirection = 1;
+    console.log(`[Debug] Auto-run: ${this.autoRunEnabled ? "ON" : "OFF"}`);
   }
 
   constructor(canvas: HTMLCanvasElement, camera: THREE.Camera) {
@@ -197,10 +209,7 @@ export class InputManager {
       this.onReload();
     }
 
-    if (e.code === "KeyT" && this.onDebugDamage) {
-      this.onDebugDamage();
-    }
-
+    // F3 = Toggle debug visuals (hitboxes, rays)
     if (e.code === "F3" && this.onToggleDebug) {
       this.onToggleDebug();
     }
@@ -221,12 +230,32 @@ export class InputManager {
     }
   }
 
+  public updateAutoRun(dt: number): void {
+    if (!this.autoRunEnabled) return;
+    
+    // Switch direction every 3 seconds
+    this.autoRunTimer += dt;
+    if (this.autoRunTimer >= 3.0) {
+      this.autoRunTimer = 0;
+      this.autoRunDirection *= -1;
+    }
+  }
+
   public getState(): InputState {
     let moveZ = 0, moveX = 0;
-    if (this.isActionKeyDown("moveForward")) moveZ += 1;
-    if (this.isActionKeyDown("moveBack")) moveZ -= 1;
-    if (this.isActionKeyDown("moveRight")) moveX += 1;
-    if (this.isActionKeyDown("moveLeft")) moveX -= 1;
+    let autoSprint = false;
+    
+    // Auto-run overrides manual input when enabled
+    if (this.autoRunEnabled) {
+      // Simple forward/backward run
+      moveZ = this.autoRunDirection;
+      autoSprint = true;
+    } else {
+      if (this.isActionKeyDown("moveForward")) moveZ += 1;
+      if (this.isActionKeyDown("moveBack")) moveZ -= 1;
+      if (this.isActionKeyDown("moveRight")) moveX += 1;
+      if (this.isActionKeyDown("moveLeft")) moveX -= 1;
+    }
 
     const len = Math.hypot(moveX, moveZ);
     if (len > 0) {
@@ -255,7 +284,7 @@ export class InputManager {
       moveZ,
       yaw: this.yaw,
       pitch: this.pitch,
-      sprint: this.sprintToggle,
+      sprint: autoSprint || this.sprintToggle,
       crouchPressed,
       crouchReleased,
       crouchHeld: currentCrouch,

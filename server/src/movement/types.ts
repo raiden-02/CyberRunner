@@ -29,7 +29,8 @@ export interface MovementCtx extends CharacterDeps {
   flags: {
     wantsToProne: boolean;
     wallRight: boolean;
-  }
+  };
+  speedMultiplier: number; // Applied when taking damage (0.5 = 50% speed)
 }
 
 export interface IMovementState {

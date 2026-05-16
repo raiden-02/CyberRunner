@@ -103,6 +103,7 @@ export class NetworkManager {
   private room?: Room;
   private pingInterval?: number;
   public latencyMs = 50;
+  public jitterMs = 10;  // Network jitter (variance in latency)
   
   public onHealthChange?: (msg: HealthChangeMessage) => void;
   public onShotFired?: (msg: ShotFiredMessage) => void;
@@ -279,7 +280,16 @@ export class NetworkManager {
     this.room.onMessage("pong", (msg: { clientTime: number; serverTime: number }) => {
       const now = Date.now();
       const rtt = now - msg.clientTime;
-      this.latencyMs = Math.max(0, rtt / 2);
+      const newLatency = Math.max(0, rtt / 2);
+      
+      // Exponential moving average for smooth latency tracking
+      // Alpha 0.3 = 30% new value, 70% old value (smooths out spikes)
+      const alpha = 0.3;
+      this.latencyMs = this.latencyMs * (1 - alpha) + newLatency * alpha;
+      
+      // Track jitter (variance in latency) for additional compensation
+      const jitterSample = Math.abs(newLatency - this.latencyMs);
+      this.jitterMs = this.jitterMs * (1 - alpha) + jitterSample * alpha;
     });
     
     this.startPingInterval();
@@ -287,9 +297,15 @@ export class NetworkManager {
   
   private startPingInterval(): void {
     this.stopPingInterval();
+    // Ping every 500ms for more responsive latency tracking
     this.pingInterval = window.setInterval(() => {
-      this.room?.send("ping", { clientTime: Date.now() });
-    }, 2000);
+      // Send latency + jitter for dynamic server-side compensation
+      this.room?.send("ping", { 
+        clientTime: Date.now(), 
+        measuredLatency: this.latencyMs,
+        jitter: this.jitterMs
+      });
+    }, 500);
   }
   
   private stopPingInterval(): void {
@@ -335,6 +351,14 @@ export class NetworkManager {
       sourceId: "test",
       weaponId: "debug"
     });
+  }
+
+  public sendToggleGodMode(): void {
+    this.room?.send("toggle_god_mode", {});
+  }
+
+  public sendToggleUnlimitedAmmo(): void {
+    this.room?.send("toggle_unlimited_ammo", {});
   }
 
   public sendSpikeAction(action: SpikeAction): void {

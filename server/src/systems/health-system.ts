@@ -4,6 +4,13 @@ import { calculateSpawnFacing } from "../world/maps/map-registry.js";
 
 export class HealthSystem {
   private static RESPAWN_DELAY = 3.0; // seconds
+  
+  // Slow effect when taking damage
+  private static DAMAGE_SLOW_AMOUNT = 0.35; // 35% speed reduction on hit
+  private static DAMAGE_SLOW_DECAY_RATE = 1.0; // Decay per second (takes ~0.4s to fully decay)
+  // Max slow caps at 40% to ensure speed never drops below ADS speed (3.0 m/s)
+  // Walking (5.0) * 0.6 = 3.0 = ADS speed
+  private static MAX_SLOW_EFFECT = 0.4;
 
   /**
    * Apply damage to a player and handle death/respawn logic
@@ -29,15 +36,30 @@ export class HealthSystem {
     const damaged = player.health < oldHealth;
     const killed = !player.isDead && player.health <= 0;
 
+    // Apply slow effect when taking damage (stacks up to max)
+    if (damaged && !killed) {
+      player.slowEffect = Math.min(HealthSystem.MAX_SLOW_EFFECT, player.slowEffect + HealthSystem.DAMAGE_SLOW_AMOUNT);
+    }
+
     if (killed) {
       player.isDead = true;
       player.respawnTime = HealthSystem.RESPAWN_DELAY;
+      player.slowEffect = 0; // Reset slow on death
       
       player.firing = false;
       player.reloading = false;
     }
 
     return { damaged, killed, newHealth: player.health };
+  }
+
+  /**
+   * Update slow effect decay (call every frame)
+   */
+  static updateSlowEffect(player: PlayerState, deltaTime: number): void {
+    if (player.slowEffect > 0) {
+      player.slowEffect = Math.max(0, player.slowEffect - HealthSystem.DAMAGE_SLOW_DECAY_RATE * deltaTime);
+    }
   }
 
   /**
