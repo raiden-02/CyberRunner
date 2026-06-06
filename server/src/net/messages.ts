@@ -1,18 +1,4 @@
-// Network input message types
-export type InputMsg = {
-  seq: number;
-  moveX: number;
-  moveZ: number;
-  lookYaw: number;
-  lookPitch: number;
-  sprint: boolean;
-  aiming: boolean;
-  crouchPressed: boolean;
-  crouchReleased: boolean;
-  crouchHeld: boolean;
-  jumpPressed: boolean;
-  dashPressed: boolean;
-};
+export type { InputMsg } from "@shared/movement/types.js";
 
 // Weapon messages
 export type WeaponSwitchMsg = {
@@ -23,6 +9,10 @@ export type WeaponSwitchMsg = {
 export type FireInputMsg = {
   firing: boolean; // true = start firing, false = stop firing
   aimDir: { x: number; y: number; z: number }; // normalized aim direction
+  // Client timestamp when fire button was pressed (for accurate lag compensation)
+  clientShotTime?: number;
+  // Client's position when firing (for shooter origin rewind)
+  clientPos?: { x: number; y: number; z: number };
 };
 
 export type ReloadInputMsg = {

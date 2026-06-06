@@ -1,11 +1,10 @@
 import { BaseState } from "./base.js";
-import { MovementCtx, IMovementState } from "../types.js";
-import { MovementState } from "../../PlayerState.js";
+import type { MovementCtx, IMovementState } from "../types.js";
+import { MovementState } from "../types.js";
 import { SLIDE, CAPSULE } from "../../physics/constants.js";
 
 export class SlidingState extends BaseState {
   kind = MovementState.Sliding;
-  private enteredAt = 0;
   private slideDirection = { x: 0, z: 0 };
   private currentVelocity = { x: 0, z: 0 };
   private verticalVelocity = 0;
@@ -15,8 +14,6 @@ export class SlidingState extends BaseState {
   }
 
   enter(ctx: MovementCtx) {
-    this.enteredAt = ctx.env.now;
-    
     const currentHorizontalSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
     if (currentHorizontalSpeed > 0.1) {
       this.slideDirection.x = this.currentVelocity.x / currentHorizontalSpeed;
@@ -38,18 +35,13 @@ export class SlidingState extends BaseState {
 
   update(ctx: MovementCtx): IMovementState | null {
     const input = ctx.input;
-    const env = ctx.env;
 
-    // Must be grounded to slide
     if (!ctx.isGrounded()) {
       return this.transitionToWalking();
     }
 
-    // Process slide physics
     this.processSlideMovement(ctx);
 
-    // Check exit conditions
-    
     const currentSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
     if (currentSpeed < SLIDE.ExitThreshold) {
       if (input.crouchHeld) {
@@ -58,8 +50,7 @@ export class SlidingState extends BaseState {
       return this.transitionToCrouching();
     }
 
-
-    return null; // Stay in sliding state
+    return null;
   }
 
   exit(ctx: MovementCtx) {
@@ -117,9 +108,7 @@ export class SlidingState extends BaseState {
 
   private desiredSlideVelocity(ctx: MovementCtx): { x: number; z: number } {
     const input = ctx.input;
-    
-    // During slide, input provides very limited steering
-    const maxSteerSpeed = 2.0; // Limited steering speed during slide
+    const maxSteerSpeed = 2.0;
     
     const forwardX = -Math.sin(input.lookYaw);
     const forwardZ = -Math.cos(input.lookYaw);
@@ -130,25 +119,6 @@ export class SlidingState extends BaseState {
     const desiredVelZ = (input.moveZ * forwardZ + input.moveX * rightZ) * maxSteerSpeed;
 
     return { x: desiredVelX, z: desiredVelZ };
-  }
-
-  private canStandUp(ctx: MovementCtx): boolean {
-    // Check if there's enough clearance above to stand up
-    const pos = ctx.body.translation();
-    const standingHeight = CAPSULE.HalfHeight;
-    const currentHeight = CAPSULE.HalfHeight * 0.4; // Slide height
-    const additionalHeightNeeded = standingHeight - currentHeight;
-    
-    const rayStart = { x: pos.x, y: pos.y + currentHeight, z: pos.z };
-    const rayDir = { x: 0, y: 1, z: 0 };
-    
-    const hit = ctx.env.world.castRay(
-      { origin: rayStart, dir: rayDir } as any,
-      additionalHeightNeeded + 0.1,
-      true
-    );
-    
-    return !hit;
   }
 
   private transitionToWalking(): IMovementState {

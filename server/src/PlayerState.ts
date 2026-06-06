@@ -1,15 +1,6 @@
 import { Schema, type } from "@colyseus/schema";
-
-export enum MovementState {
-  Walking = 0,
-  Crouching = 1,
-  Sliding = 2, 
-  Prone = 3,
-  Dashing = 4,
-  WallRun = 5,
-  Mantling = 6,
-  Falling = 7
-}
+export { MovementState } from "@shared/movement/types.js";
+import { MovementState } from "@shared/movement/types.js";
 
 export class PlayerState extends Schema {
   @type("number") x: number = 0;

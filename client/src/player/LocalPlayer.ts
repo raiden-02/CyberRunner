@@ -1,256 +1,196 @@
 import * as THREE from "three";
-import { resolveCollisions } from "../physics/client-collision.js";
+import { PhysicsWorld } from "../physics/PhysicsWorld.js";
+import type { InputMsg } from "@shared/movement/types.js";
+import { CAPSULE } from "@shared/physics/constants.js";
 
-// Constants - match server values
-const MOVE_SPEED = 5.0;
-const SPRINT_SPEED = 7.5;
-const ADS_SPEED = 3.0;
-const AIR_CONTROL = 0.3;
-const GRAVITY = 9.81;
-const JUMP_IMPULSE = 5.5;
-
-// Capsule dimensions for eye height calculation
-const CAPSULE_HALF = 0.9;
-const CAPSULE_RADIUS = 0.35;
-const CENTER_TO_FOOT = CAPSULE_HALF + CAPSULE_RADIUS;
+const CENTER_TO_FOOT = CAPSULE.HalfHeight + CAPSULE.Radius;
 const EYE_HEIGHT = 1.6;
 const EYE_FROM_CENTER = EYE_HEIGHT - CENTER_TO_FOOT;
 
+const FIXED_DT = 1 / 60;
+
+// With shared RAPIER physics, reconciliation errors are near-zero under normal
+// conditions (only floating-point non-determinism). These thresholds handle
+// the rare case and teleport/respawn snaps.
+const SMOOTH_DECAY_RATE = 8;
+const SNAP_MIN = 0.008;
+const SNAP_MAX = 2.0;
+const AXIS_DEAD_ZONE = 0.005;
+
+export interface PredictionInput {
+  seq: number;
+  moveX: number;
+  moveZ: number;
+  yaw: number;
+  sprint: boolean;
+  aiming: boolean;
+  jump: boolean;
+}
+
 /**
- * Simple velocity-based local player.
- * No physics engine - just smooth movement that runs every frame.
+ * Client-side predicted local player.
+ *
+ * Runs the same RAPIER CharacterController as the server for prediction
+ * and reconciliation. On each server ack, resets to the authoritative
+ * position and replays unacknowledged inputs to re-derive the predicted state.
  */
 export class LocalPlayer {
   private camera: THREE.PerspectiveCamera;
+  private physics: PhysicsWorld;
 
-  // Position is the capsule CENTER (server-authoritative)
-  private capsuleCenter = new THREE.Vector3(0, CENTER_TO_FOOT, 0);
-  private velocity = new THREE.Vector3(0, 0, 0);
-
-  // For smooth visual blending toward server
+  private predictedPos = new THREE.Vector3(0, CENTER_TO_FOOT, 0);
+  private smoothOffset = new THREE.Vector3(0, 0, 0);
   private visualPos = new THREE.Vector3(0, EYE_HEIGHT, 0);
-  private lastGrounded = true;
-  private lastInputMag = 0;
 
-  // Health state
+  private pendingInputs: PredictionInput[] = [];
+  public lastAckedSeq = 0;
+
   public health = 100;
   public maxHealth = 100;
   public isDead = false;
   public respawnTime = 0;
   public isReloading = false;
 
+  private accumulator = 0;
+  private tickCount = 0;
+
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
+    this.physics = new PhysicsWorld();
   }
 
-  /**
-   * Initialize position (called after receiving first server state).
-   */
   public setInitialPosition(x: number, y: number, z: number): void {
-    this.capsuleCenter.set(x, y, z);
+    this.physics.setPosition(x, y, z);
+    this.predictedPos.set(x, y, z);
+    this.smoothOffset.set(0, 0, 0);
     this.visualPos.set(x, y + EYE_FROM_CENTER, z);
-    this.velocity.set(0, 0, 0);
+    this.pendingInputs = [];
+    this.accumulator = 0;
   }
 
   /**
-   * Apply input and update position. Called EVERY FRAME for smooth movement.
+   * Buffer the input for replay and step the RAPIER world at a fixed 60 Hz timestep.
    */
-  public update(
-    dt: number,
-    input: {
-      moveX: number;
-      moveZ: number;
-      yaw: number;
-      sprint: boolean;
-      aiming: boolean;
-      jump: boolean;
-    }
-  ): void {
+  public applyInput(dt: number, input: PredictionInput): void {
     if (this.isDead) return;
 
-    const grounded = this.capsuleCenter.y <= CENTER_TO_FOOT + 0.1;
-
-    const forwardX = -Math.sin(input.yaw);
-    const forwardZ = -Math.cos(input.yaw);
-    const rightX = Math.cos(input.yaw);
-    const rightZ = -Math.sin(input.yaw);
-
-    const inputDirX = input.moveZ * forwardX + input.moveX * rightX;
-    const inputDirZ = input.moveZ * forwardZ + input.moveX * rightZ;
-    const inputMag = Math.hypot(inputDirX, inputDirZ);
-    this.lastGrounded = grounded;
-    this.lastInputMag = inputMag;
-
-    // Determine speed: ADS < Walk < Sprint (ADS blocks sprinting)
-    const getSpeed = () => {
-      if (input.aiming) return ADS_SPEED;
-      if (input.sprint) return SPRINT_SPEED;
-      return MOVE_SPEED;
-    };
-
-    if (grounded) {
-      if (inputMag < 0.01) {
-        this.velocity.x = 0;
-        this.velocity.z = 0;
-      } else {
-        const speed = getSpeed();
-        const normX = inputDirX / inputMag;
-        const normZ = inputDirZ / inputMag;
-        this.velocity.x = normX * speed;
-        this.velocity.z = normZ * speed;
-      }
-    } else {
-      const speed = getSpeed();
-      const targetVelX = inputMag > 0.01 ? (inputDirX / inputMag) * speed : 0;
-      const targetVelZ = inputMag > 0.01 ? (inputDirZ / inputMag) * speed : 0;
-      
-      const airBlend = AIR_CONTROL * dt * 10;
-      this.velocity.x += (targetVelX - this.velocity.x) * airBlend;
-      this.velocity.z += (targetVelZ - this.velocity.z) * airBlend;
+    this.pendingInputs.push(input);
+    if (this.pendingInputs.length > 300) {
+      this.pendingInputs.splice(0, this.pendingInputs.length - 300);
     }
 
-    // Gravity
-    if (!grounded) {
-      this.velocity.y -= GRAVITY * dt;
-    } else if (this.velocity.y < 0) {
-      this.velocity.y = 0;
+    this.accumulator += dt;
+    while (this.accumulator >= FIXED_DT) {
+      this.accumulator -= FIXED_DT;
+      this.tickCount++;
+      this.physics.simulateTick(this.toInputMsg(input), this.tickCount * FIXED_DT);
     }
 
-    // Jump
-    if (input.jump && grounded) {
-      this.velocity.y = JUMP_IMPULSE;
-    }
-
-    // Apply velocity to position
-    this.capsuleCenter.x += this.velocity.x * dt;
-    this.capsuleCenter.y += this.velocity.y * dt;
-    this.capsuleCenter.z += this.velocity.z * dt;
-
-    // Client-side wall collision prediction
-    const resolved = resolveCollisions(
-      this.capsuleCenter.x,
-      this.capsuleCenter.y,
-      this.capsuleCenter.z,
-      CAPSULE_RADIUS
-    );
-    
-    if (resolved.x !== this.capsuleCenter.x) {
-      this.capsuleCenter.x = resolved.x;
-      this.velocity.x = 0;
-    }
-    if (resolved.z !== this.capsuleCenter.z) {
-      this.capsuleCenter.z = resolved.z;
-      this.velocity.z = 0;
-    }
-
-    // Simple ground collision (y >= CENTER_TO_FOOT)
-    const groundY = CENTER_TO_FOOT;
-    if (this.capsuleCenter.y < groundY + 0.01) {
-      this.capsuleCenter.y = groundY;
-      if (this.velocity.y < 0) {
-        this.velocity.y = 0;
-      }
-    }
-
-    // Update visual position to follow capsule center (instant, no lag here)
-    this.visualPos.set(
-      this.capsuleCenter.x,
-      this.capsuleCenter.y + EYE_FROM_CENTER,
-      this.capsuleCenter.z
-    );
+    const pos = this.physics.getPosition();
+    this.predictedPos.set(pos.x, pos.y, pos.z);
   }
 
   /**
-   * Blend toward server's authoritative position.
-   * Called when we receive server state.
+   * Reconcile the predicted state with the server's authoritative position.
+   *
+   * 1. Reset physics to the server position
+   * 2. Discard acknowledged inputs
+   * 3. Replay remaining unacked inputs through RAPIER
+   * 4. Compute visual correction offset for smooth blending
    */
   public reconcileWithServer(
-    serverX: number,
-    serverY: number,
-    serverZ: number,
-    dt: number
+    serverX: number, serverY: number, serverZ: number,
+    ackSeq: number, _dt: number,
   ): void {
-    // Horizontal error (X/Z)
-    const hErrorX = serverX - this.capsuleCenter.x;
-    const hErrorZ = serverZ - this.capsuleCenter.z;
-    const hError = Math.hypot(hErrorX, hErrorZ);
+    if (ackSeq <= this.lastAckedSeq) return;
 
-    // Vertical error (Y)
-    const vError = Math.abs(serverY - this.capsuleCenter.y);
+    const oldVisX = this.predictedPos.x + this.smoothOffset.x;
+    const oldVisY = this.predictedPos.y + this.smoothOffset.y;
+    const oldVisZ = this.predictedPos.z + this.smoothOffset.z;
 
-    // Total error for snap detection
-    const totalError = Math.hypot(hError, vError);
+    this.physics.setPosition(serverX, serverY, serverZ);
 
-    if (totalError > 2.0) {
-      // Large error (teleport, respawn): snap immediately
-      this.capsuleCenter.set(serverX, serverY, serverZ);
-      this.velocity.set(0, 0, 0);
-    } else {
-      // Blend X/Z with stronger correction on ground to avoid "car" drift
-      if (this.lastGrounded) {
-        if (this.lastInputMag < 0.01) {
-          // No input or counter-strafe: snap small drift quickly
-          if (hError > 0.02) {
-            this.capsuleCenter.x = serverX;
-            this.capsuleCenter.z = serverZ;
-          }
-        } else if (hError > 0.02) {
-          const hBlend = Math.min(1, dt * 25);
-          this.capsuleCenter.x += hErrorX * hBlend;
-          this.capsuleCenter.z += hErrorZ * hBlend;
-        }
-      } else if (hError > 0.05) {
-        const hBlend = Math.min(1, dt * (5 + hError * 10));
-        this.capsuleCenter.x += hErrorX * hBlend;
-        this.capsuleCenter.z += hErrorZ * hBlend;
-      }
+    this.pendingInputs = this.pendingInputs.filter(cmd => cmd.seq > ackSeq);
+    this.lastAckedSeq = ackSeq;
 
-      // Blend Y more gently to avoid bouncing when grounded
-      // Only correct Y if error is significant (jumping, falling, or real desync)
-      if (vError > 0.15) {
-        const vBlend = Math.min(1, dt * 3); // Slower vertical correction
-        this.capsuleCenter.y += (serverY - this.capsuleCenter.y) * vBlend;
-      } else if (vError > 0.02) {
-        // Very small vertical blend for tiny discrepancies
-        const vBlend = Math.min(1, dt * 1);
-        this.capsuleCenter.y += (serverY - this.capsuleCenter.y) * vBlend;
-      }
-      // If vError < 0.02, don't correct Y (avoid micro-bouncing)
+    let replayTick = this.tickCount - this.pendingInputs.length;
+    for (const cmd of this.pendingInputs) {
+      replayTick++;
+      this.physics.simulateTick(this.toInputMsg(cmd), replayTick * FIXED_DT);
     }
 
-    // Visual always follows capsule center
+    const pos = this.physics.getPosition();
+    this.predictedPos.set(pos.x, pos.y, pos.z);
+
+    this.smoothOffset.set(
+      oldVisX - this.predictedPos.x,
+      oldVisY - this.predictedPos.y,
+      oldVisZ - this.predictedPos.z,
+    );
+
+    // Per-axis dead zone: zero out axes with sub-millimeter corrections
+    // to prevent float non-determinism from creating visible oscillation.
+    if (Math.abs(this.smoothOffset.x) < AXIS_DEAD_ZONE) this.smoothOffset.x = 0;
+    if (Math.abs(this.smoothOffset.y) < AXIS_DEAD_ZONE) this.smoothOffset.y = 0;
+    if (Math.abs(this.smoothOffset.z) < AXIS_DEAD_ZONE) this.smoothOffset.z = 0;
+
+    const errorMag = this.smoothOffset.length();
+    if (errorMag > SNAP_MAX || errorMag < SNAP_MIN) {
+      this.smoothOffset.set(0, 0, 0);
+    }
+
+    this.updateVisualPos();
+  }
+
+  public updateSmoothing(dt: number): void {
+    if (this.smoothOffset.lengthSq() > 0.000001) {
+      this.smoothOffset.multiplyScalar(1 - Math.min(1, SMOOTH_DECAY_RATE * dt));
+      if (this.smoothOffset.lengthSq() < 0.000001) {
+        this.smoothOffset.set(0, 0, 0);
+      }
+    }
+    this.updateVisualPos();
+  }
+
+  private updateVisualPos(): void {
     this.visualPos.set(
-      this.capsuleCenter.x,
-      this.capsuleCenter.y + EYE_FROM_CENTER,
-      this.capsuleCenter.z
+      this.predictedPos.x + this.smoothOffset.x,
+      this.predictedPos.y + this.smoothOffset.y + EYE_FROM_CENTER,
+      this.predictedPos.z + this.smoothOffset.z,
     );
   }
 
-  /**
-   * Get current visual position (eye level) for camera.
-   */
-  public get position(): THREE.Vector3 {
-    return this.visualPos.clone();
-  }
+  public get position(): THREE.Vector3 { return this.visualPos.clone(); }
 
-  /**
-   * Get capsule center for debugging/comparison.
-   */
   public getCapsuleCenter(): { x: number; y: number; z: number } {
-    return { x: this.capsuleCenter.x, y: this.capsuleCenter.y, z: this.capsuleCenter.z };
+    return { x: this.predictedPos.x, y: this.predictedPos.y, z: this.predictedPos.z };
   }
 
-  /**
-   * Apply visual position to camera.
-   */
-  public applyToCamera(): void {
-    this.camera.position.copy(this.visualPos);
-  }
+  public getCorrectionMag(): number { return this.smoothOffset.length(); }
+  public getPendingInputCount(): number { return this.pendingInputs.length; }
+  public applyToCamera(): void { this.camera.position.copy(this.visualPos); }
 
   public updateHealth(newHealth: number, maxHealth: number, isDead: boolean, respawnTime: number): void {
     this.health = newHealth;
     this.maxHealth = maxHealth;
     this.isDead = isDead;
     this.respawnTime = respawnTime;
+  }
+
+  private toInputMsg(input: PredictionInput): InputMsg {
+    return {
+      seq: input.seq,
+      moveX: input.moveX,
+      moveZ: input.moveZ,
+      lookYaw: input.yaw,
+      lookPitch: 0,
+      sprint: input.sprint,
+      aiming: input.aiming,
+      crouchPressed: false,
+      crouchReleased: false,
+      crouchHeld: false,
+      jumpPressed: input.jump,
+      dashPressed: false,
+    };
   }
 }

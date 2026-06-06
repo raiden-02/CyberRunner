@@ -1,13 +1,11 @@
 import { BaseState } from "./base.js";
-import { MovementCtx, IMovementState } from "../types.js";
-import { MovementState } from "../../PlayerState.js";
-import { SLIDE, PRONE, DASH, MOVE, CROUCH } from "../../physics/constants.js";
+import type { MovementCtx, IMovementState } from "../types.js";
+import { MovementState } from "../types.js";
+import { SLIDE, DASH, MOVE } from "../../physics/constants.js";
 
 export class WalkingState extends BaseState {
   kind = MovementState.Walking;
-  private crouchHoldStart = -1;
   private verticalVelocity = 0;
-  // Track current horizontal velocity for momentum preservation
   private currentVelocity = { x: 0, z: 0 };
 
   setInitialVelocity(velocity: { x: number; z: number }): void {
@@ -17,34 +15,26 @@ export class WalkingState extends BaseState {
   enter(ctx: MovementCtx) {
     ctx.setFriction(0.7);
     ctx.setGravityScale(1.0);
-    this.crouchHoldStart = -1;
   }
 
   update(ctx: MovementCtx): IMovementState | null {
     const input = ctx.input;
     const env = ctx.env;
 
-    // Phase 2: Basic Movement Implementation
-    
-    // 1. Handle Ground Movement (Walking & Running)
     if (ctx.isGrounded()) {
       this.processGroundedMovement(ctx);
     } else {
-      // Allow slight air control while falling
       this.processAirMovement(ctx);
     }
 
-    // Handle jumping
     if (input.jumpPressed && ctx.isGrounded()) {
       this.performJump(ctx);
     }
 
-    // 3. Handle Dash (Phase 5 feature - already implemented)
     if (input.dashPressed && (env.now - ctx.lastDashTime > DASH.Cooldown)) {
       return this.tryDash(ctx);
     }
 
-    // Handle crouch and slide transitions
     if (input.crouchPressed) {
       const currentSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
       
@@ -54,14 +44,9 @@ export class WalkingState extends BaseState {
         return this.transitionToCrouching(ctx);
       }
       
-      if (this.crouchHoldStart < 0) {
-        this.crouchHoldStart = env.now;
-      }
-    } else if (input.crouchReleased) {
-      this.crouchHoldStart = -1;
     }
     
-    return null; // Stay in walking state
+    return null;
   }
 
   private processGroundedMovement(ctx: MovementCtx) {
@@ -75,6 +60,14 @@ export class WalkingState extends BaseState {
     const maxDelta = maxAccel * ctx.env.dt;
     this.currentVelocity.x = this.moveTowards(this.currentVelocity.x, desired.x, maxDelta);
     this.currentVelocity.z = this.moveTowards(this.currentVelocity.z, desired.z, maxDelta);
+
+    const hSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
+    const hardMax = MOVE.MaxSprintSpeed * 1.1;
+    if (hSpeed > hardMax) {
+      const scale = hardMax / hSpeed;
+      this.currentVelocity.x *= scale;
+      this.currentVelocity.z *= scale;
+    }
     
     if (this.verticalVelocity < 0) {
       this.verticalVelocity = 0;
@@ -162,6 +155,14 @@ export class WalkingState extends BaseState {
     this.currentVelocity.x += dashDir.x * dashStrength;
     this.currentVelocity.z += dashDir.z * dashStrength;
 
+    const dashSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
+    const maxDashSpeed = DASH.Impulse * 1.2;
+    if (dashSpeed > maxDashSpeed) {
+      const s = maxDashSpeed / dashSpeed;
+      this.currentVelocity.x *= s;
+      this.currentVelocity.z *= s;
+    }
+
     if (DASH.UpwardBoost && DASH.UpwardBoost > 0) {
       this.verticalVelocity = Math.max(this.verticalVelocity, DASH.UpwardBoost);
     }
@@ -171,31 +172,25 @@ export class WalkingState extends BaseState {
     return null;
   }
 
-  // Phase 3 transition methods
-  private transitionToSliding(ctx: MovementCtx): IMovementState {
+  private transitionToSliding(_ctx: MovementCtx): IMovementState {
     if (!this.factory) {
       throw new Error("StateFactory not injected into WalkingState");
     }
     const slidingState = this.factory.createSlidingState();
-    // Pass current velocity to sliding state using proper API
     if (slidingState.setInitialVelocity) {
       slidingState.setInitialVelocity({ x: this.currentVelocity.x, z: this.currentVelocity.z });
     }
     return slidingState;
   }
 
-  private transitionToCrouching(ctx: MovementCtx): IMovementState {
+  private transitionToCrouching(_ctx: MovementCtx): IMovementState {
     if (!this.factory) {
       throw new Error("StateFactory not injected into WalkingState");
     }
     const crouchingState = this.factory.createCrouchingState();
-    // Pass current velocity to crouching state using proper API
     if (crouchingState.setInitialVelocity) {
       crouchingState.setInitialVelocity({ x: this.currentVelocity.x, z: this.currentVelocity.z });
     }
     return crouchingState;
   }
 }
-
-
-

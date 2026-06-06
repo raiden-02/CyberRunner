@@ -1,10 +1,14 @@
 import { Room, Client } from "colyseus";
 import { GameState } from "./GameState.js";
 import { PlayerState, MovementState } from "./PlayerState.js";
-import { InputMsg, WeaponSwitchMsg, FireInputMsg, ReloadInputMsg, DamageMsg, SpikeActionMsg, TeamSelectMsg } from "./net/messages.js";
-import { CharacterController } from "./movement/character-controller.js";
-import { CAPSULE } from "./physics/constants.js";
-import { COLLISION_GROUPS } from "./physics/layers.js";
+import { WeaponSwitchMsg, FireInputMsg, ReloadInputMsg, DamageMsg, SpikeActionMsg, TeamSelectMsg } from "./net/messages.js";
+import type { InputMsg } from "@shared/movement/types.js";
+import { decodeInputCmd, decodeFireCmd } from "./net/BinaryCodec.js";
+import { CharacterController } from "@shared/movement/character-controller.js";
+import { CAPSULE } from "@shared/physics/constants.js";
+import { COLLISION_GROUPS } from "@shared/physics/collision-groups.js";
+import { buildMapColliders, createPlayerPhysics } from "@shared/world/map-physics.js";
+import { SHOOT_HOUSE_NEON_COLLISION } from "@shared/world/maps/shoot-house-neon.js";
 import { HealthSystem } from "./systems/health-system.js";
 import { WeaponSystem } from "./systems/weapon-system.js";
 import { getWeaponConfig } from "./weapons/weapon-config.js";
@@ -49,6 +53,7 @@ export class GameRoom extends Room<GameState> {
   private gameMode!: BaseGameMode;
   private lagCompensation = new LagCompensation();
   private projectileManager!: ProjectileManager;
+  private serverTick = 0;
 
   private joinCode: string = "";
   private hostId: string = "";
@@ -109,69 +114,12 @@ export class GameRoom extends Room<GameState> {
     await RAPIER.init();
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 
-    this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(
-        currentMap.boundsHalfSize,
-        currentMap.groundThickness,
-        currentMap.boundsHalfSize
-      ).setTranslation(0, -currentMap.groundThickness, 0)
-       .setFriction(1.0)
-       .setCollisionGroups(COLLISION_GROUPS.WORLD)
-    );
+    // Build map colliders using shared builder (identical to client)
+    const { breakableColliders } = buildMapColliders(RAPIER, this.world, SHOOT_HOUSE_NEON_COLLISION);
 
-    const wallHalfThickness = currentMap.wallThickness;
-    const wallHalfHeight = currentMap.wallHeight / 2;
-    const halfSize = currentMap.boundsHalfSize;
-    this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(wallHalfThickness, wallHalfHeight, halfSize)
-        .setTranslation(halfSize + wallHalfThickness, wallHalfHeight, 0)
-        .setFriction(0.8)
-        .setCollisionGroups(COLLISION_GROUPS.WORLD)
-    );
-    this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(wallHalfThickness, wallHalfHeight, halfSize)
-        .setTranslation(-halfSize - wallHalfThickness, wallHalfHeight, 0)
-        .setFriction(0.8)
-        .setCollisionGroups(COLLISION_GROUPS.WORLD)
-    );
-    this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(halfSize, wallHalfHeight, wallHalfThickness)
-        .setTranslation(0, wallHalfHeight, halfSize + wallHalfThickness)
-        .setFriction(0.8)
-        .setCollisionGroups(COLLISION_GROUPS.WORLD)
-    );
-    this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(halfSize, wallHalfHeight, wallHalfThickness)
-        .setTranslation(0, wallHalfHeight, -halfSize - wallHalfThickness)
-        .setFriction(0.8)
-        .setCollisionGroups(COLLISION_GROUPS.WORLD)
-    );
-
-    for (const obs of currentMap.obstacles) {
-      this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(obs.hx, obs.hy, obs.hz)
-          .setTranslation(obs.x, obs.y, obs.z)
-          .setFriction(0.9)
-          .setCollisionGroups(COLLISION_GROUPS.WORLD)
-      );
-    }
-
-    for (const occ of currentMap.occluders) {
-      this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(occ.hx, occ.hy, occ.hz)
-          .setTranslation(occ.x, occ.y, occ.z)
-          .setFriction(0.9)
-          .setCollisionGroups(COLLISION_GROUPS.WORLD)
-      );
-    }
-
-    currentMap.breakables.forEach((b, idx) => {
-      const collider = this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(b.hx, b.hy, b.hz)
-          .setTranslation(b.x, b.y, b.z)
-          .setFriction(0.9)
-          .setCollisionGroups(COLLISION_GROUPS.WORLD)
-      );
+    // Track breakables for gameplay
+    breakableColliders.forEach((collider, idx) => {
+      const b = SHOOT_HOUSE_NEON_COLLISION.breakables[idx];
       const runtime: BreakableRuntime = {
         id: idx,
         hp: b.hp,
@@ -190,13 +138,17 @@ export class GameRoom extends Room<GameState> {
       this.update(dt);
     }, 1000 / TICK_RATE);
 
+    // Binary-encoded input handler (hot path, 13 bytes per message)
+    this.onMessage("input_bin", (client, raw: any) => {
+      const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+      const data = decodeInputCmd(bytes);
+      if (!data) return;
+      this.handleInput(client, data);
+    });
+
+    // Legacy JSON input handler (fallback)
     this.onMessage("input", (client, data: InputMsg) => {
-      const player = this.players.get(client.sessionId);
-      if (!player) return;
-      
-      player.ctrl.updateInput(data);
-      player.schema.rotationY = data.lookYaw;
-      player.schema.pitch = data.lookPitch;
+      this.handleInput(client, data);
     });
 
     this.onMessage("weapon_switch", (client, data: WeaponSwitchMsg) => {
@@ -231,12 +183,17 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
+    // Binary-encoded fire handler (hot path, 26 bytes per message)
+    this.onMessage("fire_bin", (client, raw: any) => {
+      const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+      const data = decodeFireCmd(bytes);
+      if (!data) return;
+      this.handleFireInput(client, data);
+    });
+
+    // Legacy JSON fire handler (fallback)
     this.onMessage("fire_input", (client, data: FireInputMsg) => {
-      const player = this.players.get(client.sessionId);
-      if (!player) return;
-      
-      player.schema.firing = data.firing;
-      (player as any).aimDir = data.aimDir;
+      this.handleFireInput(client, data);
     });
     
     this.onMessage("ping", (client, data: { clientTime: number; measuredLatency?: number; jitter?: number }) => {
@@ -449,23 +406,13 @@ export class GameRoom extends Room<GameState> {
     
     this.state.players.set(client.sessionId, schema);
 
-    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
-      .setTranslation(schema.x, schema.y, schema.z);
-    const body = this.world.createRigidBody(bodyDesc);
-    
-    const colliderDesc = RAPIER.ColliderDesc.capsule(CAPSULE.HalfHeight, CAPSULE.Radius)
-      .setFriction(0.7)
-      .setRestitution(0.0)
-      .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DEFAULT)
-      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
-      .setCollisionGroups(COLLISION_GROUPS.PLAYER);
-    const collider = this.world.createCollider(colliderDesc, body);
-    
-    const controller = this.world.createCharacterController(0.1);
-    controller.enableAutostep(0.3, 0.2, true);
-    controller.enableSnapToGround(0.2);
-    controller.setApplyImpulsesToDynamicBodies(true);
-    
+    // Create player physics using shared builder (identical to client)
+    const { body, collider, controller } = createPlayerPhysics(
+      RAPIER, this.world,
+      schema.x, schema.y, schema.z,
+      CAPSULE.HalfHeight, CAPSULE.Radius
+    );
+
     const ctrl = new CharacterController(body, collider, controller);
     
     const hitboxes = createHitboxes(this.world, body, client.sessionId, this.hitboxRegistry);
@@ -654,6 +601,44 @@ export class GameRoom extends Room<GameState> {
     this.state.spikeCarrierId = "";
   }
 
+  private handleInput(client: any, data: InputMsg): void {
+    const player = this.players.get(client.sessionId);
+    if (!player) return;
+
+    data.moveX = Math.max(-1, Math.min(1, data.moveX || 0));
+    data.moveZ = Math.max(-1, Math.min(1, data.moveZ || 0));
+
+    if (!Number.isFinite(data.lookYaw)) data.lookYaw = 0;
+    if (!Number.isFinite(data.lookPitch)) data.lookPitch = 0;
+    data.lookPitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, data.lookPitch));
+
+    player.ctrl.updateInput(data);
+    player.schema.rotationY = data.lookYaw;
+    player.schema.pitch = data.lookPitch;
+  }
+
+  private handleFireInput(client: any, data: FireInputMsg): void {
+    const player = this.players.get(client.sessionId);
+    if (!player) return;
+
+    player.schema.firing = data.firing;
+    (player as any).aimDir = data.aimDir;
+
+    if (data.firing && data.clientPos) {
+      const serverPos = player.ctrl.body.translation();
+      const dx = data.clientPos.x - serverPos.x;
+      const dy = data.clientPos.y - serverPos.y;
+      const dz = data.clientPos.z - serverPos.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+
+      if (distSq <= 9) {
+        (player as any).clientShotPos = data.clientPos;
+      } else {
+        (player as any).clientShotPos = null;
+      }
+    }
+  }
+
   private update(dt: number) {
     if (this.state.isGameOver) return;
     
@@ -757,24 +742,34 @@ export class GameRoom extends Room<GameState> {
         const currentState = player.ctrl.currentState();
         player.schema.isCrouching = (currentState === MovementState.Crouching);
         player.schema.isSliding = (currentState === MovementState.Sliding);
-        
-        // Record from physics body directly, not schema (schema may be 1 frame behind)
-        const bodyPos = player.ctrl.body.translation();
-        this.lagCompensation.recordPosition(
-          sessionId,
-          now * 1000,
-          bodyPos.x,
-          bodyPos.y,
-          bodyPos.z
-        );
       }
+    }
 
+    // Record all player positions for this tick (before processing shots)
+    this.serverTick++;
+    this.lagCompensation.recordTick(this.serverTick, this.players);
+
+    // Process shots (uses lag compensation to rewind to historical positions)
+    for (const [sessionId, player] of this.players) {
       if (!player.schema.isDead && player.schema.firing && !player.schema.reloading) {
         if (WeaponSystem.canFire(player.schema, now)) {
           const aimDir = (player as any).aimDir;
           if (aimDir) {
             const aim = normalize(aimDir);
-            const pos = player.ctrl.body.translation();
+            
+            // Use client-provided shot position if available (more accurate)
+            // Otherwise fall back to current server position
+            const clientShotPos = (player as any).clientShotPos;
+            let pos: { x: number; y: number; z: number };
+            
+            if (clientShotPos) {
+              // Use client position at shot time (fixes shooter origin mismatch)
+              pos = clientShotPos;
+            } else {
+              // Fallback: get shooter's historical position at shot time
+              const currentPos = player.ctrl.body.translation();
+              pos = { x: currentPos.x, y: currentPos.y, z: currentPos.z };
+            }
 
             const eye = { x: pos.x, y: pos.y + EYE_FROM_CENTER, z: pos.z };
             const origin = {
@@ -784,14 +779,13 @@ export class GameRoom extends Room<GameState> {
             };
 
             const client = this.clients.find(c => c.sessionId === sessionId);
-            // Use full compensation time (network latency + client interpolation delay)
-            const compensationMs = client ? this.lagCompensation.getFullCompensationTime(client) : 100;
-            const shotTimestamp = now * 1000 - compensationMs;
-            
+
+            // Rewind all other players to where the shooter saw them
+            // Uses tick-based rewind: PresentTick - AverageTickLag
             const originalPositions = this.lagCompensation.rewindPlayers(
               this.players,
               sessionId,
-              shotTimestamp,
+              client,
               this.world
             );
             

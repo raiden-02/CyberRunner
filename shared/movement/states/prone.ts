@@ -1,6 +1,6 @@
 import { BaseState } from "./base.js";
-import { MovementCtx, IMovementState } from "../types.js";
-import { MovementState } from "../../PlayerState.js";
+import type { MovementCtx, IMovementState } from "../types.js";
+import { MovementState } from "../types.js";
 import { PRONE, CAPSULE } from "../../physics/constants.js";
 
 export class ProneState extends BaseState {
@@ -9,7 +9,7 @@ export class ProneState extends BaseState {
   private verticalVelocity = 0;
   private prevCrouchHeld = true;
 
-  constructor(private fromSlide: boolean) {
+  constructor(_fromSlide: boolean) {
     super();
   }
 
@@ -158,7 +158,7 @@ export class ProneState extends BaseState {
     return null;
   }
 
-  private hasClearance(ctx: MovementCtx, targetHalfHeight: number): boolean {
+  private hasClearance(_ctx: MovementCtx, _targetHalfHeight: number): boolean {
     return true;
   }
 
@@ -184,5 +184,3 @@ export class ProneState extends BaseState {
     return crouchingState;
   }
 }
-
-

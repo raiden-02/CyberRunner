@@ -5,8 +5,8 @@ import cookieParser from "cookie-parser";
 import { Server } from "colyseus";
 import { GameRoom } from "./GameRoom.js";
 import path from "path";
-import { fileURLToPath } from "url";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import apiRoutes from "./api/routes.js";
 import { attachUser } from "./api/middleware.js";
 import { isDatabaseEnabled } from "./db/pool.js";
@@ -23,10 +23,20 @@ app.use(attachUser);
 // API routes
 app.use("/api", apiRoutes);
 
-// Serve built client
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const clientDistPath = path.resolve(__dirname, "../../client/dist");
+// Find project root by walking up from this file until we find the
+// directory containing both client/ and server/ (works for tsx and compiled).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+function findProjectRoot(from: string): string {
+  let dir = from;
+  for (let i = 0; i < 10; i++) {
+    if (fs.existsSync(path.join(dir, "client")) && fs.existsSync(path.join(dir, "server"))) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+  return process.cwd();
+}
+const clientDistPath = path.join(findProjectRoot(__dirname), "client", "dist");
 
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath, { index: false }));

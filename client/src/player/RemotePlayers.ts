@@ -89,7 +89,6 @@ export class RemotePlayers {
       const debugGroup = this.createDebugHitboxes();
       debugGroup.visible = this.debugEnabled;
 
-      // Add all body parts to root
       root.add(bodyParts.head);
       root.add(bodyParts.upperTorso);
       root.add(bodyParts.lowerTorso);
@@ -111,11 +110,13 @@ export class RemotePlayers {
       data = { root, bodyParts, debugGroup, weaponView, targetPos, targetRotY };
       this.players.set(sessionId, data);
     } else {
-      // Update target
-      data.targetPos.copy(targetPos);
+      // Dead zone: ignore sub-millimeter position changes to prevent chasing
+      // RAPIER settling micro-oscillations that cause rubber-band on stop.
+      if (data.targetPos.distanceToSquared(targetPos) > 0.005 * 0.005) {
+        data.targetPos.copy(targetPos);
+      }
       data.targetRotY = targetRotY;
 
-      // Update weapon if changed
       if (player.equippedWeapon) {
         const resolved = resolveWeaponDefinition(player.equippedWeapon)?.id || player.equippedWeapon;
         if (data.weaponView.getCurrentWeaponId() !== resolved) {
@@ -123,12 +124,10 @@ export class RemotePlayers {
         }
       }
 
-      // Update weapon look direction
       if (player.pitch !== undefined) {
         data.weaponView.updateLookDirection(targetRotY, player.pitch);
       }
 
-      // Handle visibility
       const isDead = player.isDead || false;
       data.root.visible = !isDead;
       data.weaponView.setVisible(!isDead);
@@ -146,32 +145,33 @@ export class RemotePlayers {
   }
 
   /**
-   * Interpolate remote player positions for smooth visuals.
-   * 
-   * Uses fast interpolation (dt*50) to minimize visual delay while preventing jitter.
-   * At 60fps, this catches up to target position in ~1-2 frames (~17-33ms).
-   * 
-   * IMPORTANT: This delay must be accounted for in server-side lag compensation.
-   * See: server/src/systems/lag-compensation.ts (CLIENT_INTERPOLATION_DELAY_MS)
+   * Smooth remote player positions using fast exponential lerp.
+   * Position lerp is aggressive (dt*50) to minimize visual lag for hit registration.
+   * Rotation uses a dead zone to prevent constant micro-corrections from
+   * quantized server rotation values.
    */
   private interpolate(dt: number): void {
-    const alpha = Math.min(1, dt * 50);
+    const posAlpha = Math.min(1, dt * 50);
+    const rotAlpha = Math.min(1, dt * 20);
 
     for (const data of this.players.values()) {
       const distance = data.root.position.distanceTo(data.targetPos);
-      if (distance < 0.05) {
-        // Snap to position if within 5cm to eliminate micro-jitter
+      if (distance < 0.03) {
         data.root.position.copy(data.targetPos);
       } else {
-        data.root.position.lerp(data.targetPos, alpha);
+        data.root.position.lerp(data.targetPos, posAlpha);
       }
-      
-      const rotAlpha = Math.min(1, dt * 40);
-      data.root.rotation.y = THREE.MathUtils.lerp(
-        data.root.rotation.y,
-        data.targetRotY,
-        rotAlpha
-      );
+
+      let rotDiff = data.targetRotY - data.root.rotation.y;
+      // Normalize to [-PI, PI]
+      while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+      while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+
+      if (Math.abs(rotDiff) < 0.005) {
+        data.root.rotation.y = data.targetRotY;
+      } else {
+        data.root.rotation.y += rotDiff * rotAlpha;
+      }
     }
   }
 

@@ -25,6 +25,7 @@ import { HitMarker } from "../ui/HitMarker.js";
 import { DamageIndicator } from "../ui/DamageIndicator.js";
 import { KillFeed } from "../ui/KillFeed.js";
 import { DeathCam } from "../ui/DeathCam.js";
+import { Netgraph } from "../ui/Netgraph.js";
 import type { UserProfile } from "../api/client.js";
 import type { PlayAction } from "../ui/screens/LobbyScreen.js";
 import type { GameOverMessage } from "../network/NetworkManager.js";
@@ -61,6 +62,7 @@ export class Game {
   private damageIndicator: DamageIndicator;
   private killFeed: KillFeed;
   private deathCam: DeathCam;
+  private netgraph: Netgraph;
 
   private lastTime = performance.now();
   private running = false;
@@ -106,6 +108,7 @@ export class Game {
     this.damageIndicator = new DamageIndicator();
     this.killFeed = new KillFeed();
     this.deathCam = new DeathCam();
+    this.netgraph = new Netgraph(this.network);
     
     this.pauseMenu.setOnResume(() => {
       this.renderer.canvas.requestPointerLock();
@@ -156,7 +159,9 @@ export class Game {
     this.weaponSystem = new WeaponSystem(this.renderer.camera, {
       onFireInput: (firing, aimDir) => {
         if (this.network.connected) {
-          this.network.sendFireInput(firing, aimDir);
+          // Include local player position at shot time for accurate lag compensation
+          const camPos = this.renderer.camera.position;
+          this.network.sendFireInput(firing, aimDir, { x: camPos.x, y: camPos.y, z: camPos.z });
         }
       },
       onWeaponSwitch: (weaponId) => {
@@ -270,6 +275,7 @@ export class Game {
     this.input.onToggleDebug = () => {
       this.debugEnabled = !this.debugEnabled;
       this.remotePlayers.setDebugEnabled(this.debugEnabled);
+      this.netgraph.toggle();
       if (this.localCapsule) this.localCapsule.visible = this.debugEnabled;
       if (this.debugRay) this.debugRay.visible = this.debugEnabled;
     };
@@ -796,7 +802,8 @@ debug.help()          - Show this help message
     
     this.damageIndicator.setPlayerYaw(inputState.yaw);
 
-    this.localPlayer.update(dt, {
+    this.localPlayer.applyInput(dt, {
+      seq: this.inputSeq,
       moveX: inputState.moveX,
       moveZ: inputState.moveZ,
       yaw: inputState.yaw,
@@ -899,7 +906,15 @@ debug.help()          - Show this help message
         this.hasInitialPosition = true;
       }
 
-      this.localPlayer.reconcileWithServer(serverPlayer.x, serverPlayer.y, serverPlayer.z, dt);
+      const ackSeq = serverPlayer.lastProcessedInputSeq || 0;
+      this.localPlayer.reconcileWithServer(serverPlayer.x, serverPlayer.y, serverPlayer.z, ackSeq, dt);
+
+      this.netgraph.updateStats({
+        correctionMag: this.localPlayer.getCorrectionMag(),
+        inputSeqLocal: this.inputSeq,
+        lastAckedSeq: this.localPlayer.lastAckedSeq,
+        pendingInputCount: this.localPlayer.getPendingInputCount(),
+      });
 
       this.localPlayer.health = serverPlayer.health;
       this.localPlayer.maxHealth = serverPlayer.maxHealth;
@@ -926,6 +941,12 @@ debug.help()          - Show this help message
         serverPlayer.reloading
       );
     }
+
+    // Decay visual smoothing offset from reconciliation corrections
+    this.localPlayer.updateSmoothing(dt);
+
+    // Update netgraph overlay
+    this.netgraph.update(dt);
 
     const showScoreboard = this.input.isKeyDown("Tab");
     this.scoreboard.setVisible(showScoreboard);
@@ -1227,6 +1248,7 @@ debug.help()          - Show this help message
     this.damageIndicator.dispose();
     this.killFeed.dispose();
     this.deathCam.dispose();
+    this.netgraph.destroy();
     this.hud.destroy();
     this.scoreboard.destroy();
     this.teamLobbyScreen.destroy();

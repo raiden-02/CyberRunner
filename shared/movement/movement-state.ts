@@ -1,4 +1,4 @@
-import { IMovementState, MovementCtx } from "./types.js";
+import type { IMovementState, MovementCtx } from "./types.js";
 
 export class StateMachine {
   private current: IMovementState;

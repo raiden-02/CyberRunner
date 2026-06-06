@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 380" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr-cyan" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0,0 10,3.5 0,7" fill="#00cccc"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0,0 10,3.5 0,7" fill="#b366ff"/>
+    </marker>
+  </defs>
+
+  <rect width="820" height="380" rx="10" fill="#0d0d1a"/>
+
+  <!-- Client -->
+  <rect x="30" y="28" width="280" height="270" rx="8" fill="none" stroke="#00cccc" stroke-width="1.5"/>
+  <text x="170" y="54" text-anchor="middle" fill="#00cccc" font-size="14" font-weight="700">CLIENT</text>
+
+  <rect x="55" y="72" width="230" height="34" rx="5" fill="#161633"/>
+  <text x="170" y="94" text-anchor="middle" fill="#ddd" font-size="12">Input  →  Binary Codec</text>
+
+  <rect x="55" y="120" width="230" height="34" rx="5" fill="#161633"/>
+  <text x="170" y="142" text-anchor="middle" fill="#ddd" font-size="12">Prediction + Reconciliation</text>
+
+  <rect x="55" y="168" width="230" height="34" rx="5" fill="#161633"/>
+  <text x="170" y="190" text-anchor="middle" fill="#ddd" font-size="12">Remote Player Interpolation</text>
+
+  <rect x="55" y="216" width="230" height="34" rx="5" fill="#161633"/>
+  <text x="170" y="238" text-anchor="middle" fill="#ddd" font-size="12">Three.js Render + HUD</text>
+
+  <!-- Server -->
+  <rect x="510" y="28" width="280" height="270" rx="8" fill="none" stroke="#b366ff" stroke-width="1.5"/>
+  <text x="650" y="54" text-anchor="middle" fill="#b366ff" font-size="14" font-weight="700">SERVER</text>
+
+  <rect x="535" y="72" width="230" height="34" rx="5" fill="#161633"/>
+  <text x="650" y="94" text-anchor="middle" fill="#ddd" font-size="12">Decode  →  RAPIER Physics</text>
+
+  <rect x="535" y="120" width="230" height="34" rx="5" fill="#161633"/>
+  <text x="650" y="142" text-anchor="middle" fill="#ddd" font-size="12">Lag Compensation (Rewind)</text>
+
+  <rect x="535" y="168" width="230" height="34" rx="5" fill="#161633"/>
+  <text x="650" y="190" text-anchor="middle" fill="#ddd" font-size="12">Hit Detection + Damage</text>
+
+  <rect x="535" y="216" width="230" height="34" rx="5" fill="#161633"/>
+  <text x="650" y="238" text-anchor="middle" fill="#ddd" font-size="12">Game Modes + State Sync</text>
+
+  <!-- Client → Server arrow -->
+  <line x1="314" y1="89" x2="506" y2="89" stroke="#00cccc" stroke-width="2" marker-end="url(#arr-cyan)"/>
+  <text x="410" y="80" text-anchor="middle" fill="#00cccc" font-size="11">input / fire</text>
+
+  <!-- Server → Client arrow -->
+  <line x1="506" y1="237" x2="314" y2="237" stroke="#b366ff" stroke-width="2" marker-end="url(#arr-purple)"/>
+  <text x="410" y="228" text-anchor="middle" fill="#b366ff" font-size="11">state / hit results</text>
+
+  <!-- WebSocket label -->
+  <rect x="378" y="144" width="64" height="24" rx="4" fill="#161633" stroke="#555" stroke-width="0.8"/>
+  <text x="410" y="160" text-anchor="middle" fill="#999" font-size="10">WebSocket</text>
+
+  <!-- Shared -->
+  <rect x="30" y="320" width="760" height="36" rx="6" fill="#111e11" stroke="#44bb44" stroke-width="1"/>
+  <text x="410" y="343" text-anchor="middle" fill="#44bb44" font-size="12" font-weight="600">Shared:  CharacterController  ·  Physics Constants  ·  Collision Groups  ·  Map Data</text>
+</svg>

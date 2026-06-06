@@ -248,41 +248,32 @@ export class Minimap {
       }
     }
 
-    // Draw other players
+    // Draw teammates only
     const localTeam = localPlayer.teamId;
     for (const player of this.players) {
       if (player.isDead) continue;
-      if (player.isLocal) continue; // Draw local player last
+      if (player.isLocal) continue;
+      if (!localTeam || player.teamId !== localTeam) continue;
 
       const pos = this.worldToMinimap(player.x, player.z, centerX, centerZ, rotation);
       if (!pos) continue;
 
-      // Player indicator
       ctx.save();
       ctx.translate(pos.x, pos.y);
-      // Rotate player indicator relative to minimap (their rotation - our rotation)
       ctx.rotate(-(player.rotationY - rotation));
 
-      // Triangle pointing in look direction
       ctx.beginPath();
       ctx.moveTo(0, -6);
       ctx.lineTo(-4, 4);
       ctx.lineTo(4, 4);
       ctx.closePath();
 
-      // Team coloring
-      if (localTeam && player.teamId === localTeam) {
-        ctx.fillStyle = "#00ccff";
-        ctx.strokeStyle = "#00ccff";
-      } else {
-        ctx.fillStyle = "#ff4444";
-        ctx.strokeStyle = "#ff4444";
-      }
+      ctx.fillStyle = "#00ccff";
+      ctx.strokeStyle = "#00ccff";
       ctx.fill();
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Spike indicator
       if (player.hasSpike) {
         ctx.beginPath();
         ctx.arc(0, 0, 9, 0, Math.PI * 2);

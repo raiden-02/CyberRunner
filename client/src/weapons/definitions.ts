@@ -70,17 +70,10 @@ export interface AttachmentDefinition {
   statMods?: Partial<WeaponStats>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// WEAPON DEFINITIONS - AAA-balanced, cyberpunk-themed
-// ═══════════════════════════════════════════════════════════════════════════
-
 export const WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
-  // ─────────────────────────────────────────────────────────────────────────
-  // ASSAULT RIFLE - Balanced all-rounder
-  // ─────────────────────────────────────────────────────────────────────────
   AR_1: {
     id: "AR_1",
-    name: "Axiom AR-7",
+    name: "AR-1",
     family: "AssaultRifle",
     colorVariant: "cyan",
     attachments: ["HOLO_SIGHT", "COMPENSATOR"],
@@ -99,12 +92,9 @@ export const WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SMG - High ROF, close quarters beast
-  // ─────────────────────────────────────────────────────────────────────────
   SMG_1: {
     id: "SMG_1",
-    name: "Viper MK-9",
+    name: "SMG-1",
     family: "SMG",
     colorVariant: "magenta",
     attachments: ["REFLEX_SIGHT", "SUPPRESSOR"],
@@ -123,12 +113,9 @@ export const WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // LMG - Suppressive fire, slow but deadly
-  // ─────────────────────────────────────────────────────────────────────────
   LMG_1: {
     id: "LMG_1",
-    name: "Thunderclap T-200",
+    name: "LMG-1",
     family: "LMG",
     colorVariant: "orange",
     attachments: ["HOLO_SIGHT"],
@@ -147,12 +134,9 @@ export const WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SHOTGUN - Devastating close range
-  // ─────────────────────────────────────────────────────────────────────────
   SHOTGUN_1: {
     id: "SHOTGUN_1",
-    name: "Havoc S-12",
+    name: "Shotgun-1",
     family: "Shotgun",
     colorVariant: "red",
     attachments: [],
@@ -172,12 +156,9 @@ export const WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SNIPER - One shot, one kill potential
-  // ─────────────────────────────────────────────────────────────────────────
   SNIPER_1: {
     id: "SNIPER_1",
-    name: "Specter SR-X",
+    name: "Sniper-1",
     family: "Sniper",
     colorVariant: "green",
     attachments: ["SCOPE_4X"],
@@ -196,9 +177,6 @@ export const WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // PISTOL - Reliable sidearm
-  // ─────────────────────────────────────────────────────────────────────────
   PISTOL_1: {
     id: "PISTOL_1",
     name: "Phantom P-45",
@@ -220,12 +198,9 @@ export const WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ROCKET LAUNCHER - Area denial, vehicle killer
-  // ─────────────────────────────────────────────────────────────────────────
   ROCKET_1: {
     id: "ROCKET_1",
-    name: "Oblivion RL-X",
+    name: "Rocket-1",
     family: "RocketLauncher",
     colorVariant: "red",
     attachments: [],
@@ -244,12 +219,9 @@ export const WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // GRENADE LAUNCHER - Explosive utility
-  // ─────────────────────────────────────────────────────────────────────────
   GL_1: {
     id: "GL_1",
-    name: "Rift GL-6",
+    name: "GL-1",
     family: "GrenadeLauncher",
     colorVariant: "orange",
     attachments: ["REFLEX_SIGHT"],
@@ -274,15 +246,10 @@ export function resolveWeaponDefinition(weaponId: string): WeaponDefinition | un
   return undefined;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ATTACHMENT DEFINITIONS - Cyberpunk optics and muzzle devices
-// ═══════════════════════════════════════════════════════════════════════════
-
 export const ATTACHMENT_DEFINITIONS: Record<string, AttachmentDefinition> = {
-  // Holographic sight - versatile mid-range
   HOLO_SIGHT: {
     id: "HOLO_SIGHT",
-    name: "Neon Holo",
+    name: "Holo Sight",
     mountSocket: "rail_top",
     type: "optic",
     statMods: {
@@ -290,10 +257,9 @@ export const ATTACHMENT_DEFINITIONS: Record<string, AttachmentDefinition> = {
     }
   },
   
-  // Reflex sight - fast acquisition
   REFLEX_SIGHT: {
     id: "REFLEX_SIGHT",
-    name: "Prism Reflex",
+    name: "Reflex Sight",
     mountSocket: "rail_top",
     type: "optic",
     statMods: {
@@ -301,10 +267,9 @@ export const ATTACHMENT_DEFINITIONS: Record<string, AttachmentDefinition> = {
     }
   },
   
-  // 4x scope - long range precision
   SCOPE_4X: {
     id: "SCOPE_4X",
-    name: "Spectra 4x",
+    name: "4x Scope",
     mountSocket: "rail_top",
     type: "optic",
     statMods: {
@@ -312,10 +277,9 @@ export const ATTACHMENT_DEFINITIONS: Record<string, AttachmentDefinition> = {
     }
   },
   
-  // Compensator - recoil control
   COMPENSATOR: {
     id: "COMPENSATOR",
-    name: "Vector Comp",
+    name: "Compensator",
     mountSocket: "muzzle",
     type: "muzzle",
     statMods: {
@@ -323,10 +287,9 @@ export const ATTACHMENT_DEFINITIONS: Record<string, AttachmentDefinition> = {
     }
   },
   
-  // Suppressor - stealth + range penalty
   SUPPRESSOR: {
     id: "SUPPRESSOR",
-    name: "Ghost Suppressor",
+    name: "Suppressor",
     mountSocket: "muzzle",
     type: "muzzle",
     statMods: {
@@ -334,10 +297,9 @@ export const ATTACHMENT_DEFINITIONS: Record<string, AttachmentDefinition> = {
     }
   },
   
-  // Iron sight - backup optic
   IRON_SIGHT: {
     id: "IRON_SIGHT",
-    name: "Tritium Iron",
+    name: "Iron Sight",
     mountSocket: "rail_top",
     type: "optic",
     statMods: {

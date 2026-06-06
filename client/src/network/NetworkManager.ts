@@ -1,4 +1,5 @@
 import { Client, Room } from "colyseus.js";
+import { encodeInputCmd, encodeFireCmd } from "./BinaryCodec.js";
 
 export interface HealthChangeMessage {
   playerId: string;
@@ -175,6 +176,16 @@ export class NetworkManager {
       }
 
       this.setupMessageHandlers();
+
+      this.room.onLeave((code) => {
+        console.warn(`[Network] Room left (code: ${code})`);
+        this.stopPingInterval();
+        this.room = undefined;
+      });
+
+      this.room.onError((code, message) => {
+        console.error(`[Network] Room error ${code}: ${message}`);
+      });
     } catch (e) {
       console.error("Join error", e);
       if (this.onError) {
@@ -320,7 +331,7 @@ export class NetworkManager {
   }
 
   public get connected(): boolean {
-    return !!this.room;
+    return !!this.room && (this.room.connection as any)?.isOpen !== false;
   }
 
   public get state(): any {
@@ -328,11 +339,21 @@ export class NetworkManager {
   }
 
   public sendInput(data: any): void {
-    this.room?.send("input", data);
+    if (!this.connected) return;
+    this.room!.send("input_bin", encodeInputCmd(data));
   }
 
-  public sendFireInput(firing: boolean, aimDir: { x: number; y: number; z: number }): void {
-    this.room?.send("fire_input", { firing, aimDir });
+  public sendFireInput(
+    firing: boolean, 
+    aimDir: { x: number; y: number; z: number },
+    clientPos?: { x: number; y: number; z: number }
+  ): void {
+    if (!this.connected) return;
+    this.room!.send("fire_bin", encodeFireCmd({
+      firing,
+      aimDir,
+      clientPos: firing ? clientPos : undefined,
+    }));
   }
 
   public sendWeaponSwitch(weaponId: string): void {

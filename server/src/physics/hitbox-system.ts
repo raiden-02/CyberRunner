@@ -1,6 +1,6 @@
 import * as RAPIER from "@dimforge/rapier3d-compat";
-import { HITBOX, DAMAGE_MULTIPLIERS } from "./constants.js";
-import { COLLISION_GROUPS } from "./layers.js";
+import { HITBOX, DAMAGE_MULTIPLIERS } from "@shared/physics/constants.js";
+import { COLLISION_GROUPS } from "@shared/physics/collision-groups.js";
 import type { BodyPartHit } from "../net/messages.js";
 
 export type BodyPart = BodyPartHit;

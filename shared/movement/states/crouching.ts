@@ -1,7 +1,7 @@
 import { BaseState } from "./base.js";
-import { MovementCtx, IMovementState } from "../types.js";
-import { MovementState } from "../../PlayerState.js";
-import { CROUCH, PRONE, CAPSULE, MOVE } from "../../physics/constants.js";
+import type { MovementCtx, IMovementState } from "../types.js";
+import { MovementState } from "../types.js";
+import { CROUCH, PRONE, CAPSULE } from "../../physics/constants.js";
 
 export class CrouchingState extends BaseState {
   kind = MovementState.Crouching;
@@ -41,21 +41,18 @@ export class CrouchingState extends BaseState {
       this.processAirMovement(ctx);
     }
 
-    // Jump while crouched transitions to standing
     if (input.jumpPressed && ctx.isGrounded()) {
       if (this.canStandUp(ctx)) {
         return this.transitionToWalking();
       }
     }
 
-    // Toggle crouch to stand up
     if (input.crouchPressed) {
       if (this.canStandUp(ctx)) {
         return this.transitionToWalking();
       }
     }
     
-    // Hold crouch to go prone
     if (input.crouchHeld && this.crouchHoldStart >= 0) {
       const heldDuration = env.now - this.crouchHoldStart;
       const currentSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
@@ -115,7 +112,6 @@ export class CrouchingState extends BaseState {
     this.currentVelocity.x = this.moveTowards(this.currentVelocity.x, desired.x, maxDelta);
     this.currentVelocity.z = this.moveTowards(this.currentVelocity.z, desired.z, maxDelta);
     
-    // Apply gravity
     this.verticalVelocity -= 9.81 * ctx.env.dt;
     
     const movement = {
@@ -135,13 +131,8 @@ export class CrouchingState extends BaseState {
     });
   }
 
-  private performCrouchJump(_ctx: MovementCtx) {
-    this.verticalVelocity = MOVE.JumpImpulse * 0.8;
-  }
-
   private desiredCrouchVelocity(ctx: MovementCtx): { x: number; z: number } {
     const input = ctx.input;
-    // Apply damage slow effect
     const maxSpeed = CROUCH.MaxSpeed * ctx.speedMultiplier;
 
     const forwardX = -Math.sin(input.lookYaw);
@@ -155,7 +146,7 @@ export class CrouchingState extends BaseState {
     };
   }
 
-  private canStandUp(ctx: MovementCtx): boolean {
+  private canStandUp(_ctx: MovementCtx): boolean {
     return true;
   }
 
@@ -181,4 +172,3 @@ export class CrouchingState extends BaseState {
     return walkingState;
   }
 }
-

@@ -1,5 +1,4 @@
 // Weapon configuration for server-authoritative gameplay
-// All values are AAA-balanced for competitive multiplayer
 
 export type WeaponType = "hitscan" | "projectile";
 export type FireMode = "semi" | "auto" | "burst";
@@ -38,18 +37,10 @@ export interface WeaponConfig {
   explosionMinDamage?: number; // Damage at edge of explosion radius (percentage 0-1)
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// WEAPON DATABASE - Server authoritative stats
-// ═══════════════════════════════════════════════════════════════════════════
-
 export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
-  // ─────────────────────────────────────────────────────────────────────────
-  // ASSAULT RIFLE - Balanced all-rounder
-  // Full damage up to 30m, drops to 70% at 60m+
-  // ─────────────────────────────────────────────────────────────────────────
   AR_1: {
     id: "AR_1",
-    name: "Axiom AR-7",
+    name: "AR-1",
     type: "hitscan",
     damage: 28,
     headshotMultiplier: 1.4,
@@ -63,13 +54,9 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     damageFalloff: { startRange: 30, endRange: 60, minDamagePercent: 0.7 }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SMG - High ROF, close quarters
-  // Full damage up to 12m, drops to 50% at 25m+ (severe falloff)
-  // ─────────────────────────────────────────────────────────────────────────
   SMG_1: {
     id: "SMG_1",
-    name: "Viper MK-9",
+    name: "SMG-1",
     type: "hitscan",
     damage: 20,
     headshotMultiplier: 1.35,
@@ -83,13 +70,9 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     damageFalloff: { startRange: 12, endRange: 25, minDamagePercent: 0.5 }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // LMG - Suppressive fire, sustained damage
-  // Full damage up to 35m, drops to 65% at 70m+
-  // ─────────────────────────────────────────────────────────────────────────
   LMG_1: {
     id: "LMG_1",
-    name: "Thunderclap T-200",
+    name: "LMG-1",
     type: "hitscan",
     damage: 30,
     headshotMultiplier: 1.35,
@@ -103,13 +86,9 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     damageFalloff: { startRange: 35, endRange: 70, minDamagePercent: 0.65 }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SHOTGUN - Devastating close range
-  // 8 pellets × 18 = 144 max, severe falloff after 8m
-  // ─────────────────────────────────────────────────────────────────────────
   SHOTGUN_1: {
     id: "SHOTGUN_1",
-    name: "Havoc S-12",
+    name: "Shotgun-1",
     type: "hitscan",
     damage: 18,
     pelletCount: 8,
@@ -125,13 +104,9 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     damageFalloff: { startRange: 8, endRange: 15, minDamagePercent: 0.25 }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SNIPER - One shot potential
-  // No damage falloff - consistent damage at all ranges
-  // ─────────────────────────────────────────────────────────────────────────
   SNIPER_1: {
     id: "SNIPER_1",
-    name: "Specter SR-X",
+    name: "Sniper-1",
     type: "hitscan",
     damage: 85,
     headshotMultiplier: 2.0,
@@ -145,13 +120,9 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     // No damageFalloff - snipers maintain damage at range
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // PISTOL - Reliable sidearm
-  // Full damage up to 15m, drops to 60% at 30m+
-  // ─────────────────────────────────────────────────────────────────────────
   PISTOL_1: {
     id: "PISTOL_1",
-    name: "Phantom P-45",
+    name: "Pistol-1",
     type: "hitscan",
     damage: 30,
     headshotMultiplier: 1.5,
@@ -165,13 +136,9 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     damageFalloff: { startRange: 15, endRange: 30, minDamagePercent: 0.6 }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ROCKET LAUNCHER - Area denial
-  // Direct hit = 150 damage, splash 150 at center to 30 at edge (4m radius)
-  // ─────────────────────────────────────────────────────────────────────────
   ROCKET_1: {
     id: "ROCKET_1",
-    name: "Oblivion RL-X",
+    name: "Rocket-1",
     type: "projectile",
     damage: 150,
     headshotMultiplier: 1.0,
@@ -188,13 +155,9 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     explosionMinDamage: 0.2
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // GRENADE LAUNCHER - Explosive utility
-  // Indirect fire, 110 at center to 25 at edge (3.5m radius)
-  // ─────────────────────────────────────────────────────────────────────────
   GL_1: {
     id: "GL_1",
-    name: "Rift GL-6",
+    name: "GL-1",
     type: "projectile",
     damage: 110,
     headshotMultiplier: 1.0,
