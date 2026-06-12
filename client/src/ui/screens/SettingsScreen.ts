@@ -79,7 +79,7 @@ export class SettingsScreen extends BaseScreen {
     const tabBar = document.createElement("div");
     tabBar.style.cssText = `
       display: flex;
-      border-bottom: 2px solid #0f3460;
+      border-bottom: 2px solid #4a433a;
       margin-bottom: 16px;
     `;
     
@@ -117,8 +117,8 @@ export class SettingsScreen extends BaseScreen {
     const tabs = this.tabBar.querySelectorAll("button");
     tabs.forEach((tab) => {
       const isActive = tab.dataset.tabId === tabId;
-      tab.style.color = isActive ? "#00ffff" : "#aaa";
-      tab.style.borderBottomColor = isActive ? "#00ffff" : "transparent";
+      tab.style.color = isActive ? "#d4893a" : "#aaa";
+      tab.style.borderBottomColor = isActive ? "#d4893a" : "transparent";
     });
     
     this.controlsContent.style.display = tabId === "controls" ? "block" : "none";
@@ -130,7 +130,7 @@ export class SettingsScreen extends BaseScreen {
     
     const keybindsHeader = document.createElement("h3");
     keybindsHeader.textContent = "Keybinds";
-    keybindsHeader.style.cssText = "color: #00ffff; margin: 0 0 12px 0; font-size: 16px;";
+    keybindsHeader.style.cssText = "color: #d4893a; margin: 0 0 12px 0; font-size: 16px;";
     content.appendChild(keybindsHeader);
     
     const headerRow = document.createElement("div");
@@ -185,7 +185,7 @@ export class SettingsScreen extends BaseScreen {
     
     const sensitivityHeader = document.createElement("h3");
     sensitivityHeader.textContent = "Sensitivity";
-    sensitivityHeader.style.cssText = "color: #00ffff; margin: 0 0 12px 0; font-size: 16px;";
+    sensitivityHeader.style.cssText = "color: #d4893a; margin: 0 0 12px 0; font-size: 16px;";
     content.appendChild(sensitivityHeader);
     
     content.appendChild(this.createSliderRow("Mouse Sensitivity", "mouseSensitivity", 0.1, 2.0, 0.1));
@@ -221,9 +221,9 @@ export class SettingsScreen extends BaseScreen {
         width: 90px;
         padding: 8px 12px;
         background: rgba(0, 255, 255, 0.1);
-        border: 1px solid #00ffff;
+        border: 1px solid #d4893a;
         border-radius: 4px;
-        color: #00ffff;
+        color: #d4893a;
         text-align: center;
         cursor: pointer;
         transition: all 0.2s;
@@ -313,8 +313,8 @@ export class SettingsScreen extends BaseScreen {
     
     keyDisplay.textContent = settings.getKeyDisplayName(code);
     keyDisplay.style.background = "rgba(0, 255, 255, 0.1)";
-    keyDisplay.style.borderColor = "#00ffff";
-    keyDisplay.style.color = "#00ffff";
+    keyDisplay.style.borderColor = "#d4893a";
+    keyDisplay.style.color = "#d4893a";
     row.style.borderColor = "transparent";
     
     this.rebindingAction = null;
@@ -337,8 +337,8 @@ export class SettingsScreen extends BaseScreen {
     const keyValue = slot === "primary" ? this.pendingKeybinds[action] : this.pendingKeybindsAlt[action];
     keyDisplay.textContent = settings.getKeyDisplayName(keyValue);
     keyDisplay.style.background = "rgba(0, 255, 255, 0.1)";
-    keyDisplay.style.borderColor = "#00ffff";
-    keyDisplay.style.color = "#00ffff";
+    keyDisplay.style.borderColor = "#d4893a";
+    keyDisplay.style.color = "#d4893a";
     row.style.borderColor = "transparent";
     
     this.rebindingAction = null;
@@ -359,15 +359,15 @@ export class SettingsScreen extends BaseScreen {
       if (primaryDisplay && action) {
         const key = this.pendingKeybinds[action];
         primaryDisplay.textContent = settings.getKeyDisplayName(key);
-        primaryDisplay.style.borderColor = "#00ffff";
-        primaryDisplay.style.color = "#00ffff";
+        primaryDisplay.style.borderColor = "#d4893a";
+        primaryDisplay.style.color = "#d4893a";
       }
       
       if (secondaryDisplay && action) {
         const key = this.pendingKeybindsAlt[action];
         secondaryDisplay.textContent = settings.getKeyDisplayName(key);
-        secondaryDisplay.style.borderColor = "#00ffff";
-        secondaryDisplay.style.color = "#00ffff";
+        secondaryDisplay.style.borderColor = "#d4893a";
+        secondaryDisplay.style.color = "#d4893a";
       }
     }
   }
@@ -441,10 +441,10 @@ export class SettingsScreen extends BaseScreen {
     toggle.textContent = isOn ? "ON" : "OFF";
     toggle.style.cssText = `
       padding: 8px 20px;
-      border: 2px solid ${isOn ? "#00ffff" : "#666"};
+      border: 2px solid ${isOn ? "#d4893a" : "#666"};
       border-radius: 4px;
       background: ${isOn ? "rgba(0, 255, 255, 0.2)" : "transparent"};
-      color: ${isOn ? "#00ffff" : "#aaa"};
+      color: ${isOn ? "#d4893a" : "#aaa"};
       cursor: pointer;
       min-width: 60px;
     `;
@@ -479,7 +479,7 @@ export class SettingsScreen extends BaseScreen {
     
     const valueEl = document.createElement("span");
     valueEl.className = `value-${key}`;
-    valueEl.style.color = "#00ffff";
+    valueEl.style.color = "#d4893a";
     valueEl.textContent = String(this.pendingGraphics[key]);
     
     labelRow.appendChild(labelEl);
@@ -495,7 +495,7 @@ export class SettingsScreen extends BaseScreen {
     slider.className = `slider-${key}`;
     slider.style.cssText = `
       width: 100%;
-      accent-color: #00ffff;
+      accent-color: #d4893a;
     `;
     
     slider.addEventListener("input", () => {
@@ -592,9 +592,9 @@ export class SettingsScreen extends BaseScreen {
       if (toggle) {
         const isOn = this.pendingGraphics[key] as boolean;
         toggle.textContent = isOn ? "ON" : "OFF";
-        toggle.style.borderColor = isOn ? "#00ffff" : "#666";
+        toggle.style.borderColor = isOn ? "#d4893a" : "#666";
         toggle.style.background = isOn ? "rgba(0, 255, 255, 0.2)" : "transparent";
-        toggle.style.color = isOn ? "#00ffff" : "#aaa";
+        toggle.style.color = isOn ? "#d4893a" : "#aaa";
       }
     }
     

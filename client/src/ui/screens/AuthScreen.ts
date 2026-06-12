@@ -1,5 +1,6 @@
 import { BaseScreen } from "./BaseScreen.js";
 import { api, type UserProfile } from "../../api/client.js";
+import { THEME } from "../../theme.js";
 
 // Google Identity Services types
 declare global {
@@ -33,13 +34,25 @@ export class AuthScreen extends BaseScreen {
     panel.appendChild(title);
 
     const subtitle = document.createElement("p");
-    subtitle.textContent = "Sign in to play";
+    subtitle.textContent = "Browser multiplayer FPS. The server owns physics and hits.";
     subtitle.style.cssText = `
-      color: #888;
+      color: ${THEME.paper};
       text-align: center;
-      margin: 0 0 24px 0;
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      line-height: 1.4;
     `;
     panel.appendChild(subtitle);
+
+    const demoNote = document.createElement("p");
+    demoNote.textContent = "Play as guest. Open two tabs to fight yourself.";
+    demoNote.style.cssText = `
+      color: ${THEME.muted};
+      text-align: center;
+      margin: 0 0 24px 0;
+      font-size: 13px;
+    `;
+    panel.appendChild(demoNote);
 
     const googleBtnContainer = document.createElement("div");
     googleBtnContainer.id = "google-signin-btn";
@@ -58,12 +71,12 @@ export class AuthScreen extends BaseScreen {
       display: flex;
       align-items: center;
       margin: 20px 0;
-      color: #666;
+      color: ${THEME.muted};
     `;
     separator.innerHTML = `
-      <div style="flex: 1; height: 1px; background: #333;"></div>
+      <div style="flex: 1; height: 1px; background: ${THEME.panelBorder};"></div>
       <span style="padding: 0 16px;">OR</span>
-      <div style="flex: 1; height: 1px; background: #333;"></div>
+      <div style="flex: 1; height: 1px; background: ${THEME.panelBorder};"></div>
     `;
     panel.appendChild(separator);
 
@@ -74,7 +87,7 @@ export class AuthScreen extends BaseScreen {
     const guestNote = document.createElement("p");
     guestNote.textContent = "Guest progress is not saved";
     guestNote.style.cssText = `
-      color: #666;
+      color: ${THEME.muted};
       text-align: center;
       margin: 8px 0 0 0;
       font-size: 12px;
@@ -135,7 +148,6 @@ export class AuthScreen extends BaseScreen {
 
   private initGoogleSignIn(): void {
     if (!this.googleClientId) {
-      this.errorDiv.textContent = "Google Client ID not configured";
       return;
     }
 

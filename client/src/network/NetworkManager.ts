@@ -1,5 +1,6 @@
 import { Client, Room } from "colyseus.js";
 import { encodeInputCmd, encodeFireCmd } from "./BinaryCodec.js";
+import type { SyncedGameState } from "./synced-state.js";
 
 export interface HealthChangeMessage {
   playerId: string;
@@ -104,7 +105,12 @@ export class NetworkManager {
   private room?: Room;
   private pingInterval?: number;
   public latencyMs = 50;
-  public jitterMs = 10;  // Network jitter (variance in latency)
+  public jitterMs = 10;
+
+  /** Smoothed client RTT from ping/pong. One-way estimate is latencyMs. */
+  public get rttMs(): number {
+    return this.latencyMs * 2;
+  }
   
   public onHealthChange?: (msg: HealthChangeMessage) => void;
   public onShotFired?: (msg: ShotFiredMessage) => void;
@@ -288,19 +294,19 @@ export class NetworkManager {
       }
     });
     
-    this.room.onMessage("pong", (msg: { clientTime: number; serverTime: number }) => {
+    this.room.onMessage("pong", (msg: { clientTime: number; challengeId?: number }) => {
       const now = Date.now();
       const rtt = now - msg.clientTime;
       const newLatency = Math.max(0, rtt / 2);
-      
-      // Exponential moving average for smooth latency tracking
-      // Alpha 0.3 = 30% new value, 70% old value (smooths out spikes)
+
       const alpha = 0.3;
       this.latencyMs = this.latencyMs * (1 - alpha) + newLatency * alpha;
-      
-      // Track jitter (variance in latency) for additional compensation
       const jitterSample = Math.abs(newLatency - this.latencyMs);
       this.jitterMs = this.jitterMs * (1 - alpha) + jitterSample * alpha;
+
+      if (Number.isFinite(msg.challengeId)) {
+        this.room?.send("rtt_echo", { challengeId: msg.challengeId });
+      }
     });
     
     this.startPingInterval();
@@ -311,11 +317,7 @@ export class NetworkManager {
     // Ping every 500ms for more responsive latency tracking
     this.pingInterval = window.setInterval(() => {
       // Send latency + jitter for dynamic server-side compensation
-      this.room?.send("ping", { 
-        clientTime: Date.now(), 
-        measuredLatency: this.latencyMs,
-        jitter: this.jitterMs
-      });
+      this.room?.send("ping", { clientTime: Date.now() });
     }, 500);
   }
   
@@ -334,8 +336,8 @@ export class NetworkManager {
     return !!this.room && (this.room.connection as any)?.isOpen !== false;
   }
 
-  public get state(): any {
-    return (this.room as any)?.state;
+  public get state(): SyncedGameState | undefined {
+    return this.room?.state as SyncedGameState | undefined;
   }
 
   public sendInput(data: any): void {
@@ -344,16 +346,11 @@ export class NetworkManager {
   }
 
   public sendFireInput(
-    firing: boolean, 
+    firing: boolean,
     aimDir: { x: number; y: number; z: number },
-    clientPos?: { x: number; y: number; z: number }
   ): void {
     if (!this.connected) return;
-    this.room!.send("fire_bin", encodeFireCmd({
-      firing,
-      aimDir,
-      clientPos: firing ? clientPos : undefined,
-    }));
+    this.room!.send("fire_bin", encodeFireCmd({ firing, aimDir }));
   }
 
   public sendWeaponSwitch(weaponId: string): void {

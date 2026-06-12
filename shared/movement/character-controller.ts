@@ -1,16 +1,15 @@
 import type RAPIER from "@dimforge/rapier3d-compat";
 import { StateMachine } from "./movement-state.js";
-import type { MovementCtx, CharacterDeps, InputMsg } from "./types.js";
+import type { MovementCtx, InputMsg, CharacterControllerSnapshot } from "./types.js";
 import { MovementState } from "./types.js";
 import { stateFactory } from "./state-factory.js";
+import { hasCapsuleClearance, resizeCapsuleKeepFeet } from "./capsule.js";
+import { CAPSULE } from "../physics/constants.js";
 
 /**
- * RAPIER-based kinematic character controller with a movement state machine.
- *
- * Shared between client (prediction) and server (authoritative simulation)
- * to guarantee identical physics outcomes and near-zero reconciliation error.
+ * Shared kinematic controller used by client prediction and the server tick.
  */
-export class CharacterController implements CharacterDeps {
+export class CharacterController {
   body: RAPIER.RigidBody;
   collider: RAPIER.Collider;
   controller: RAPIER.KinematicCharacterController;
@@ -23,10 +22,8 @@ export class CharacterController implements CharacterDeps {
     lookYaw: 0, lookPitch: 0,
     sprint: false, aiming: false,
     crouchPressed: false, crouchReleased: false, crouchHeld: false,
-    jumpPressed: false, dashPressed: false,
+    jumpPressed: false,
   };
-  public lastDashTime = -999;
-  public flags = { wantsToProne: false, wallRight: false };
 
   constructor(body: RAPIER.RigidBody, collider: RAPIER.Collider, controller: RAPIER.KinematicCharacterController) {
     this.body = body;
@@ -51,21 +48,50 @@ export class CharacterController implements CharacterDeps {
     return { x: 0, y: 1, z: 0 };
   }
 
-  setCapsuleHalfHeight(_h: number): void {
-    // TODO: implement collider resizing for crouch/prone capsule changes
+  setCapsuleHalfHeight(h: number): void {
+    resizeCapsuleKeepFeet(this.body, this.collider, h);
   }
 
-  setFriction(_f: number): void {}
-  setGravityScale(_scale: number): void {}
+  setFriction(f: number): void {
+    this.collider.setFriction(Math.max(0, f));
+  }
 
   setSpeedMultiplier(mult: number): void {
     this._speedMultiplier = Math.max(0, Math.min(1, mult));
   }
 
+  /** Spawn, respawn, or a true teleport. Drops walk velocity and stands up. */
+  resetAfterTeleport(): void {
+    this.sm = new StateMachine(stateFactory.createWalkingState());
+    this._speedMultiplier = 1;
+    this.setCapsuleHalfHeight(CAPSULE.HalfHeight);
+    this.setFriction(0.7);
+  }
+
+  capture(): CharacterControllerSnapshot {
+    return {
+      speedMultiplier: this._speedMultiplier,
+      lookYaw: this.input.lookYaw,
+      lookPitch: this.input.lookPitch,
+      capsuleHalfHeight: this.collider.halfHeight(),
+      friction: this.collider.friction(),
+      state: this.sm.snapshot().capture(),
+    };
+  }
+
   /**
-   * Advance the movement state machine by one fixed timestep.
-   * Builds a MovementCtx from current state and delegates to the active state.
+   * Restore controller internals for an earlier tick.
+   * Does not call state enter(), which would re-apply slide boost and similar.
    */
+  applySnapshot(snap: CharacterControllerSnapshot): void {
+    this._speedMultiplier = snap.speedMultiplier;
+    this.input.lookYaw = snap.lookYaw;
+    this.input.lookPitch = snap.lookPitch;
+    this.setCapsuleHalfHeight(snap.capsuleHalfHeight);
+    this.setFriction(snap.friction);
+    this.sm.replaceSilent(stateFactory.createFromSnapshot(snap.state));
+  }
+
   update(world: RAPIER.World, dt: number, now: number) {
     const ctx: MovementCtx = {
       body: this.body,
@@ -77,23 +103,18 @@ export class CharacterController implements CharacterDeps {
       up: () => this.up(),
       setCapsuleHalfHeight: (h) => this.setCapsuleHalfHeight(h),
       setFriction: (f) => this.setFriction(f),
-      setGravityScale: (s) => this.setGravityScale(s),
+      hasCapsuleClearance: (h) => hasCapsuleClearance(world, this.body, this.collider, h),
 
       env: { world, dt, now },
       input: this.input,
-      lastDashTime: this.lastDashTime,
-      flags: this.flags,
       speedMultiplier: this._speedMultiplier,
     };
 
     this.sm.update(ctx);
-    this.lastDashTime = ctx.lastDashTime;
 
-    // Clear one-shot input flags after processing
     this.input.crouchPressed = false;
     this.input.crouchReleased = false;
     this.input.jumpPressed = false;
-    this.input.dashPressed = false;
   }
 
   currentState(): MovementState {

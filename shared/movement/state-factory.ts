@@ -1,34 +1,50 @@
-import type { IMovementState } from "./types.js";
-
-// Concrete state imports are at the bottom to break the circular dependency:
-// states -> base -> StateFactory interface vs StateFactory class -> states
+import type { IMovementState, MovementStateSnapshot } from "./types.js";
+import { MovementState } from "./types.js";
 import { WalkingState } from "./states/walking.js";
 import { CrouchingState } from "./states/crouching.js";
 import { SlidingState } from "./states/sliding.js";
 import { ProneState } from "./states/prone.js";
+import type { BaseState } from "./states/base.js";
 
 export class StateFactory {
   createWalkingState(): IMovementState {
-    const state = new WalkingState();
-    (state as any).factory = this;
-    return state;
+    return this.attach(new WalkingState());
   }
 
   createCrouchingState(): IMovementState {
-    const state = new CrouchingState();
-    (state as any).factory = this;
-    return state;
+    return this.attach(new CrouchingState());
   }
 
   createSlidingState(): IMovementState {
-    const state = new SlidingState();
-    (state as any).factory = this;
-    return state;
+    return this.attach(new SlidingState());
   }
 
   createProneState(fromSlide = false): IMovementState {
-    const state = new ProneState(fromSlide);
-    (state as any).factory = this;
+    return this.attach(new ProneState(fromSlide));
+  }
+
+  createFromSnapshot(data: MovementStateSnapshot): IMovementState {
+    let state: IMovementState;
+    switch (data.kind) {
+      case MovementState.Crouching:
+        state = this.createCrouchingState();
+        break;
+      case MovementState.Sliding:
+        state = this.createSlidingState();
+        break;
+      case MovementState.Prone:
+        state = this.createProneState(false);
+        break;
+      default:
+        state = this.createWalkingState();
+        break;
+    }
+    state.applySnapshot(data);
+    return state;
+  }
+
+  private attach(state: BaseState): IMovementState {
+    state.attachFactory(this);
     return state;
   }
 }

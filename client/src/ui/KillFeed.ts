@@ -1,3 +1,5 @@
+import { WEAPON_DEFINITIONS } from "../weapons/definitions.js";
+
 interface KillFeedEntry {
   element: HTMLDivElement;
   timestamp: number;
@@ -15,15 +17,9 @@ const DEFAULT_CONFIG: KillFeedConfig = {
   fadeTime: 500,
 };
 
-const WEAPON_ICONS: Record<string, string> = {
-  AR_1: "🔫",
-  PISTOL_1: "🔫",
-  SMG_1: "🔫",
-  SNIPER_1: "🎯",
-  SHOTGUN_1: "💥",
-  ROCKET_1: "🚀",
-  GL_1: "💣",
-};
+function weaponLabel(weaponId: string): string {
+  return WEAPON_DEFINITIONS[weaponId]?.name ?? weaponId.replaceAll("_", "-");
+}
 
 export class KillFeed {
   private container: HTMLDivElement;
@@ -64,16 +60,16 @@ export class KillFeed {
     entry.className = "kill-feed-entry";
     
     const bgColor = isLocalKiller 
-      ? "rgba(0, 255, 100, 0.15)" 
+      ? "rgba(74, 139, 138, 0.18)" 
       : isLocalVictim 
-        ? "rgba(255, 50, 50, 0.15)" 
-        : "rgba(0, 0, 0, 0.6)";
+        ? "rgba(196, 92, 58, 0.18)" 
+        : "rgba(26, 24, 20, 0.72)";
     
     const borderColor = isLocalKiller 
-      ? "#00ff66" 
+      ? "#4a8b8a" 
       : isLocalVictim 
-        ? "#ff4444" 
-        : "#333";
+        ? "#c45c3a" 
+        : "#4a433a";
     
     entry.style.cssText = `
       display: flex;
@@ -91,7 +87,7 @@ export class KillFeed {
     const killerSpan = document.createElement("span");
     killerSpan.textContent = killerName;
     killerSpan.style.cssText = `
-      color: ${isLocalKiller ? "#00ff66" : "#ffffff"};
+      color: ${isLocalKiller ? "#4a8b8a" : "#ede6d9"};
       font-weight: ${isLocalKiller ? "700" : "500"};
       font-size: 13px;
       max-width: 100px;
@@ -101,17 +97,19 @@ export class KillFeed {
     `;
     
     const weaponSpan = document.createElement("span");
-    const icon = WEAPON_ICONS[weaponId] || "🔫";
-    weaponSpan.textContent = isHeadshot ? `${icon}💀` : icon;
+    const label = weaponLabel(weaponId);
+    weaponSpan.textContent = isHeadshot ? `${label} HS` : label;
     weaponSpan.style.cssText = `
-      color: ${isHeadshot ? "#ff4444" : "#888"};
-      font-size: 14px;
+      color: ${isHeadshot ? "#c45c3a" : "#9a9286"};
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     `;
     
     const victimSpan = document.createElement("span");
     victimSpan.textContent = victimName;
     victimSpan.style.cssText = `
-      color: ${isLocalVictim ? "#ff4444" : "#aaaaaa"};
+      color: ${isLocalVictim ? "#c45c3a" : "#9a9286"};
       font-weight: ${isLocalVictim ? "700" : "400"};
       font-size: 13px;
       max-width: 100px;

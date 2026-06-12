@@ -1,15 +1,8 @@
 import * as THREE from "three";
+import { HITBOX } from "@shared/physics/constants.js";
+import { WORLD } from "../theme.js";
 import { ThirdPersonWeaponView } from "../weapons/third-person-view.js";
 import { resolveWeaponDefinition } from "../weapons/definitions.js";
-
-// Must match server hitbox dimensions
-const HITBOX = {
-  Head:       { radius: 0.16, offsetY: 0.50 },
-  UpperTorso: { halfExtents: { x: 0.30, y: 0.17, z: 0.18 }, offsetY: 0.17 },
-  LowerTorso: { halfExtents: { x: 0.28, y: 0.15, z: 0.16 }, offsetY: -0.15 },
-  Arm:        { radius: 0.07, halfHeight: 0.22, offsetX: 0.38, offsetY: 0.10 },
-  Leg:        { radius: 0.10, halfHeight: 0.30, offsetX: 0.12, offsetY: -0.60 },
-};
 
 interface BodyParts {
   head: THREE.Mesh;
@@ -25,6 +18,8 @@ interface RemotePlayerData {
   root: THREE.Group;
   bodyParts: BodyParts;
   debugGroup: THREE.Group;
+  nameSprite: THREE.Sprite;
+  solidMats: THREE.MeshStandardMaterial[];
   weaponView: ThirdPersonWeaponView;
   targetPos: THREE.Vector3;
   targetRotY: number;
@@ -43,7 +38,7 @@ export class RemotePlayers {
   public setDebugEnabled(enabled: boolean): void {
     this.debugEnabled = enabled;
     for (const p of this.players.values()) {
-      p.debugGroup.visible = enabled;
+      this.applyDebugStyle(p);
     }
   }
 
@@ -85,9 +80,9 @@ export class RemotePlayers {
 
     if (!data) {
       const root = new THREE.Group();
-      const bodyParts = this.createBodyParts();
+      const { parts: bodyParts, materials: solidMats } = this.createBodyParts();
       const debugGroup = this.createDebugHitboxes();
-      debugGroup.visible = this.debugEnabled;
+      const nameSprite = this.createNameSprite(player.displayName || sessionId.slice(0, 8));
 
       root.add(bodyParts.head);
       root.add(bodyParts.upperTorso);
@@ -97,6 +92,7 @@ export class RemotePlayers {
       root.add(bodyParts.leftLeg);
       root.add(bodyParts.rightLeg);
       root.add(debugGroup);
+      root.add(nameSprite);
 
       root.position.copy(targetPos);
       root.rotation.y = targetRotY;
@@ -107,7 +103,8 @@ export class RemotePlayers {
         weaponView.switchWeapon(player.equippedWeapon);
       }
 
-      data = { root, bodyParts, debugGroup, weaponView, targetPos, targetRotY };
+      data = { root, bodyParts, debugGroup, nameSprite, solidMats, weaponView, targetPos, targetRotY };
+      this.applyDebugStyle(data);
       this.players.set(sessionId, data);
     } else {
       // Dead zone: ignore sub-millimeter position changes to prevent chasing
@@ -139,6 +136,9 @@ export class RemotePlayers {
       if (!presentIds.has(sid)) {
         this.scene.remove(data.root);
         data.weaponView.dispose();
+        const map = (data.nameSprite.material as THREE.SpriteMaterial).map;
+        map?.dispose();
+        (data.nameSprite.material as THREE.SpriteMaterial).dispose();
         this.players.delete(sid);
       }
     }
@@ -175,10 +175,41 @@ export class RemotePlayers {
     }
   }
 
-  private createBodyParts(): BodyParts {
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.85, metalness: 0.0 });
-    const headMat = new THREE.MeshStandardMaterial({ color: 0x00ffaa, roughness: 0.8, metalness: 0.0 });
-    const limbMat = new THREE.MeshStandardMaterial({ color: 0x00dd77, roughness: 0.85, metalness: 0.0 });
+  private applyDebugStyle(data: RemotePlayerData): void {
+    data.debugGroup.visible = this.debugEnabled;
+    data.nameSprite.visible = this.debugEnabled;
+    for (const mat of data.solidMats) {
+      mat.transparent = this.debugEnabled;
+      mat.opacity = this.debugEnabled ? 0.35 : 1;
+      mat.needsUpdate = true;
+    }
+  }
+
+  private createNameSprite(name: string): THREE.Sprite {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "rgba(26, 24, 20, 0.82)";
+    ctx.fillRect(0, 0, 256, 64);
+    ctx.font = "bold 26px Segoe UI, system-ui, sans-serif";
+    ctx.fillStyle = "#ede6d9";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(name.slice(0, 16), 128, 32);
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(1.3, 0.32, 1);
+    sprite.position.y = 1.85;
+    sprite.visible = this.debugEnabled;
+    return sprite;
+  }
+
+  private createBodyParts(): { parts: BodyParts; materials: THREE.MeshStandardMaterial[] } {
+    const bodyMat = new THREE.MeshStandardMaterial({ color: WORLD.playerBody, roughness: 0.85, metalness: 0.0 });
+    const headMat = new THREE.MeshStandardMaterial({ color: WORLD.playerHead, roughness: 0.8, metalness: 0.0 });
+    const limbMat = new THREE.MeshStandardMaterial({ color: WORLD.playerLimb, roughness: 0.85, metalness: 0.0 });
 
     // Head - sphere
     const headGeom = new THREE.SphereGeometry(HITBOX.Head.radius, 12, 8);
@@ -217,57 +248,59 @@ export class RemotePlayers {
     const rightLeg = new THREE.Mesh(legGeom, limbMat);
     rightLeg.position.set(HITBOX.Leg.offsetX, HITBOX.Leg.offsetY, 0);
 
-    return { head, upperTorso, lowerTorso, leftArm, rightArm, leftLeg, rightLeg };
+    return {
+      parts: { head, upperTorso, lowerTorso, leftArm, rightArm, leftLeg, rightLeg },
+      materials: [bodyMat, headMat, limbMat],
+    };
   }
 
   private createDebugHitboxes(): THREE.Group {
     const group = new THREE.Group();
-    const debugMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true });
+    const headMat = new THREE.MeshBasicMaterial({ color: 0xc45c3a, wireframe: true });
+    const torsoMat = new THREE.MeshBasicMaterial({ color: 0xd4893a, wireframe: true });
+    const armMat = new THREE.MeshBasicMaterial({ color: 0x4a8b8a, wireframe: true });
+    const legMat = new THREE.MeshBasicMaterial({ color: 0x9a9286, wireframe: true });
 
-    // Head
     const headGeom = new THREE.SphereGeometry(HITBOX.Head.radius, 8, 6);
-    const head = new THREE.Mesh(headGeom, debugMat);
+    const head = new THREE.Mesh(headGeom, headMat);
     head.position.y = HITBOX.Head.offsetY;
     group.add(head);
 
-    // Upper torso
     const upperTorsoGeom = new THREE.BoxGeometry(
       HITBOX.UpperTorso.halfExtents.x * 2,
       HITBOX.UpperTorso.halfExtents.y * 2,
       HITBOX.UpperTorso.halfExtents.z * 2
     );
-    const upperTorso = new THREE.Mesh(upperTorsoGeom, debugMat);
+    const upperTorso = new THREE.Mesh(upperTorsoGeom, torsoMat);
     upperTorso.position.y = HITBOX.UpperTorso.offsetY;
     group.add(upperTorso);
 
-    // Lower torso
     const lowerTorsoGeom = new THREE.BoxGeometry(
       HITBOX.LowerTorso.halfExtents.x * 2,
       HITBOX.LowerTorso.halfExtents.y * 2,
       HITBOX.LowerTorso.halfExtents.z * 2
     );
-    const lowerTorso = new THREE.Mesh(lowerTorsoGeom, debugMat);
+    const lowerTorso = new THREE.Mesh(lowerTorsoGeom, torsoMat);
     lowerTorso.position.y = HITBOX.LowerTorso.offsetY;
     group.add(lowerTorso);
 
-    // Arms
     const armGeom = new THREE.CapsuleGeometry(HITBOX.Arm.radius, HITBOX.Arm.halfHeight * 2, 4, 4);
-    const leftArm = new THREE.Mesh(armGeom, debugMat);
+    const leftArm = new THREE.Mesh(armGeom, armMat);
     leftArm.position.set(-HITBOX.Arm.offsetX, HITBOX.Arm.offsetY, 0);
     group.add(leftArm);
-    const rightArm = new THREE.Mesh(armGeom, debugMat);
+    const rightArm = new THREE.Mesh(armGeom, armMat);
     rightArm.position.set(HITBOX.Arm.offsetX, HITBOX.Arm.offsetY, 0);
     group.add(rightArm);
 
-    // Legs
     const legGeom = new THREE.CapsuleGeometry(HITBOX.Leg.radius, HITBOX.Leg.halfHeight * 2, 4, 4);
-    const leftLeg = new THREE.Mesh(legGeom, debugMat);
+    const leftLeg = new THREE.Mesh(legGeom, legMat);
     leftLeg.position.set(-HITBOX.Leg.offsetX, HITBOX.Leg.offsetY, 0);
     group.add(leftLeg);
-    const rightLeg = new THREE.Mesh(legGeom, debugMat);
+    const rightLeg = new THREE.Mesh(legGeom, legMat);
     rightLeg.position.set(HITBOX.Leg.offsetX, HITBOX.Leg.offsetY, 0);
     group.add(rightLeg);
 
+    group.visible = this.debugEnabled;
     return group;
   }
 }

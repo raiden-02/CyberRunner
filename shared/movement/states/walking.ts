@@ -1,7 +1,7 @@
 import { BaseState } from "./base.js";
-import type { MovementCtx, IMovementState } from "../types.js";
+import type { MovementCtx, IMovementState, MovementStateSnapshot } from "../types.js";
 import { MovementState } from "../types.js";
-import { SLIDE, DASH, MOVE } from "../../physics/constants.js";
+import { SLIDE, MOVE, CAPSULE } from "../../physics/constants.js";
 
 export class WalkingState extends BaseState {
   kind = MovementState.Walking;
@@ -12,14 +12,31 @@ export class WalkingState extends BaseState {
     this.currentVelocity = { x: velocity.x, z: velocity.z };
   }
 
+  capture(): MovementStateSnapshot {
+    return {
+      kind: MovementState.Walking,
+      vx: this.currentVelocity.x,
+      vz: this.currentVelocity.z,
+      vy: this.verticalVelocity,
+      crouchHoldStart: -1,
+      prevCrouchHeld: false,
+      slideDirX: 0,
+      slideDirZ: 0,
+    };
+  }
+
+  applySnapshot(data: MovementStateSnapshot): void {
+    this.currentVelocity = { x: data.vx, z: data.vz };
+    this.verticalVelocity = data.vy;
+  }
+
   enter(ctx: MovementCtx) {
     ctx.setFriction(0.7);
-    ctx.setGravityScale(1.0);
+    ctx.setCapsuleHalfHeight(CAPSULE.HalfHeight);
   }
 
   update(ctx: MovementCtx): IMovementState | null {
     const input = ctx.input;
-    const env = ctx.env;
 
     if (ctx.isGrounded()) {
       this.processGroundedMovement(ctx);
@@ -29,10 +46,6 @@ export class WalkingState extends BaseState {
 
     if (input.jumpPressed && ctx.isGrounded()) {
       this.performJump(ctx);
-    }
-
-    if (input.dashPressed && (env.now - ctx.lastDashTime > DASH.Cooldown)) {
-      return this.tryDash(ctx);
     }
 
     if (input.crouchPressed) {
@@ -120,56 +133,6 @@ export class WalkingState extends BaseState {
 
   private performJump(_ctx: MovementCtx) {
     this.verticalVelocity = MOVE.JumpImpulse;
-  }
-
-  private tryDash(ctx: MovementCtx): IMovementState | null {
-    const input = ctx.input;
-
-    let dashInput = { x: input.moveX, z: input.moveZ };
-    const inputMagnitude = Math.hypot(dashInput.x, dashInput.z);
-
-    if (inputMagnitude < 0.1) {
-      dashInput = { x: 0, z: 1 };
-    } else {
-      dashInput.x /= inputMagnitude;
-      dashInput.z /= inputMagnitude;
-    }
-
-    const forwardX = -Math.sin(input.lookYaw);
-    const forwardZ = -Math.cos(input.lookYaw);
-    const rightX = Math.cos(input.lookYaw);
-    const rightZ = -Math.sin(input.lookYaw);
-
-    const dashDir = {
-      x: dashInput.z * forwardX + dashInput.x * rightX,
-      z: dashInput.z * forwardZ + dashInput.x * rightZ,
-    };
-
-    const dashDirLength = Math.hypot(dashDir.x, dashDir.z);
-    if (dashDirLength > 0.001) {
-      dashDir.x /= dashDirLength;
-      dashDir.z /= dashDirLength;
-    }
-
-    const dashStrength = DASH.Impulse;
-    this.currentVelocity.x += dashDir.x * dashStrength;
-    this.currentVelocity.z += dashDir.z * dashStrength;
-
-    const dashSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
-    const maxDashSpeed = DASH.Impulse * 1.2;
-    if (dashSpeed > maxDashSpeed) {
-      const s = maxDashSpeed / dashSpeed;
-      this.currentVelocity.x *= s;
-      this.currentVelocity.z *= s;
-    }
-
-    if (DASH.UpwardBoost && DASH.UpwardBoost > 0) {
-      this.verticalVelocity = Math.max(this.verticalVelocity, DASH.UpwardBoost);
-    }
-
-    ctx.lastDashTime = ctx.env.now;
-
-    return null;
   }
 
   private transitionToSliding(_ctx: MovementCtx): IMovementState {

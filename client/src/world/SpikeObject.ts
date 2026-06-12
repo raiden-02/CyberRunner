@@ -23,7 +23,7 @@ export class SpikeObject {
     // Core spike - octahedron shape (diamond-like)
     const coreGeom = new THREE.OctahedronGeometry(0.3, 0);
     const coreMat = new THREE.MeshBasicMaterial({
-      color: 0xff3300,
+      color: 0xd4893a,
       transparent: true,
       opacity: 0.9,
     });
@@ -34,7 +34,7 @@ export class SpikeObject {
     // Outer glow sphere
     const glowGeom = new THREE.SphereGeometry(0.5, 16, 16);
     const glowMat = new THREE.MeshBasicMaterial({
-      color: 0xff6600,
+      color: 0xc45c3a,
       transparent: true,
       opacity: 0.3,
       side: THREE.BackSide,
@@ -46,7 +46,7 @@ export class SpikeObject {
     // Rotating ring
     const ringGeom = new THREE.TorusGeometry(0.4, 0.03, 8, 24);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xff9900,
+      color: 0xd4893a,
       transparent: true,
       opacity: 0.8,
     });
@@ -58,7 +58,7 @@ export class SpikeObject {
     // Add vertical beam of light
     const beamGeom = new THREE.CylinderGeometry(0.05, 0.15, 2, 8, 1, true);
     const beamMat = new THREE.MeshBasicMaterial({
-      color: 0xff4400,
+      color: 0xd4893a,
       transparent: true,
       opacity: 0.4,
       side: THREE.DoubleSide,
@@ -70,7 +70,7 @@ export class SpikeObject {
     // Ground marker ring
     const groundRingGeom = new THREE.RingGeometry(0.3, 0.5, 24);
     const groundRingMat = new THREE.MeshBasicMaterial({
-      color: 0xff3300,
+      color: 0xc45c3a,
       transparent: true,
       opacity: 0.6,
       side: THREE.DoubleSide,
@@ -118,21 +118,20 @@ export class SpikeObject {
     switch (spikeState) {
       case "ground":
       case "dropped":
-        coreMat.color.setHex(0xff3300);
-        glowMat.color.setHex(0xff6600);
+        coreMat.color.setHex(0xd4893a);
+        glowMat.color.setHex(0xc45c3a);
         break;
       case "carried":
         // When carried, spike is not visible (player has it)
         break;
       case "uploading":
-        coreMat.color.setHex(0xff6600);
-        glowMat.color.setHex(0xffaa00);
+        coreMat.color.setHex(0xc45c3a);
+        glowMat.color.setHex(0xd4893a);
         break;
       case "uploaded":
       case "decrypting":
-        // Urgent red pulse when active
-        coreMat.color.setHex(0xff0000);
-        glowMat.color.setHex(0xff3300);
+        coreMat.color.setHex(0x8a3a2e);
+        glowMat.color.setHex(0xc45c3a);
         break;
     }
 

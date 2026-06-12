@@ -67,9 +67,9 @@ export class Minimap {
       width: ${this.config.displaySize}px;
       height: ${this.config.displaySize}px;
       background: rgba(0, 10, 20, 0.85);
-      border: 3px solid #00ffff;
+      border: 2px solid #4a433a;
       border-radius: 50%;
-      box-shadow: 0 4px 20px rgba(0, 255, 255, 0.3);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
       pointer-events: none;
       z-index: 100;
       overflow: hidden;
@@ -95,9 +95,8 @@ export class Minimap {
       left: 50%;
       transform: translateX(-50%);
       font-size: 10px;
-      color: #00ffff;
+      color: #d4893a;
       font-weight: bold;
-      text-shadow: 0 0 4px #00ffff;
     `;
     compass.textContent = "N";
     this.container.appendChild(compass);
@@ -205,11 +204,11 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
       
-      let color = terminal.id === "A" ? "#00ffff" : "#ff00ff";
+      let color = terminal.id === "A" ? "#4a8b8a" : "#d4893a";
       if (terminal.state === "uploading") {
-        color = "#ff6600";
+        color = "#c45c3a";
       } else if (terminal.state === "uploaded") {
-        color = "#ff0000";
+        color = "#8a3a2e";
       }
       
       ctx.fillStyle = color + "33";
@@ -240,9 +239,9 @@ export class Minimap {
         const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.005);
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, 6 * pulse, 0, Math.PI * 2);
-        ctx.fillStyle = "#ff6600";
+        ctx.fillStyle = "#c45c3a";
         ctx.fill();
-        ctx.strokeStyle = "#ffaa00";
+        ctx.strokeStyle = "#d4893a";
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -268,8 +267,8 @@ export class Minimap {
       ctx.lineTo(4, 4);
       ctx.closePath();
 
-      ctx.fillStyle = "#00ccff";
-      ctx.strokeStyle = "#00ccff";
+      ctx.fillStyle = "#4a8b8a";
+      ctx.strokeStyle = "#4a8b8a";
       ctx.fill();
       ctx.lineWidth = 1;
       ctx.stroke();
@@ -295,8 +294,8 @@ export class Minimap {
     ctx.lineTo(-5, 5);
     ctx.lineTo(5, 5);
     ctx.closePath();
-    ctx.fillStyle = "#00ff00";
-    ctx.strokeStyle = "#00ff00";
+    ctx.fillStyle = "#d4893a";
+    ctx.strokeStyle = "#d4893a";
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.stroke();
@@ -328,7 +327,7 @@ export class Minimap {
     ];
 
     // Draw lines between corners that are visible
-    ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+    ctx.strokeStyle = "rgba(212, 137, 58, 0.35)";
     ctx.lineWidth = 2;
     
     for (let i = 0; i < corners.length; i++) {

@@ -1,4 +1,5 @@
 import { WEAPON_DEFINITIONS } from "../weapons/definitions.js";
+import { THEME } from "../theme.js";
 
 export interface GameModeState {
   gameMode: string;
@@ -44,16 +45,16 @@ export class HUD {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      color: #fff;
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: ${THEME.paper};
+      font-family: ${THEME.font};
       font-size: 13px;
-      background: linear-gradient(135deg, rgba(0,20,40,0.85) 0%, rgba(0,10,20,0.9) 100%);
+      background: ${THEME.hudBg};
       padding: 14px 18px;
-      border-radius: 4px;
-      border-left: 3px solid #00ffff;
+      border-radius: 3px;
+      border-left: 3px solid ${THEME.accent};
       pointer-events: none;
       min-width: 200px;
-      box-shadow: 0 4px 20px rgba(0,255,255,0.15);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
       line-height: 1.6;
     `;
     document.body.appendChild(this.element);
@@ -64,15 +65,15 @@ export class HUD {
       position: fixed;
       top: 50px;
       right: 20px;
-      color: #fff;
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: ${THEME.paper};
+      font-family: ${THEME.font};
       font-size: 12px;
-      background: linear-gradient(135deg, rgba(0,20,40,0.85) 0%, rgba(0,10,20,0.9) 100%);
+      background: ${THEME.hudBg};
       padding: 10px 14px;
-      border-radius: 4px;
-      border-left: 3px solid #00ff88;
+      border-radius: 3px;
+      border-left: 3px solid ${THEME.teammate};
       pointer-events: none;
-      box-shadow: 0 4px 20px rgba(0,255,136,0.15);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
       display: none;
     `;
     document.body.appendChild(this.roomInfoElement);
@@ -84,15 +85,15 @@ export class HUD {
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      color: #fff;
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: ${THEME.paper};
+      font-family: ${THEME.font};
       font-size: 14px;
-      background: linear-gradient(135deg, rgba(0,20,40,0.85) 0%, rgba(0,10,20,0.9) 100%);
+      background: ${THEME.hudBg};
       padding: 10px 20px;
-      border-radius: 4px;
-      border-bottom: 2px solid #ff6600;
+      border-radius: 3px;
+      border-bottom: 2px solid ${THEME.accent};
       pointer-events: none;
-      box-shadow: 0 4px 20px rgba(255,102,0,0.2);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
       text-align: center;
       display: none;
     `;
@@ -118,9 +119,9 @@ export class HUD {
     }
     this.roomInfoElement.style.display = "block";
     this.roomInfoElement.innerHTML = `
-      <div style="color:#00ff88;font-weight:600;margin-bottom:4px;">JOIN CODE</div>
+      <div style="color:${THEME.teammate};font-weight:600;margin-bottom:4px;">JOIN CODE</div>
       <div style="font-size:18px;font-weight:bold;letter-spacing:2px;margin-bottom:6px;">${this.joinCode}</div>
-      <div style="color:#888;">Players: ${this.playerCount}/${this.maxPlayers}</div>
+      <div style="color:${THEME.muted};">Players: ${this.playerCount}/${this.maxPlayers}</div>
     `;
   }
 
@@ -151,20 +152,20 @@ export class HUD {
     let html = "";
     
     if (s.isGameOver) {
-      html = `<div style="color:#ff6600;font-weight:bold;font-size:18px;">GAME OVER</div>`;
+      html = `<div style="color:${THEME.accent};font-weight:bold;font-size:18px;">GAME OVER</div>`;
     } else if (s.gameMode === "deathmatch") {
       html = `
         <div style="display:flex;gap:24px;align-items:center;">
           <div>
-            <div style="color:#888;font-size:10px;">MODE</div>
-            <div style="color:#ff6600;font-weight:600;">DEATHMATCH</div>
+            <div style="color:${THEME.muted};font-size:10px;">MODE</div>
+            <div style="color:${THEME.accent};font-weight:600;">DEATHMATCH</div>
           </div>
           <div>
-            <div style="color:#888;font-size:10px;">TARGET</div>
+            <div style="color:${THEME.muted};font-size:10px;">TARGET</div>
             <div>${s.scoreLimit} kills</div>
           </div>
           <div>
-            <div style="color:#888;font-size:10px;">TIME</div>
+            <div style="color:${THEME.muted};font-size:10px;">TIME</div>
             <div>${this.formatTime(s.timeRemaining)}</div>
           </div>
         </div>
@@ -177,54 +178,54 @@ export class HUD {
       }
       
       const isGhost = s.myTeam === "ghosts";
-      const teamColor = isGhost ? "#ff4444" : "#4488ff";
+      const teamColor = isGhost ? THEME.ghosts : THEME.sentinels;
       const teamName = isGhost ? "GHOSTS" : "SENTINELS";
       
       // Spike status
       let spikeHtml = "";
       if (s.spikeState === "ground") {
         if (isGhost) {
-          spikeHtml = `<div style="color:#ffaa00;">SPIKE ON GROUND - Pick it up!</div>`;
+          spikeHtml = `<div style="color:${THEME.accent};">SPIKE ON GROUND - Pick it up!</div>`;
         } else {
-          spikeHtml = `<div style="color:#4488ff;">Defend the terminals</div>`;
+          spikeHtml = `<div style="color:${THEME.sentinels};">Defend the terminals</div>`;
         }
       } else if (s.spikeState === "carried" || s.spikeState === "dropped") {
         if (s.hasSpike) {
-          spikeHtml = `<div style="color:#ff3300;font-weight:bold;">YOU HAVE THE SPIKE</div>`;
+          spikeHtml = `<div style="color:${THEME.danger};font-weight:bold;">YOU HAVE THE SPIKE</div>`;
         } else if (s.spikeState === "dropped") {
-          spikeHtml = `<div style="color:#ffaa00;">SPIKE DROPPED</div>`;
+          spikeHtml = `<div style="color:${THEME.accent};">SPIKE DROPPED</div>`;
         } else if (s.spikeCarrierId) {
           spikeHtml = isGhost 
-            ? `<div style="color:#ff4444;">Teammate has spike</div>`
-            : `<div style="color:#4488ff;">Enemy has spike</div>`;
+            ? `<div style="color:${THEME.ghosts};">Teammate has spike</div>`
+            : `<div style="color:${THEME.sentinels};">Enemy has spike</div>`;
         }
       } else if (s.spikeState === "uploading") {
         // Only Ghosts (planting team) see terminal ID during upload
         if (isGhost) {
           spikeHtml = `
-            <div style="color:#ff3300;">UPLOADING ${s.spikeTerminalId}</div>
-            <div style="background:#333;height:6px;width:100px;border-radius:3px;overflow:hidden;">
-              <div style="background:#ff3300;height:100%;width:${s.spikeUploadProgress}%;"></div>
+            <div style="color:${THEME.danger};">UPLOADING ${s.spikeTerminalId}</div>
+            <div style="background:${THEME.ink};height:6px;width:100px;border-radius:3px;overflow:hidden;">
+              <div style="background:${THEME.danger};height:100%;width:${s.spikeUploadProgress}%;"></div>
             </div>
           `;
         } else {
-          spikeHtml = `<div style="color:#ff3300;font-weight:bold;">ENEMY UPLOADING SPIKE!</div>`;
+          spikeHtml = `<div style="color:${THEME.danger};font-weight:bold;">ENEMY UPLOADING SPIKE!</div>`;
         }
       } else if (s.spikeState === "uploaded" || s.spikeState === "decrypting") {
         const decryptProgress = s.isDecrypting ? s.spikeDecryptProgress : 0;
         // Ghosts see the terminal ID, Sentinels must find it
         if (isGhost) {
-          spikeHtml = `<div style="color:#ff0000;font-weight:bold;">SPIKE ACTIVE - ${s.spikeTerminalId}</div>`;
+          spikeHtml = `<div style="color:${THEME.danger};font-weight:bold;">SPIKE ACTIVE - ${s.spikeTerminalId}</div>`;
         } else {
           // Sentinels don't see which terminal - they must search
           spikeHtml = `
-            <div style="color:#ff0000;font-weight:bold;">SPIKE ACTIVE - FIND IT!</div>
+            <div style="color:${THEME.danger};font-weight:bold;">SPIKE ACTIVE - FIND IT!</div>
             ${s.isDecrypting ? `
-              <div style="color:#00ff00;">DECRYPTING...</div>
-              <div style="background:#333;height:6px;width:100px;border-radius:3px;overflow:hidden;">
-                <div style="background:#00ff00;height:100%;width:${decryptProgress}%;"></div>
+              <div style="color:${THEME.teammate};">DECRYPTING...</div>
+              <div style="background:${THEME.ink};height:6px;width:100px;border-radius:3px;overflow:hidden;">
+                <div style="background:${THEME.teammate};height:100%;width:${decryptProgress}%;"></div>
               </div>
-            ` : `<div style="color:#ffaa00;">Find and decrypt the spike!</div>`}
+            ` : `<div style="color:${THEME.accent};">Find and decrypt the spike!</div>`}
           `;
         }
       }
@@ -233,28 +234,28 @@ export class HUD {
       const spikePlanted = s.spikeState === "uploaded" || s.spikeState === "decrypting";
       const timerLabel = spikePlanted ? "SPIKE" : "TIME";
       const timerValue = spikePlanted ? s.spikeDetonationTimer : s.roundTimeRemaining;
-      const timerColor = spikePlanted ? "#ff0000" : "#fff";
+      const timerColor = spikePlanted ? THEME.danger : THEME.paper;
 
       html = `
         <div style="display:flex;gap:24px;align-items:center;">
           <div>
-            <div style="color:#888;font-size:10px;">TEAM</div>
+            <div style="color:${THEME.muted};font-size:10px;">TEAM</div>
             <div style="color:${teamColor};font-weight:600;">${teamName}</div>
           </div>
           <div>
-            <div style="color:#888;font-size:10px;">SCORE</div>
+            <div style="color:${THEME.muted};font-size:10px;">SCORE</div>
             <div>
-              <span style="color:#ff4444;">${s.ghostsRoundsWon}</span>
-              <span style="color:#666;"> - </span>
-              <span style="color:#4488ff;">${s.sentinelsRoundsWon}</span>
+              <span style="color:${THEME.ghosts};">${s.ghostsRoundsWon}</span>
+              <span style="color:${THEME.muted};"> - </span>
+              <span style="color:${THEME.sentinels};">${s.sentinelsRoundsWon}</span>
             </div>
           </div>
           <div>
-            <div style="color:#888;font-size:10px;">ROUND</div>
+            <div style="color:${THEME.muted};font-size:10px;">ROUND</div>
             <div>${s.currentRound}</div>
           </div>
           <div>
-            <div style="color:#888;font-size:10px;">${timerLabel}</div>
+            <div style="color:${THEME.muted};font-size:10px;">${timerLabel}</div>
             <div style="color:${timerColor};${spikePlanted ? "font-weight:bold;" : ""}">${this.formatTime(timerValue)}</div>
           </div>
         </div>
@@ -307,28 +308,28 @@ export class HUD {
     const weaponName = this.getWeaponDisplayName(this.currentWeaponId);
     const weaponType = this.getWeaponFamily(this.currentWeaponId);
     
-    let html = `<div style="color:#00ffff;font-weight:500;margin-bottom:6px;">WEAPON</div>`;
-    html += `<div style="margin-bottom:10px;">${weaponName} <span style="color:#888;">(${weaponType})</span></div>`;
+    let html = `<div style="color:${THEME.accent};font-weight:500;margin-bottom:6px;">WEAPON</div>`;
+    html += `<div style="margin-bottom:10px;">${weaponName} <span style="color:${THEME.muted};">(${weaponType})</span></div>`;
 
     if (ammoInMag !== undefined && ammoReserve !== undefined) {
-      html += `<div style="color:#00ffff;font-weight:500;margin-bottom:4px;">AMMO</div>`;
+      html += `<div style="color:${THEME.accent};font-weight:500;margin-bottom:4px;">AMMO</div>`;
       if (isReloading) {
-        html += `<div style="color:#ffcc00;margin-bottom:10px;">RELOADING...</div>`;
+        html += `<div style="color:${THEME.accent};margin-bottom:10px;">RELOADING...</div>`;
       } else {
         html += `<div style="margin-bottom:10px;">${ammoInMag} / ${ammoReserve}</div>`;
       }
     }
 
     if (health !== undefined && maxHealth !== undefined) {
-      html += `<div style="color:#00ffff;font-weight:500;margin-bottom:4px;">HEALTH</div>`;
+      html += `<div style="color:${THEME.accent};font-weight:500;margin-bottom:4px;">HEALTH</div>`;
       const percent = Math.round((health / maxHealth) * 100);
       const healthBar = this.createHealthBar(percent);
       html += `<div>${health} / ${maxHealth} ${healthBar}</div>`;
 
       if (isDead && respawnTime !== undefined && respawnTime > 0) {
-        html += `<div style="color:#ff4444;margin-top:8px;font-weight:500;">DEAD - Respawn: ${respawnTime.toFixed(1)}s</div>`;
+        html += `<div style="color:${THEME.danger};margin-top:8px;font-weight:500;">DEAD - Respawn: ${respawnTime.toFixed(1)}s</div>`;
       } else if (isDead) {
-        html += `<div style="color:#ff4444;margin-top:8px;font-weight:500;">DEAD</div>`;
+        html += `<div style="color:${THEME.danger};margin-top:8px;font-weight:500;">DEAD</div>`;
       }
     }
 
@@ -338,7 +339,7 @@ export class HUD {
   private createHealthBar(percent: number): string {
     const filled = Math.round(percent / 10);
     const empty = 10 - filled;
-    const color = percent > 60 ? '#0f0' : percent > 30 ? '#ff0' : '#f00';
+    const color = percent > 60 ? THEME.teammate : percent > 30 ? THEME.accent : THEME.danger;
     return `<span style="color:${color}">${'█'.repeat(filled)}${'░'.repeat(empty)}</span>`;
   }
 

@@ -108,12 +108,7 @@ export class HealthSystem {
       // Orient player to face center of map
       player.rotationY = calculateSpawnFacing(spawnPosition.x, spawnPosition.z);
       player.pitch = 0;
-      
-      // Reset movement state
-      player.velX = 0;
-      player.velY = 0;
-      player.velZ = 0;
-      
+
       player.firing = false;
       player.reloading = false;
       player.reloadEndTime = 0;

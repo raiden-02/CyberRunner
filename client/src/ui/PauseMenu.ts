@@ -1,4 +1,5 @@
 import { SettingsScreen } from "./screens/SettingsScreen.js";
+import { THEME } from "../theme.js";
 
 export class PauseMenu {
   private container: HTMLDivElement;
@@ -23,9 +24,9 @@ export class PauseMenu {
       display: none;
       justify-content: center;
       align-items: center;
-      background: rgba(0, 0, 0, 0.8);
+      background: ${THEME.overlay};
       z-index: 999;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: ${THEME.font};
     `;
     document.body.appendChild(this.container);
     
@@ -54,22 +55,23 @@ export class PauseMenu {
   private createPanel(): HTMLDivElement {
     const panel = document.createElement("div");
     panel.style.cssText = `
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      border: 2px solid #0f3460;
-      border-radius: 12px;
+      background: ${THEME.panel};
+      border: 1px solid ${THEME.panelBorder};
+      border-radius: 4px;
       padding: 32px;
       width: 300px;
-      box-shadow: 0 0 40px rgba(0, 255, 255, 0.1);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
     `;
     
     const title = document.createElement("h1");
     title.textContent = "Menu";
     title.style.cssText = `
       margin: 0 0 24px 0;
-      color: #00ffff;
-      font-size: 28px;
+      color: ${THEME.paper};
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
       text-align: center;
-      text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
     `;
     panel.appendChild(title);
     
@@ -82,14 +84,16 @@ export class PauseMenu {
     panel.appendChild(settingsBtn);
     
     const leaveBtn = this.createButton("Leave Game", false);
-    leaveBtn.style.borderColor = "#ff4444";
-    leaveBtn.style.color = "#ff4444";
+    leaveBtn.style.borderColor = THEME.danger;
+    leaveBtn.style.color = THEME.danger;
     leaveBtn.addEventListener("click", () => this.leaveGame());
     leaveBtn.addEventListener("mouseenter", () => {
-      leaveBtn.style.background = "rgba(255, 68, 68, 0.2)";
+      leaveBtn.style.background = "rgba(196, 92, 58, 0.18)";
+      leaveBtn.style.borderColor = THEME.danger;
     });
     leaveBtn.addEventListener("mouseleave", () => {
       leaveBtn.style.background = "transparent";
+      leaveBtn.style.borderColor = THEME.danger;
     });
     panel.appendChild(leaveBtn);
     
@@ -103,30 +107,23 @@ export class PauseMenu {
       width: 100%;
       padding: 14px 24px;
       margin: 8px 0;
-      border: 2px solid ${primary ? "#00ffff" : "#666"};
-      border-radius: 8px;
-      background: ${primary ? "linear-gradient(135deg, #00ffff22, #00ffff11)" : "transparent"};
-      color: ${primary ? "#00ffff" : "#aaa"};
-      font-size: 16px;
+      border: 1px solid ${primary ? THEME.accent : THEME.panelBorder};
+      border-radius: 3px;
+      background: ${primary ? THEME.accent : "transparent"};
+      color: ${primary ? THEME.ink : THEME.paper};
+      font-size: 15px;
       font-weight: 600;
+      letter-spacing: 0.03em;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background 0.15s, border-color 0.15s;
     `;
     button.addEventListener("mouseenter", () => {
-      if (primary) {
-        button.style.background = "linear-gradient(135deg, #00ffff44, #00ffff22)";
-      } else {
-        button.style.background = "rgba(255,255,255,0.1)";
-      }
-      button.style.transform = "scale(1.02)";
+      button.style.background = primary ? THEME.accentHover : "rgba(237, 230, 217, 0.08)";
+      button.style.borderColor = THEME.accent;
     });
     button.addEventListener("mouseleave", () => {
-      if (primary) {
-        button.style.background = "linear-gradient(135deg, #00ffff22, #00ffff11)";
-      } else {
-        button.style.background = "transparent";
-      }
-      button.style.transform = "scale(1)";
+      button.style.background = primary ? THEME.accent : "transparent";
+      button.style.borderColor = primary ? THEME.accent : THEME.panelBorder;
     });
     return button;
   }

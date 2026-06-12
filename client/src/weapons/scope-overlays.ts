@@ -91,25 +91,25 @@ export class SniperScopeOverlay extends BaseScopeOverlay {
     ctx.fill();
 
     // Rim glow
-    ctx.strokeStyle = "#00ffff";
+    ctx.strokeStyle = "#4a433a";
     ctx.lineWidth = 3;
-    ctx.shadowColor = "#00ffff";
-    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#d4893a";
+    ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    ctx.strokeStyle = "#003333";
+    ctx.strokeStyle = "#2a2620";
     ctx.lineWidth = 8;
     ctx.beginPath();
     ctx.arc(cx, cy, radius - 5, 0, Math.PI * 2);
     ctx.stroke();
 
     // Reticle
-    ctx.strokeStyle = "#00ffaa";
+    ctx.strokeStyle = "#d4893a";
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = "#00ffaa";
+    ctx.shadowColor = "#d4893a";
     ctx.shadowBlur = 8;
 
     const gap = 30;
@@ -129,7 +129,7 @@ export class SniperScopeOverlay extends BaseScopeOverlay {
     ctx.lineTo(cx, cy + lineLen);
     ctx.stroke();
 
-    ctx.fillStyle = "#00ffaa";
+    ctx.fillStyle = "#d4893a";
     ctx.beginPath();
     ctx.arc(cx, cy, 3, 0, Math.PI * 2);
     ctx.fill();
@@ -161,7 +161,7 @@ export class SniperScopeOverlay extends BaseScopeOverlay {
 
       if (i % 2 === 0) {
         ctx.font = "10px monospace";
-        ctx.fillStyle = "#00ffaa";
+        ctx.fillStyle = "#d4893a";
         ctx.textAlign = "left";
         ctx.fillText(`${i * 100}`, cx + markW + 5, y + 4);
       }
@@ -209,7 +209,7 @@ export class SniperScopeOverlay extends BaseScopeOverlay {
     // Data readouts
     ctx.shadowBlur = 0;
     ctx.font = "11px monospace";
-    ctx.fillStyle = "#00ffaa";
+    ctx.fillStyle = "#d4893a";
     ctx.textAlign = "left";
     ctx.fillText(this.weaponName, cx - radius + 30, cy - radius + 40);
     ctx.fillText(`${this.magnification} MAG`, cx - radius + 30, cy - radius + 55);

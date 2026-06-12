@@ -11,11 +11,11 @@ export class Scoreboard {
       transform: translateX(-50%);
       min-width: 420px;
       max-width: 720px;
-      color: #fff;
-      font-family: "Segoe UI", Arial, sans-serif;
+      color: #ede6d9;
+      font-family: "Segoe UI", system-ui, sans-serif;
       font-size: 14px;
-      background: linear-gradient(180deg, rgba(12, 13, 15, 0.92), rgba(12, 13, 15, 0.72));
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(36, 31, 26, 0.92);
+      border: 1px solid #4a433a;
       border-radius: 8px;
       padding: 14px 16px 10px 16px;
       z-index: 9998;

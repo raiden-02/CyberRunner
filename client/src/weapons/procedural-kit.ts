@@ -13,63 +13,63 @@ export interface MaterialSet {
   danger: THREE.MeshStandardMaterial;
 }
 
-const NEON_COLORS: Record<ColorVariant, number> = {
-  cyan: 0x00f0ff,
-  magenta: 0xff00ff,
-  green: 0x00ff66,
-  orange: 0xff6600,
-  red: 0xff2222
+const ACCENT_COLORS: Record<ColorVariant, number> = {
+  cyan: 0x4a8b8a,
+  magenta: 0x8a5a52,
+  green: 0x6b7a4a,
+  orange: 0xd4893a,
+  red: 0xc45c3a
 };
 
 export function createMaterialSet(variant: ColorVariant): MaterialSet {
-  const neonColor = NEON_COLORS[variant];
-  const dimColor = new THREE.Color(neonColor).multiplyScalar(0.4).getHex();
+  const accent = ACCENT_COLORS[variant];
+  const dimColor = new THREE.Color(accent).multiplyScalar(0.45).getHex();
 
   return {
     darkMetal: new THREE.MeshStandardMaterial({
-      color: 0x0a0c10,
-      roughness: 0.6,
-      metalness: 0.85
+      color: 0x1c1f24,
+      roughness: 0.55,
+      metalness: 0.72
     }),
     midMetal: new THREE.MeshStandardMaterial({
-      color: 0x1a1e26,
-      roughness: 0.45,
-      metalness: 0.8
+      color: 0x2e333a,
+      roughness: 0.42,
+      metalness: 0.68
     }),
     lightMetal: new THREE.MeshStandardMaterial({
-      color: 0x3a4050,
-      roughness: 0.35,
-      metalness: 0.7
+      color: 0x5a616c,
+      roughness: 0.38,
+      metalness: 0.55
     }),
     neon: new THREE.MeshStandardMaterial({
-      color: neonColor,
-      emissive: neonColor,
-      emissiveIntensity: 2.0,
-      roughness: 0.15,
-      metalness: 0.5
+      color: accent,
+      emissive: accent,
+      emissiveIntensity: 0.35,
+      roughness: 0.4,
+      metalness: 0.45
     }),
     neonDim: new THREE.MeshStandardMaterial({
       color: dimColor,
       emissive: dimColor,
-      emissiveIntensity: 0.8,
-      roughness: 0.3,
-      metalness: 0.6
+      emissiveIntensity: 0.15,
+      roughness: 0.5,
+      metalness: 0.5
     }),
     glass: new THREE.MeshStandardMaterial({
-      color: 0x88ffff,
+      color: 0x8a9aa0,
       transparent: true,
-      opacity: 0.25,
-      roughness: 0.05,
-      metalness: 0.0,
-      emissive: neonColor,
-      emissiveIntensity: 0.3
+      opacity: 0.28,
+      roughness: 0.08,
+      metalness: 0.05,
+      emissive: accent,
+      emissiveIntensity: 0.08
     }),
     danger: new THREE.MeshStandardMaterial({
-      color: 0xff3300,
-      emissive: 0xff2200,
-      emissiveIntensity: 1.2,
-      roughness: 0.3,
-      metalness: 0.5
+      color: 0xc45c3a,
+      emissive: 0x6a2818,
+      emissiveIntensity: 0.25,
+      roughness: 0.4,
+      metalness: 0.4
     })
   };
 }

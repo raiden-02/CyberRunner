@@ -1,3 +1,5 @@
+import { THEME } from "../../theme.js";
+
 // Base class for all UI screens
 export abstract class BaseScreen {
   protected container: HTMLDivElement;
@@ -16,9 +18,9 @@ export abstract class BaseScreen {
       display: none;
       justify-content: center;
       align-items: center;
-      background: rgba(0, 0, 0, 0.9);
+      background: ${THEME.overlay};
       z-index: 1000;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: ${THEME.font};
     `;
     document.body.appendChild(this.container);
   }
@@ -45,13 +47,13 @@ export abstract class BaseScreen {
   protected createPanel(width = "400px"): HTMLDivElement {
     const panel = document.createElement("div");
     panel.style.cssText = `
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      border: 2px solid #0f3460;
-      border-radius: 12px;
+      background: ${THEME.panel};
+      border: 1px solid ${THEME.panelBorder};
+      border-radius: 4px;
       padding: 32px;
       width: ${width};
       max-width: 90vw;
-      box-shadow: 0 0 40px rgba(0, 255, 255, 0.1);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
     `;
     return panel;
   }
@@ -61,10 +63,11 @@ export abstract class BaseScreen {
     title.textContent = text;
     title.style.cssText = `
       margin: 0 0 24px 0;
-      color: #00ffff;
-      font-size: 28px;
+      color: ${THEME.paper};
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
       text-align: center;
-      text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
     `;
     return title;
   }
@@ -76,26 +79,23 @@ export abstract class BaseScreen {
       width: 100%;
       padding: 14px 24px;
       margin: 8px 0;
-      border: 2px solid ${primary ? "#00ffff" : "#666"};
-      border-radius: 8px;
-      background: ${primary ? "linear-gradient(135deg, #00ffff22, #00ffff11)" : "transparent"};
-      color: ${primary ? "#00ffff" : "#aaa"};
-      font-size: 16px;
+      border: 1px solid ${primary ? THEME.accent : THEME.panelBorder};
+      border-radius: 3px;
+      background: ${primary ? THEME.accent : "transparent"};
+      color: ${primary ? THEME.ink : THEME.paper};
+      font-size: 15px;
       font-weight: 600;
+      letter-spacing: 0.03em;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background 0.15s, border-color 0.15s;
     `;
     button.onmouseenter = () => {
-      button.style.background = primary 
-        ? "linear-gradient(135deg, #00ffff44, #00ffff22)" 
-        : "rgba(255,255,255,0.1)";
-      button.style.transform = "scale(1.02)";
+      button.style.background = primary ? THEME.accentHover : "rgba(237, 230, 217, 0.08)";
+      button.style.borderColor = THEME.accent;
     };
     button.onmouseleave = () => {
-      button.style.background = primary 
-        ? "linear-gradient(135deg, #00ffff22, #00ffff11)" 
-        : "transparent";
-      button.style.transform = "scale(1)";
+      button.style.background = primary ? THEME.accent : "transparent";
+      button.style.borderColor = primary ? THEME.accent : THEME.panelBorder;
     };
     return button;
   }
@@ -108,15 +108,15 @@ export abstract class BaseScreen {
       width: 100%;
       padding: 12px 16px;
       margin: 8px 0;
-      border: 2px solid #333;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.5);
-      color: #fff;
+      border: 1px solid ${THEME.panelBorder};
+      border-radius: 3px;
+      background: ${THEME.ink};
+      color: ${THEME.paper};
       font-size: 16px;
       box-sizing: border-box;
     `;
-    input.onfocus = () => { input.style.borderColor = "#00ffff"; };
-    input.onblur = () => { input.style.borderColor = "#333"; };
+    input.onfocus = () => { input.style.borderColor = THEME.accent; };
+    input.onblur = () => { input.style.borderColor = THEME.panelBorder; };
     return input;
   }
 
@@ -126,7 +126,7 @@ export abstract class BaseScreen {
     label.style.cssText = `
       display: block;
       margin: 16px 0 4px 0;
-      color: #aaa;
+      color: ${THEME.muted};
       font-size: 14px;
     `;
     return label;
@@ -138,10 +138,10 @@ export abstract class BaseScreen {
       width: 100%;
       padding: 12px 16px;
       margin: 8px 0;
-      border: 2px solid #333;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.5);
-      color: #fff;
+      border: 1px solid ${THEME.panelBorder};
+      border-radius: 3px;
+      background: ${THEME.ink};
+      color: ${THEME.paper};
       font-size: 16px;
       cursor: pointer;
     `;
@@ -149,7 +149,7 @@ export abstract class BaseScreen {
       const option = document.createElement("option");
       option.value = opt.value;
       option.textContent = opt.label;
-      option.style.background = "#1a1a2e";
+      option.style.background = THEME.panel;
       select.appendChild(option);
     }
     return select;
@@ -158,7 +158,7 @@ export abstract class BaseScreen {
   protected createError(): HTMLDivElement {
     const error = document.createElement("div");
     error.style.cssText = `
-      color: #ff4444;
+      color: ${THEME.danger};
       font-size: 14px;
       margin: 8px 0;
       text-align: center;

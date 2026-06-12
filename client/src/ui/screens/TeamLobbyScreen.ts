@@ -1,5 +1,6 @@
 import { BaseScreen } from "./BaseScreen.js";
 import type { LobbyStateMessage, TeamId } from "../../network/NetworkManager.js";
+import { THEME } from "../../theme.js";
 
 export interface TeamLobbyCallbacks {
   onTeamSelect: (teamId: TeamId) => void;
@@ -54,13 +55,13 @@ export class TeamLobbyScreen extends BaseScreen {
     
     const ghostsTitle = document.createElement("div");
     ghostsTitle.style.cssText = `
-      color: #ff4444;
+      color: ${THEME.ghosts};
       font-size: 18px;
       font-weight: bold;
       text-align: center;
       padding: 12px;
-      background: rgba(255, 68, 68, 0.1);
-      border: 1px solid rgba(255, 68, 68, 0.3);
+      background: rgba(196, 92, 58, 0.12);
+      border: 1px solid rgba(196, 92, 58, 0.35);
       border-radius: 8px 8px 0 0;
       text-transform: uppercase;
     `;
@@ -69,8 +70,8 @@ export class TeamLobbyScreen extends BaseScreen {
 
     this.ghostsColumn = document.createElement("div");
     this.ghostsColumn.style.cssText = `
-      background: rgba(255, 68, 68, 0.05);
-      border: 1px solid rgba(255, 68, 68, 0.2);
+      background: rgba(196, 92, 58, 0.06);
+      border: 1px solid rgba(196, 92, 58, 0.22);
       border-top: none;
       border-radius: 0 0 8px 8px;
       min-height: 200px;
@@ -78,7 +79,7 @@ export class TeamLobbyScreen extends BaseScreen {
     `;
     ghostsWrapper.appendChild(this.ghostsColumn);
 
-    const joinGhostsBtn = this.createTeamButton("Join Ghosts", "#ff4444");
+    const joinGhostsBtn = this.createTeamButton("Join Ghosts", THEME.ghosts);
     joinGhostsBtn.onclick = () => this.callbacks?.onTeamSelect("ghosts");
     ghostsWrapper.appendChild(joinGhostsBtn);
 
@@ -102,13 +103,13 @@ export class TeamLobbyScreen extends BaseScreen {
     
     const sentinelsTitle = document.createElement("div");
     sentinelsTitle.style.cssText = `
-      color: #4488ff;
+      color: ${THEME.sentinels};
       font-size: 18px;
       font-weight: bold;
       text-align: center;
       padding: 12px;
-      background: rgba(68, 136, 255, 0.1);
-      border: 1px solid rgba(68, 136, 255, 0.3);
+      background: rgba(74, 139, 138, 0.12);
+      border: 1px solid rgba(74, 139, 138, 0.35);
       border-radius: 8px 8px 0 0;
       text-transform: uppercase;
     `;
@@ -117,8 +118,8 @@ export class TeamLobbyScreen extends BaseScreen {
 
     this.sentinelsColumn = document.createElement("div");
     this.sentinelsColumn.style.cssText = `
-      background: rgba(68, 136, 255, 0.05);
-      border: 1px solid rgba(68, 136, 255, 0.2);
+      background: rgba(74, 139, 138, 0.06);
+      border: 1px solid rgba(74, 139, 138, 0.22);
       border-top: none;
       border-radius: 0 0 8px 8px;
       min-height: 200px;
@@ -126,7 +127,7 @@ export class TeamLobbyScreen extends BaseScreen {
     `;
     sentinelsWrapper.appendChild(this.sentinelsColumn);
 
-    const joinSentinelsBtn = this.createTeamButton("Join Sentinels", "#4488ff");
+    const joinSentinelsBtn = this.createTeamButton("Join Sentinels", THEME.sentinels);
     joinSentinelsBtn.onclick = () => this.callbacks?.onTeamSelect("sentinels");
     sentinelsWrapper.appendChild(joinSentinelsBtn);
 
@@ -161,7 +162,7 @@ export class TeamLobbyScreen extends BaseScreen {
       cursor: pointer;
       width: 100%;
     `;
-    leaveBtn.onmouseenter = () => { leaveBtn.style.color = "#ff4444"; };
+    leaveBtn.onmouseenter = () => { leaveBtn.style.color = THEME.danger; };
     leaveBtn.onmouseleave = () => { leaveBtn.style.color = "#666"; };
     leaveBtn.onclick = () => this.callbacks?.onLeaveLobby();
     panel.appendChild(leaveBtn);
@@ -202,7 +203,7 @@ export class TeamLobbyScreen extends BaseScreen {
   }
 
   setJoinCode(code: string): void {
-    this.joinCodeDiv.innerHTML = `Join Code: <span style="color: #00ffff; font-weight: bold;">${code}</span>`;
+    this.joinCodeDiv.innerHTML = `Join Code: <span style="color: ${THEME.accent}; font-weight: bold;">${code}</span>`;
   }
 
   setPlayerName(sessionId: string, name: string): void {
@@ -251,7 +252,7 @@ export class TeamLobbyScreen extends BaseScreen {
     const isHost = this.lobbyState?.hostId === playerId;
     const isLocal = playerId === this.localSessionId;
     const name = this.playerNames.get(playerId) || playerId.substring(0, 8);
-    const teamColor = team === "ghosts" ? "#ff4444" : "#4488ff";
+    const teamColor = team === "ghosts" ? THEME.ghosts : THEME.sentinels;
     
     el.style.cssText = `
       padding: 8px 12px;
@@ -266,7 +267,7 @@ export class TeamLobbyScreen extends BaseScreen {
     
     el.innerHTML = `
       <span>${name}${isLocal ? " (You)" : ""}</span>
-      ${isHost ? `<span style="color: #ffd700; font-size: 12px;">HOST</span>` : ""}
+      ${isHost ? `<span style="color: ${THEME.accent}; font-size: 12px;">HOST</span>` : ""}
     `;
     
     return el;

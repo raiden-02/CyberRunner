@@ -110,13 +110,13 @@ export const SHOOT_HOUSE_NEON: ShootHouseMapDefinition = {
   // ═══════════════════════════════════════════════════════════════════════════
   buildings: [
     // Left lane building
-    { x: -24, y: 2.5, z: 0, hx: 3, hy: 2.5, hz: 8, type: "warehouse", windowColor: 0xff6600 },
+    { x: -24, y: 2.5, z: 0, hx: 3, hy: 2.5, hz: 8, type: "warehouse", windowColor: 0xd4893a },
 
     // Right lane building
-    { x: 24, y: 2.5, z: 0, hx: 3, hy: 2.5, hz: 8, type: "bar", windowColor: 0x00ccff },
+    { x: 24, y: 2.5, z: 0, hx: 3, hy: 2.5, hz: 8, type: "bar", windowColor: 0x4a8b8a },
 
     // Central billboard structure (visual only)
-    { x: 0, y: 4, z: 0, hx: 6, hy: 4, hz: 1.5, type: "billboard", windowColor: 0x00ffff },
+    { x: 0, y: 4, z: 0, hx: 6, hy: 4, hz: 1.5, type: "billboard", windowColor: 0xd4893a },
   ],
 
   catwalks: [],
@@ -140,28 +140,28 @@ export const SHOOT_HOUSE_NEON: ShootHouseMapDefinition = {
   // ═══════════════════════════════════════════════════════════════════════════
   neonSigns: [
     // Central billboard (primary landmark)
-    { x: 0, y: 5, z: 1.6, width: 8, height: 2.5, rotationY: 0, color: "cyan", flicker: false },
-    { x: 0, y: 5, z: -1.6, width: 8, height: 2.5, rotationY: Math.PI, color: "magenta", flicker: false },
+    { x: 0, y: 5, z: 1.6, width: 8, height: 2.5, rotationY: 0, color: "orange", flicker: false },
+    { x: 0, y: 5, z: -1.6, width: 8, height: 2.5, rotationY: Math.PI, color: "teal", flicker: false },
 
     // Spawn zone markers
-    { x: 0, y: 2.5, z: -27, width: 4, height: 1, rotationY: 0, color: "cyan", flicker: false },
-    { x: 0, y: 2.5, z: 27, width: 4, height: 1, rotationY: Math.PI, color: "magenta", flicker: false },
+    { x: 0, y: 2.5, z: -27, width: 4, height: 1, rotationY: 0, color: "orange", flicker: false },
+    { x: 0, y: 2.5, z: 27, width: 4, height: 1, rotationY: Math.PI, color: "teal", flicker: false },
   ],
 
   props: [],
 
   // Lane lights (ceiling mounted)
   laneLights: [
-    { x: -16, y: 8, z: 0, color: 0xff8866, intensity: 1.5, distance: 20, decay: 1.5 },
-    { x: 0, y: 10, z: 0, color: 0xffffff, intensity: 2.5, distance: 28, decay: 1.2 },
-    { x: 16, y: 8, z: 0, color: 0x66aaff, intensity: 1.5, distance: 20, decay: 1.5 },
-    { x: 0, y: 6, z: -26, color: 0x00dddd, intensity: 1.8, distance: 18, decay: 1.3 },
-    { x: 0, y: 6, z: 26, color: 0xdd00dd, intensity: 1.8, distance: 18, decay: 1.3 },
+    { x: -16, y: 8, z: 0, color: 0xd4893a, intensity: 0.9, distance: 18, decay: 1.6 },
+    { x: 0, y: 10, z: 0, color: 0xf0e6d4, intensity: 1.2, distance: 28, decay: 1.3 },
+    { x: 16, y: 8, z: 0, color: 0x4a8b8a, intensity: 0.7, distance: 18, decay: 1.6 },
+    { x: 0, y: 6, z: -26, color: 0xd4893a, intensity: 0.8, distance: 16, decay: 1.5 },
+    { x: 0, y: 6, z: 26, color: 0x4a8b8a, intensity: 0.65, distance: 16, decay: 1.5 },
   ],
 
   spawnLightColors: {
-    north: 0x00ffff,
-    south: 0xff00ff,
+    north: 0xd4893a,
+    south: 0x4a8b8a,
   },
 
   // Upload Terminals for Search & Destroy mode

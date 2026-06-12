@@ -1,7 +1,8 @@
 import { BaseState } from "./base.js";
-import type { MovementCtx, IMovementState } from "../types.js";
+import type { MovementCtx, IMovementState, MovementStateSnapshot } from "../types.js";
 import { MovementState } from "../types.js";
 import { PRONE, CAPSULE } from "../../physics/constants.js";
+import { CROUCH_CAPSULE_HALF } from "../capsule.js";
 
 export class ProneState extends BaseState {
   kind = MovementState.Prone;
@@ -17,12 +18,30 @@ export class ProneState extends BaseState {
     this.currentVelocity = { x: velocity.x, z: velocity.z };
   }
 
+  capture(): MovementStateSnapshot {
+    return {
+      kind: MovementState.Prone,
+      vx: this.currentVelocity.x,
+      vz: this.currentVelocity.z,
+      vy: this.verticalVelocity,
+      crouchHoldStart: -1,
+      prevCrouchHeld: this.prevCrouchHeld,
+      slideDirX: 0,
+      slideDirZ: 0,
+    };
+  }
+
+  applySnapshot(data: MovementStateSnapshot): void {
+    this.currentVelocity = { x: data.vx, z: data.vz };
+    this.verticalVelocity = data.vy;
+    this.prevCrouchHeld = data.prevCrouchHeld;
+  }
+
   enter(ctx: MovementCtx) {
     const input = ctx.input;
 
     ctx.setCapsuleHalfHeight(CAPSULE.ProneHalf);
     ctx.setFriction(1.0);
-    ctx.setGravityScale(1.0);
 
     this.prevCrouchHeld = input.crouchHeld;
   }
@@ -54,13 +73,7 @@ export class ProneState extends BaseState {
     return null;
   }
 
-  exit(ctx: MovementCtx, next?: IMovementState) {
-    const nextKind = next?.kind;
-    if (nextKind === MovementState.Crouching) {
-      ctx.setCapsuleHalfHeight(CAPSULE.CrouchHalf);
-    } else {
-      ctx.setCapsuleHalfHeight(CAPSULE.HalfHeight);
-    }
+  exit(ctx: MovementCtx) {
     ctx.setFriction(0.7);
   }
 
@@ -140,7 +153,7 @@ export class ProneState extends BaseState {
 
   private tryExitProne(ctx: MovementCtx, preferCrouch = false): IMovementState | null {
     if (preferCrouch) {
-      if (this.hasClearance(ctx, CAPSULE.CrouchHalf)) {
+      if (this.hasClearance(ctx, CROUCH_CAPSULE_HALF)) {
         return this.transitionToCrouching();
       }
       if (this.hasClearance(ctx, CAPSULE.HalfHeight)) {
@@ -152,14 +165,14 @@ export class ProneState extends BaseState {
     if (this.hasClearance(ctx, CAPSULE.HalfHeight)) {
       return this.transitionToWalking();
     }
-    if (this.hasClearance(ctx, CAPSULE.CrouchHalf)) {
+    if (this.hasClearance(ctx, CROUCH_CAPSULE_HALF)) {
       return this.transitionToCrouching();
     }
     return null;
   }
 
-  private hasClearance(_ctx: MovementCtx, _targetHalfHeight: number): boolean {
-    return true;
+  private hasClearance(ctx: MovementCtx, targetHalfHeight: number): boolean {
+    return ctx.hasCapsuleClearance(targetHalfHeight);
   }
 
   private transitionToWalking(): IMovementState {

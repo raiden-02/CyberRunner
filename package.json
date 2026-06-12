@@ -2,6 +2,7 @@
   "name": "cyberrunner",
   "version": "1.0.0",
   "private": true,
+  "description": "Browser multiplayer FPS with server-authoritative netcode, client-side prediction, and lag compensation.",
   "workspaces": [
     "client",
     "server"
@@ -11,18 +12,29 @@
     "dev:server": "npm run dev -w server",
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
-    "preview": "npm run build && npm run start -w server"
+    "preview": "npm run build && npm run start -w server",
+    "test": "npm test -w server",
+    "benchmark": "npx tsx --tsconfig server/tsconfig.json server/scripts/benchmark.ts"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/raiden-02/CyberRunner.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "multiplayer",
+    "fps",
+    "netcode",
+    "colyseus",
+    "threejs",
+    "rapier",
+    "typescript",
+    "webgl"
+  ],
+  "author": "Mayur",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/raiden-02/CyberRunner/issues"
   },
-  "homepage": "https://github.com/raiden-02/CyberRunner#readme"
+  "homepage": "https://game.cyberrunnergame.dev"
 }

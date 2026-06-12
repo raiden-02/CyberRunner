@@ -13,7 +13,7 @@ export interface CrosshairConfig {
 
 export const DEFAULT_CROSSHAIR: CrosshairConfig = {
   style: "cross",
-  color: "#00ffff",
+  color: "#ede6d9",
   size: 16,
   thickness: 2,
   gap: 5,

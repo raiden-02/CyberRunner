@@ -115,19 +115,19 @@ export abstract class BaseWeapon {
 
 export class AssaultRifleWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "cross", color: "#00ffff", size: 18, thickness: 2, gap: 6, opacity: 0.9, outline: true };
+    return { style: "cross", color: "#ede6d9", size: 18, thickness: 2, gap: 6, opacity: 0.9, outline: true };
   }
 }
 
 export class SMGWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "chevron", color: "#bb66ff", size: 16, thickness: 2, gap: 4, opacity: 0.9 };
+    return { style: "chevron", color: "#d4893a", size: 16, thickness: 2, gap: 4, opacity: 0.9 };
   }
 }
 
 export class LMGWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "cross", color: "#66ff66", size: 22, thickness: 3, gap: 8, opacity: 0.85, outline: true };
+    return { style: "cross", color: "#ede6d9", size: 22, thickness: 3, gap: 8, opacity: 0.85, outline: true };
   }
 }
 
@@ -139,7 +139,7 @@ export class ShotgunWeapon extends BaseWeapon {
 
 export class MarksmanRifleWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "dot", color: "#00ffff", size: 4, thickness: 0, gap: 0, opacity: 1.0, dotSize: 4 };
+    return { style: "dot", color: "#d4893a", size: 4, thickness: 0, gap: 0, opacity: 1.0, dotSize: 4 };
   }
 }
 
@@ -152,7 +152,7 @@ export class SniperRifleWeapon extends BaseWeapon {
   }
 
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "dot", color: "#00ffff", size: 4, thickness: 0, gap: 0, opacity: 1.0, dotSize: 4 };
+    return { style: "dot", color: "#d4893a", size: 4, thickness: 0, gap: 0, opacity: 1.0, dotSize: 4 };
   }
 }
 
@@ -164,7 +164,7 @@ export class PistolWeapon extends BaseWeapon {
 
 export class MachinePistolWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "chevron", color: "#bb66ff", size: 16, thickness: 2, gap: 4, opacity: 0.9 };
+    return { style: "chevron", color: "#d4893a", size: 16, thickness: 2, gap: 4, opacity: 0.9 };
   }
 }
 
@@ -172,13 +172,13 @@ export abstract class LauncherWeapon extends BaseWeapon {}
 
 export class RocketLauncherWeapon extends LauncherWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "circle", color: "#66ff66", size: 32, thickness: 2, gap: 0, opacity: 0.9, dotSize: 4 };
+    return { style: "circle", color: "#c45c3a", size: 32, thickness: 2, gap: 0, opacity: 0.9, dotSize: 4 };
   }
 }
 
 export class GrenadeLauncherWeapon extends LauncherWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "circle", color: "#bb66ff", size: 26, thickness: 2, gap: 0, opacity: 0.9, dotSize: 3 };
+    return { style: "circle", color: "#c45c3a", size: 26, thickness: 2, gap: 0, opacity: 0.9, dotSize: 3 };
   }
 }
 
@@ -190,25 +190,25 @@ export class MeleeWeapon extends BaseWeapon {
 
 export class EnergyWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "cross", color: "#00ffff", size: 18, thickness: 2, gap: 6, opacity: 0.9, outline: true };
+    return { style: "cross", color: "#ede6d9", size: 18, thickness: 2, gap: 6, opacity: 0.9, outline: true };
   }
 }
 
 export class ChargeWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "circle", color: "#bb66ff", size: 20, thickness: 2, gap: 0, opacity: 0.9, dotSize: 3 };
+    return { style: "circle", color: "#d4893a", size: 20, thickness: 2, gap: 0, opacity: 0.9, dotSize: 3 };
   }
 }
 
 export class BeamWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "dot", color: "#00ffff", size: 6, thickness: 0, gap: 0, opacity: 1.0, dotSize: 6 };
+    return { style: "dot", color: "#d4893a", size: 6, thickness: 0, gap: 0, opacity: 1.0, dotSize: 6 };
   }
 }
 
 export class BowWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "chevron", color: "#66ff66", size: 18, thickness: 2, gap: 5, opacity: 0.9 };
+    return { style: "chevron", color: "#ede6d9", size: 18, thickness: 2, gap: 5, opacity: 0.9 };
   }
 }
 

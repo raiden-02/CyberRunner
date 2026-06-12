@@ -874,7 +874,7 @@ function buildAttachmentView(
   let eye: THREE.Object3D | undefined;
 
   const reticleMat = new THREE.MeshBasicMaterial({
-    color: 0x00ffff,
+    color: 0xd4893a,
     transparent: true,
     opacity: 1,
     depthTest: false
@@ -985,7 +985,7 @@ function buildAttachmentView(
         reticleRoot.position.set(0, 0.038, -0.02);
         
         const reticleMat = new THREE.MeshBasicMaterial({
-          color: 0x00ffaa,
+          color: 0xd4893a,
           transparent: true,
           opacity: 1,
           depthTest: false

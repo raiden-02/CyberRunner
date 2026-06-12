@@ -11,11 +11,11 @@ const TERMINAL_WIDTH = 0.8;
 const TERMINAL_DEPTH = 0.6;
 
 // Colors
-const INACTIVE_COLOR = 0x00ffff;  // Cyan
-const ACTIVE_COLOR = 0xff3300;    // Red-orange (uploading)
-const UPLOADED_COLOR = 0xff0000;  // Red (detonating)
-const ZONE_INACTIVE = 0x00ffff;   // Cyan zone
-const ZONE_ACTIVE = 0xff3300;     // Red zone
+const INACTIVE_COLOR = 0xd4893a;
+const ACTIVE_COLOR = 0xc45c3a;
+const UPLOADED_COLOR = 0x8a3a2e;
+const ZONE_INACTIVE = 0xd4893a;
+const ZONE_ACTIVE = 0xc45c3a;
 
 export class UploadTerminalMesh {
   public readonly group: THREE.Group;
@@ -59,7 +59,7 @@ export class UploadTerminalMesh {
     const ctx = labelCanvas.getContext("2d")!;
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, 64, 64);
-    ctx.fillStyle = "#00ffff";
+    ctx.fillStyle = "#d4893a";
     ctx.font = "bold 48px Arial";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";

@@ -15,9 +15,9 @@ export interface BloomConfig {
 
 export const DEFAULT_BLOOM_CONFIG: BloomConfig = {
   enabled: true,
-  strength: 0.35,
-  radius: 0.4,
-  threshold: 0.75
+  strength: 0.16,
+  radius: 0.32,
+  threshold: 0.88
 };
 
 const SHADOW_MAP_SIZES: Record<GraphicsSettings["shadowQuality"], number> = {

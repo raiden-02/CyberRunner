@@ -11,7 +11,6 @@ export interface InputState {
   crouchReleased: boolean;
   crouchHeld: boolean;
   jumpPressed: boolean;
-  dashPressed: boolean;
   firing: boolean;
   aiming: boolean;
   aimDir: THREE.Vector3;
@@ -47,7 +46,6 @@ export class InputManager {
   
   private prevCrouchState = false;
   private prevJumpState = false;
-  private prevDashState = false;
 
   public onWeaponSwitch?: (weaponId: string) => void;
   public onReload?: () => void;
@@ -209,8 +207,8 @@ export class InputManager {
       this.onReload();
     }
 
-    // F3 = Toggle debug visuals (hitboxes, rays)
     if (e.code === "F3" && this.onToggleDebug) {
+      e.preventDefault();
       this.onToggleDebug();
     }
 
@@ -241,13 +239,26 @@ export class InputManager {
     }
   }
 
+  /** Held analog + look. Does not consume jump/crouch/dash edges. */
+  public peekState(): InputState {
+    return this.buildState(false);
+  }
+
+  /** 60 Hz sample. Consumes one-shot edges. Call once per simulation tick. */
+  public consumeTickState(): InputState {
+    return this.buildState(true);
+  }
+
+  /** @deprecated Use peekState (render) or consumeTickState (sim tick). */
   public getState(): InputState {
+    return this.peekState();
+  }
+
+  private buildState(consumeEdges: boolean): InputState {
     let moveZ = 0, moveX = 0;
     let autoSprint = false;
-    
-    // Auto-run overrides manual input when enabled
+
     if (this.autoRunEnabled) {
-      // Simple forward/backward run
       moveZ = this.autoRunDirection;
       autoSprint = true;
     } else {
@@ -265,16 +276,18 @@ export class InputManager {
 
     const currentCrouch = this.isActionKeyDown("crouch");
     const currentJump = this.isActionKeyDown("jump");
-    const currentDash = false;
 
-    const crouchPressed = currentCrouch && !this.prevCrouchState;
-    const crouchReleased = !currentCrouch && this.prevCrouchState;
-    const jumpPressed = currentJump && !this.prevJumpState;
-    const dashPressed = currentDash && !this.prevDashState;
+    let crouchPressed = false;
+    let crouchReleased = false;
+    let jumpPressed = false;
 
-    this.prevCrouchState = currentCrouch;
-    this.prevJumpState = currentJump;
-    this.prevDashState = currentDash;
+    if (consumeEdges) {
+      crouchPressed = currentCrouch && !this.prevCrouchState;
+      crouchReleased = !currentCrouch && this.prevCrouchState;
+      jumpPressed = currentJump && !this.prevJumpState;
+      this.prevCrouchState = currentCrouch;
+      this.prevJumpState = currentJump;
+    }
 
     const aimDir = new THREE.Vector3(0, 0, -1);
     aimDir.applyQuaternion(this.camera.quaternion);
@@ -289,10 +302,9 @@ export class InputManager {
       crouchReleased,
       crouchHeld: currentCrouch,
       jumpPressed,
-      dashPressed,
       firing: this.isMouseDown && document.pointerLockElement === this.canvas,
       aiming: this.isRightMouseDown && document.pointerLockElement === this.canvas,
-      aimDir
+      aimDir,
     };
   }
 

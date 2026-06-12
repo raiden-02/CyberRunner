@@ -8,7 +8,10 @@ import './debug/weapon-preview.js';
 // RAPIER WASM must be initialized before any physics code runs
 await initRapier();
 
-const googleClientId = document.querySelector<HTMLMetaElement>('meta[name="google-client-id"]')?.content || "";
+const googleClientId =
+  (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim()
+  || document.querySelector<HTMLMetaElement>('meta[name="google-client-id"]')?.content
+  || "";
 
 let currentGame: Game | null = null;
 

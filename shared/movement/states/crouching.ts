@@ -1,7 +1,8 @@
 import { BaseState } from "./base.js";
-import type { MovementCtx, IMovementState } from "../types.js";
+import type { MovementCtx, IMovementState, MovementStateSnapshot } from "../types.js";
 import { MovementState } from "../types.js";
 import { CROUCH, PRONE, CAPSULE } from "../../physics/constants.js";
+import { CROUCH_CAPSULE_HALF } from "../capsule.js";
 
 export class CrouchingState extends BaseState {
   kind = MovementState.Crouching;
@@ -13,12 +14,30 @@ export class CrouchingState extends BaseState {
     this.currentVelocity = { x: velocity.x, z: velocity.z };
   }
 
+  capture(): MovementStateSnapshot {
+    return {
+      kind: MovementState.Crouching,
+      vx: this.currentVelocity.x,
+      vz: this.currentVelocity.z,
+      vy: this.verticalVelocity,
+      crouchHoldStart: this.crouchHoldStart,
+      prevCrouchHeld: false,
+      slideDirX: 0,
+      slideDirZ: 0,
+    };
+  }
+
+  applySnapshot(data: MovementStateSnapshot): void {
+    this.currentVelocity = { x: data.vx, z: data.vz };
+    this.verticalVelocity = data.vy;
+    this.crouchHoldStart = data.crouchHoldStart;
+  }
+
   enter(ctx: MovementCtx) {
     const input = ctx.input;
     
     ctx.setFriction(0.8);
-    ctx.setGravityScale(1.0);
-    ctx.setCapsuleHalfHeight(CAPSULE.HalfHeight * CROUCH.HeightScale);
+    ctx.setCapsuleHalfHeight(CROUCH_CAPSULE_HALF);
     
     this.crouchHoldStart = input.crouchHeld ? ctx.env.now : -1;
   }
@@ -66,7 +85,6 @@ export class CrouchingState extends BaseState {
   }
 
   exit(ctx: MovementCtx) {
-    ctx.setCapsuleHalfHeight(CAPSULE.HalfHeight);
     ctx.setFriction(0.7);
   }
 
@@ -146,8 +164,8 @@ export class CrouchingState extends BaseState {
     };
   }
 
-  private canStandUp(_ctx: MovementCtx): boolean {
-    return true;
+  private canStandUp(ctx: MovementCtx): boolean {
+    return ctx.hasCapsuleClearance(CAPSULE.HalfHeight);
   }
 
   private transitionToProne(): IMovementState {

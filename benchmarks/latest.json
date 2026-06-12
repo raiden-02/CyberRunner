@@ -1,0 +1,102 @@
+{
+  "date": "2026-08-29T22:56:29.083Z",
+  "command": "npm run benchmark",
+  "node": "v23.11.0",
+  "platform": {
+    "os": "win32 10.0.26200",
+    "arch": "x64",
+    "cpu": "Intel(R) Core(TM) i9-14900KF",
+    "logicalCpus": 32
+  },
+  "protocol": {
+    "kind": "measured",
+    "inputBytes": 15,
+    "fireBytes": 13,
+    "inputJsonUtf8Bytes": 177,
+    "fireJsonUtf8Bytes": 47
+  },
+  "bandwidth": {
+    "kind": "estimate",
+    "inputHz": 60,
+    "payloadBytesPerSec": 900,
+    "payloadBytesPerMin": 54000,
+    "wsClientFrameOverheadBytesPerFrame": 6,
+    "estimatedWsAppPlusFramingBytesPerSec": 1260,
+    "note": "Payload is the 15-byte INPUT_CMD only. Framing is an RFC 6455 estimate for a masked client frame (2-byte header + 4-byte mask) when payload <= 125. TLS, TCP, IP, and Colyseus room wrappers are not included. Fire is not in this 60 Hz path."
+  },
+  "prediction": {
+    "kind": "synthetic_local",
+    "ticks": 180,
+    "samples": [
+      {
+        "latencyMs": 0,
+        "delayTicks": 0,
+        "meanPending": 0,
+        "maxPending": 0,
+        "tailMeanPending": 0,
+        "meanCorrectionM": 0,
+        "maxCorrectionM": 0,
+        "tailMeanCorrectionM": 0
+      },
+      {
+        "latencyMs": 50,
+        "delayTicks": 3,
+        "meanPending": 2.983,
+        "maxPending": 3,
+        "tailMeanPending": 3,
+        "meanCorrectionM": 0.00002,
+        "maxCorrectionM": 0.00073,
+        "tailMeanCorrectionM": 0
+      },
+      {
+        "latencyMs": 100,
+        "delayTicks": 6,
+        "meanPending": 5.917,
+        "maxPending": 6,
+        "tailMeanPending": 6,
+        "meanCorrectionM": 0.00003,
+        "maxCorrectionM": 0.00072,
+        "tailMeanCorrectionM": 0
+      },
+      {
+        "latencyMs": 150,
+        "delayTicks": 9,
+        "meanPending": 8.8,
+        "maxPending": 9,
+        "tailMeanPending": 9,
+        "meanCorrectionM": 0.00004,
+        "maxCorrectionM": 0.00217,
+        "tailMeanCorrectionM": 0
+      }
+    ]
+  },
+  "serverTick": {
+    "kind": "synthetic_local",
+    "ticks": 180,
+    "byPlayers": [
+      {
+        "players": 1,
+        "meanMs": 0.0172,
+        "maxMs": 0.0866
+      },
+      {
+        "players": 4,
+        "meanMs": 0.0537,
+        "maxMs": 0.3748
+      },
+      {
+        "players": 8,
+        "meanMs": 0.1514,
+        "maxMs": 0.6788
+      }
+    ]
+  },
+  "caveats": [
+    "Input and fire sizes are measured from encodeInputCmd / encodeFireCmd.",
+    "JSON sizes are UTF-8 byte lengths of JSON.stringify on the same objects. That is not Colyseus schema patch size and not MsgPack.",
+    "Bandwidth numbers are application payload (and an RFC 6455 framing estimate). They are not captured wire bytes.",
+    "Prediction uses LocalPlayer.reconcileWithServer against a local PhysicsWorld and a delayed ack. It is not a browser tab against a Colyseus room.",
+    "Server tick timing is RAPIER + CharacterController only. No Colyseus broadcast, hitboxes, rewind, or sockets.",
+    "Do not treat these numbers as production scalability."
+  ]
+}

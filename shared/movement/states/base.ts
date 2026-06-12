@@ -1,4 +1,4 @@
-import type { IMovementState, MovementCtx } from "../types.js";
+import type { IMovementState, MovementCtx, MovementStateSnapshot } from "../types.js";
 import { MovementState } from "../types.js";
 import { MOVE } from "../../physics/constants.js";
 
@@ -13,11 +13,30 @@ export abstract class BaseState implements IMovementState {
   kind: MovementState = MovementState.Walking;
   protected factory?: StateFactory;
 
+  attachFactory(factory: StateFactory): void {
+    this.factory = factory;
+  }
+
   enter(_ctx: MovementCtx, _prev?: IMovementState) {}
   exit(_ctx: MovementCtx, _next?: IMovementState) {}
   abstract update(ctx: MovementCtx): IMovementState | null;
 
   setInitialVelocity?(_velocity: { x: number; z: number }): void;
+
+  capture(): MovementStateSnapshot {
+    return {
+      kind: this.kind,
+      vx: 0,
+      vz: 0,
+      vy: 0,
+      crouchHoldStart: -1,
+      prevCrouchHeld: false,
+      slideDirX: 0,
+      slideDirZ: 0,
+    };
+  }
+
+  applySnapshot(_data: MovementStateSnapshot): void {}
 
   protected desiredGroundVelocity(ctx: MovementCtx): { x: number; z: number } {
     const input = ctx.input;

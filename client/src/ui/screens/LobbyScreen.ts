@@ -1,5 +1,6 @@
 import { BaseScreen } from "./BaseScreen.js";
 import { api, type UserProfile } from "../../api/client.js";
+import { THEME } from "../../theme.js";
 
 export type GameModeId = "deathmatch" | "search_destroy";
 
@@ -37,11 +38,22 @@ export class LobbyScreen extends BaseScreen {
     const title = this.createTitle("CYBER RUNNER");
     panel.appendChild(title);
 
+    const netHint = document.createElement("p");
+    netHint.textContent = "Same live room. Two tabs is enough to see prediction and remote players.";
+    netHint.style.cssText = `
+      color: ${THEME.muted};
+      text-align: center;
+      margin: -8px 0 20px 0;
+      font-size: 13px;
+      line-height: 1.4;
+    `;
+    panel.appendChild(netHint);
+
     // Player info section
     this.playerInfo = document.createElement("div");
     this.playerInfo.style.cssText = `
-      background: rgba(0, 255, 255, 0.1);
-      border: 1px solid rgba(0, 255, 255, 0.3);
+      background: ${THEME.accentDim};
+      border: 1px solid ${THEME.panelBorder};
       border-radius: 8px;
       padding: 12px 16px;
       margin-bottom: 24px;
@@ -139,7 +151,7 @@ export class LobbyScreen extends BaseScreen {
       cursor: pointer;
       border-radius: 4px;
     `;
-    settingsBtn.onmouseenter = () => { settingsBtn.style.borderColor = "#00ffff"; settingsBtn.style.color = "#00ffff"; };
+    settingsBtn.onmouseenter = () => { settingsBtn.style.borderColor = THEME.accent; settingsBtn.style.color = THEME.accent; };
     settingsBtn.onmouseleave = () => { settingsBtn.style.borderColor = "#444"; settingsBtn.style.color = "#888"; };
     settingsBtn.onclick = () => this.onSettings();
     bottomRow.appendChild(settingsBtn);
@@ -155,7 +167,7 @@ export class LobbyScreen extends BaseScreen {
       font-size: 14px;
       cursor: pointer;
     `;
-    logoutBtn.onmouseenter = () => { logoutBtn.style.color = "#ff4444"; };
+    logoutBtn.onmouseenter = () => { logoutBtn.style.color = THEME.danger; };
     logoutBtn.onmouseleave = () => { logoutBtn.style.color = "#666"; };
     logoutBtn.onclick = () => this.handleLogout();
     bottomRow.appendChild(logoutBtn);
@@ -192,20 +204,20 @@ export class LobbyScreen extends BaseScreen {
     const secondary = this.user.secondaryWeaponId?.replace("_1", "") || "PISTOL";
     this.playerInfo.innerHTML = `
       <div style="flex: 1;">
-        <div style="color: #00ffff; font-weight: 600;">${this.user.displayName || "Player"}</div>
-        <div style="color: #666; font-size: 12px;">Loadout: ${primary} / ${secondary}</div>
+        <div style="color: ${THEME.accent}; font-weight: 600;">${this.user.displayName || "Player"}</div>
+        <div style="color: ${THEME.muted}; font-size: 12px;">Loadout: ${primary} / ${secondary}</div>
       </div>
       <div style="display: flex; align-items: center; gap: 12px;">
         <button id="edit-profile-btn" style="
           background: transparent;
-          border: 1px solid rgba(0, 255, 255, 0.5);
-          color: #00ffff;
+          border: 1px solid ${THEME.panelBorder};
+          color: ${THEME.paper};
           padding: 6px 12px;
-          border-radius: 4px;
+          border-radius: 3px;
           font-size: 12px;
           cursor: pointer;
         ">Edit</button>
-        <div style="color: #0f0; font-size: 12px;">● Online</div>
+        <div style="color: ${THEME.teammate}; font-size: 12px;">● Online</div>
       </div>
     `;
     

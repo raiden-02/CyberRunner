@@ -7,12 +7,8 @@ export type WeaponSwitchMsg = {
 
 // Firing messages
 export type FireInputMsg = {
-  firing: boolean; // true = start firing, false = stop firing
-  aimDir: { x: number; y: number; z: number }; // normalized aim direction
-  // Client timestamp when fire button was pressed (for accurate lag compensation)
-  clientShotTime?: number;
-  // Client's position when firing (for shooter origin rewind)
-  clientPos?: { x: number; y: number; z: number };
+  firing: boolean;
+  aimDir: { x: number; y: number; z: number };
 };
 
 export type ReloadInputMsg = {

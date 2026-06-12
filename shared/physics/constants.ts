@@ -27,37 +27,6 @@ export const PRONE = {
   Braking:        25.0,
 };
 
-export const DASH = {
-  Cooldown:       2.0,
-  AuthCooldown:   0.9,
-  Impulse:        12.0,
-  UpwardBoost:    1.5,
-};
-
-export const MANTLE = {
-  MaxDistance:     2.0,
-  ReachHeight:    0.5,
-  MinDepth:       0.3,
-  MinWallSteepDeg: 75,
-  MaxSurfaceDeg:  40,
-  MaxAlignDeg:    45,
-  MinDuration:    0.10,
-  MaxDuration:    0.25,
-};
-
-export const WALLRUN = {
-  MinSpeed:       2.0,
-  MaxSpeed:       8.0,
-  MaxVertical:    2.0,
-  DisengageDeg:   75,
-  MagnetForce:    20.0,
-  MinHeight:      0.5,
-  EjectForce:     3.0,
-  GravityScaleAlongInput: (tangentDot: number) => {
-    return tangentDot > 0 ? 0.2 : 0.6;
-  }
-};
-
 export const CAPSULE = {
   Radius:      0.35,
   HalfHeight:  0.90,

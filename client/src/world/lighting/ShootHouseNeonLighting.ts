@@ -8,20 +8,20 @@ import { BaseLighting, type LightingConfig } from "../core/BaseLighting.js";
 
 export const SHOOT_HOUSE_NEON_LIGHTING_CONFIG: LightingConfig = {
   ambient: {
-    color: 0x101418,
-    intensity: 0.35,
+    color: 0x2c2924,
+    intensity: 0.62,
   },
 
   hemisphere: {
-    skyColor: 0x2a3040,
-    groundColor: 0x080a0c,
-    intensity: 0.25,
+    skyColor: 0x6a7a88,
+    groundColor: 0x3a3832,
+    intensity: 0.5,
   },
 
   keyLight: {
-    color: 0xffffff,
-    intensity: 1.6,
-    position: new THREE.Vector3(0, 30, 0),
+    color: 0xffe2b8,
+    intensity: 2.1,
+    position: new THREE.Vector3(12, 28, -8),
     castShadow: true,
     shadowMapSize: 2048,
     shadowBias: -0.0002,
@@ -29,31 +29,31 @@ export const SHOOT_HOUSE_NEON_LIGHTING_CONFIG: LightingConfig = {
   },
 
   rimLight: {
-    color: 0xcc88ff,
-    intensity: 0.25,
-    position: new THREE.Vector3(-15, 10, 20),
+    color: 0xd4893a,
+    intensity: 0.45,
+    position: new THREE.Vector3(-18, 10, 16),
   },
 
   fillLight: {
-    color: 0x88ccff,
-    intensity: 0.2,
-    position: new THREE.Vector3(15, 8, -20),
+    color: 0x7a90a0,
+    intensity: 0.38,
+    position: new THREE.Vector3(16, 8, -18),
   },
 
   neonAccents: [
-    { color: 0xff8866, intensity: 1.0, position: new THREE.Vector3(-16, 8, 0), distance: 18, decay: 1.6 },
-    { color: 0xffffff, intensity: 1.5, position: new THREE.Vector3(0, 10, 0), distance: 25, decay: 1.4 },
-    { color: 0x66aaff, intensity: 1.0, position: new THREE.Vector3(16, 8, 0), distance: 18, decay: 1.6 },
-    { color: 0x00dddd, intensity: 1.2, position: new THREE.Vector3(0, 6, -26), distance: 16, decay: 1.5 },
-    { color: 0xdd00dd, intensity: 1.2, position: new THREE.Vector3(0, 6, 26), distance: 16, decay: 1.5 },
+    { color: 0xd4893a, intensity: 0.9, position: new THREE.Vector3(-16, 8, 0), distance: 18, decay: 1.6 },
+    { color: 0xf0e6d4, intensity: 1.2, position: new THREE.Vector3(0, 12, 0), distance: 28, decay: 1.3 },
+    { color: 0x4a8b8a, intensity: 0.7, position: new THREE.Vector3(16, 8, 0), distance: 18, decay: 1.6 },
+    { color: 0xd4893a, intensity: 0.8, position: new THREE.Vector3(0, 6, -26), distance: 16, decay: 1.5 },
+    { color: 0x4a8b8a, intensity: 0.65, position: new THREE.Vector3(0, 6, 26), distance: 16, decay: 1.5 },
   ],
 
-  exposure: 1.3,
+  exposure: 1.05,
 
   fog: {
-    color: 0x0a0c10,
-    near: 40,
-    far: 100,
+    color: 0x5a5e62,
+    near: 48,
+    far: 110,
   },
 };
 

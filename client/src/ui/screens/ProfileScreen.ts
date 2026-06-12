@@ -1,5 +1,6 @@
 import { BaseScreen } from "./BaseScreen.js";
 import { api, type UserProfile } from "../../api/client.js";
+import { THEME } from "../../theme.js";
 
 const PRIMARY_WEAPONS = [
   { value: "AR_1", label: "Assault Rifle" },
@@ -47,7 +48,7 @@ export class ProfileScreen extends BaseScreen {
     const loadoutTitle = document.createElement("div");
     loadoutTitle.textContent = "Loadout";
     loadoutTitle.style.cssText = `
-      color: #00ffff;
+      color: ${THEME.accent};
       font-size: 14px;
       font-weight: 600;
       margin: 16px 0 8px 0;

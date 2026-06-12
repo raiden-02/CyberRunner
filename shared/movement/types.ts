@@ -5,10 +5,6 @@ export enum MovementState {
   Crouching = 1,
   Sliding = 2,
   Prone = 3,
-  Dashing = 4,
-  WallRun = 5,
-  Mantling = 6,
-  Falling = 7,
 }
 
 export type InputMsg = {
@@ -23,7 +19,6 @@ export type InputMsg = {
   crouchReleased: boolean;
   crouchHeld: boolean;
   jumpPressed: boolean;
-  dashPressed: boolean;
 };
 
 export interface Environment {
@@ -42,19 +37,34 @@ export interface CharacterDeps {
   up(): { x: number; y: number; z: number };
   setCapsuleHalfHeight(h: number): void;
   setFriction(f: number): void;
-  setGravityScale(scale: number): void;
+  hasCapsuleClearance(halfHeight: number): boolean;
 }
 
 export interface MovementCtx extends CharacterDeps {
   env: Environment;
   input: InputMsg;
-  lastDashTime: number;
-  flags: {
-    wantsToProne: boolean;
-    wallRight: boolean;
-  };
   speedMultiplier: number;
 }
+
+export type MovementStateSnapshot = {
+  kind: MovementState;
+  vx: number;
+  vz: number;
+  vy: number;
+  crouchHoldStart: number;
+  prevCrouchHeld: boolean;
+  slideDirX: number;
+  slideDirZ: number;
+};
+
+export type CharacterControllerSnapshot = {
+  speedMultiplier: number;
+  lookYaw: number;
+  lookPitch: number;
+  capsuleHalfHeight: number;
+  friction: number;
+  state: MovementStateSnapshot;
+};
 
 export interface IMovementState {
   kind: MovementState;
@@ -62,4 +72,6 @@ export interface IMovementState {
   exit(ctx: MovementCtx, next?: IMovementState): void;
   update(ctx: MovementCtx): IMovementState | null;
   setInitialVelocity?(velocity: { x: number; z: number }): void;
+  capture(): MovementStateSnapshot;
+  applySnapshot(data: MovementStateSnapshot): void;
 }

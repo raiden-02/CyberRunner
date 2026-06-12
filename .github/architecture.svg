@@ -1,60 +1,83 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 380" font-family="Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 520" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="920" height="520" rx="10" fill="#161411"/>
+
+  <!-- Client column -->
+  <rect x="24" y="20" width="300" height="430" rx="8" fill="none" stroke="#d4893a" stroke-width="1.5"/>
+  <text x="174" y="48" text-anchor="middle" fill="#d4893a" font-size="15" font-weight="700">CLIENT</text>
+
+  <rect x="44" y="64" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="174" y="85" text-anchor="middle" fill="#ede6d9" font-size="12">Input 60 Hz → 15-byte input_bin</text>
+  <text x="174" y="103" text-anchor="middle" fill="#9a9286" font-size="11">one tick: predict, buffer, send</text>
+
+  <rect x="44" y="128" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="174" y="149" text-anchor="middle" fill="#ede6d9" font-size="12">Local RAPIER prediction</text>
+  <text x="174" y="167" text-anchor="middle" fill="#9a9286" font-size="11">same CharacterController, map only</text>
+
+  <rect x="44" y="192" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="174" y="213" text-anchor="middle" fill="#ede6d9" font-size="12">Reconcile on lastProcessedInputSeq</text>
+  <text x="174" y="231" text-anchor="middle" fill="#9a9286" font-size="11">restore ack snapshot, apply pose, replay</text>
+
+  <rect x="44" y="256" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="174" y="277" text-anchor="middle" fill="#ede6d9" font-size="12">Remote chase-latest lerp</text>
+  <text x="174" y="295" text-anchor="middle" fill="#9a9286" font-size="11">dt×50, rest dead zones</text>
+
+  <rect x="44" y="320" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="174" y="341" text-anchor="middle" fill="#ede6d9" font-size="12">Fire 13-byte fire_bin</text>
+  <text x="174" y="359" text-anchor="middle" fill="#9a9286" font-size="11">aim direction only</text>
+
+  <rect x="44" y="384" width="260" height="48" rx="5" fill="#241f1a"/>
+  <text x="174" y="412" text-anchor="middle" fill="#ede6d9" font-size="12">Three.js camera + HUD</text>
+
+  <!-- Server column -->
+  <rect x="596" y="20" width="300" height="430" rx="8" fill="none" stroke="#4a8b8a" stroke-width="1.5"/>
+  <text x="746" y="48" text-anchor="middle" fill="#4a8b8a" font-size="15" font-weight="700">SERVER  60 Hz</text>
+
+  <rect x="616" y="64" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="746" y="85" text-anchor="middle" fill="#ede6d9" font-size="12">Queue input, consume one per tick</text>
+  <text x="746" y="103" text-anchor="middle" fill="#9a9286" font-size="11">ack only after simulate</text>
+
+  <rect x="616" y="128" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="746" y="149" text-anchor="middle" fill="#ede6d9" font-size="12">Authoritative RAPIER world</text>
+  <text x="746" y="167" text-anchor="middle" fill="#9a9286" font-size="11">all capsules + map + projectiles</text>
+
+  <rect x="616" y="192" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="746" y="213" text-anchor="middle" fill="#ede6d9" font-size="12">Write PlayerState schema</text>
+  <text x="746" y="231" text-anchor="middle" fill="#9a9286" font-size="11">x,y,z, ack seq, health, ammo</text>
+
+  <rect x="616" y="256" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="746" y="277" text-anchor="middle" fill="#ede6d9" font-size="12">Record tick (60 samples)</text>
+  <text x="746" y="295" text-anchor="middle" fill="#9a9286" font-size="11">rewind = tick − lag − 1.5</text>
+
+  <rect x="616" y="320" width="260" height="52" rx="5" fill="#241f1a"/>
+  <text x="746" y="341" text-anchor="middle" fill="#ede6d9" font-size="12">Rewind → raycast → restore</text>
+  <text x="746" y="359" text-anchor="middle" fill="#9a9286" font-size="11">server origin, 250 ms rewind cap</text>
+
+  <rect x="616" y="384" width="260" height="48" rx="5" fill="#241f1a"/>
+  <text x="746" y="412" text-anchor="middle" fill="#ede6d9" font-size="12">Modes + Colyseus room state</text>
+
+  <!-- Arrows -->
   <defs>
-    <marker id="arr-cyan" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0,0 10,3.5 0,7" fill="#00cccc"/>
+    <marker id="arr-warm" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0,0 9,3.5 0,7" fill="#d4893a"/>
     </marker>
-    <marker id="arr-purple" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0,0 10,3.5 0,7" fill="#b366ff"/>
+    <marker id="arr-cool" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0,0 9,3.5 0,7" fill="#4a8b8a"/>
     </marker>
   </defs>
 
-  <rect width="820" height="380" rx="10" fill="#0d0d1a"/>
+  <line x1="328" y1="90" x2="592" y2="90" stroke="#d4893a" stroke-width="2" marker-end="url(#arr-warm)"/>
+  <text x="460" y="80" text-anchor="middle" fill="#d4893a" font-size="11">input_bin / fire_bin</text>
 
-  <!-- Client -->
-  <rect x="30" y="28" width="280" height="270" rx="8" fill="none" stroke="#00cccc" stroke-width="1.5"/>
-  <text x="170" y="54" text-anchor="middle" fill="#00cccc" font-size="14" font-weight="700">CLIENT</text>
+  <line x1="592" y1="218" x2="328" y2="218" stroke="#4a8b8a" stroke-width="2" marker-end="url(#arr-cool)"/>
+  <text x="460" y="208" text-anchor="middle" fill="#4a8b8a" font-size="11">schema pose + ack seq</text>
 
-  <rect x="55" y="72" width="230" height="34" rx="5" fill="#161633"/>
-  <text x="170" y="94" text-anchor="middle" fill="#ddd" font-size="12">Input  →  Binary Codec</text>
+  <line x1="592" y1="346" x2="328" y2="346" stroke="#4a8b8a" stroke-width="2" marker-end="url(#arr-cool)"/>
+  <text x="460" y="336" text-anchor="middle" fill="#4a8b8a" font-size="11">health_change / shot_fired</text>
 
-  <rect x="55" y="120" width="230" height="34" rx="5" fill="#161633"/>
-  <text x="170" y="142" text-anchor="middle" fill="#ddd" font-size="12">Prediction + Reconciliation</text>
+  <rect x="400" y="248" width="120" height="26" rx="4" fill="#1a1814" stroke="#4a433a"/>
+  <text x="460" y="266" text-anchor="middle" fill="#9a9286" font-size="11">WebSocket</text>
 
-  <rect x="55" y="168" width="230" height="34" rx="5" fill="#161633"/>
-  <text x="170" y="190" text-anchor="middle" fill="#ddd" font-size="12">Remote Player Interpolation</text>
-
-  <rect x="55" y="216" width="230" height="34" rx="5" fill="#161633"/>
-  <text x="170" y="238" text-anchor="middle" fill="#ddd" font-size="12">Three.js Render + HUD</text>
-
-  <!-- Server -->
-  <rect x="510" y="28" width="280" height="270" rx="8" fill="none" stroke="#b366ff" stroke-width="1.5"/>
-  <text x="650" y="54" text-anchor="middle" fill="#b366ff" font-size="14" font-weight="700">SERVER</text>
-
-  <rect x="535" y="72" width="230" height="34" rx="5" fill="#161633"/>
-  <text x="650" y="94" text-anchor="middle" fill="#ddd" font-size="12">Decode  →  RAPIER Physics</text>
-
-  <rect x="535" y="120" width="230" height="34" rx="5" fill="#161633"/>
-  <text x="650" y="142" text-anchor="middle" fill="#ddd" font-size="12">Lag Compensation (Rewind)</text>
-
-  <rect x="535" y="168" width="230" height="34" rx="5" fill="#161633"/>
-  <text x="650" y="190" text-anchor="middle" fill="#ddd" font-size="12">Hit Detection + Damage</text>
-
-  <rect x="535" y="216" width="230" height="34" rx="5" fill="#161633"/>
-  <text x="650" y="238" text-anchor="middle" fill="#ddd" font-size="12">Game Modes + State Sync</text>
-
-  <!-- Client → Server arrow -->
-  <line x1="314" y1="89" x2="506" y2="89" stroke="#00cccc" stroke-width="2" marker-end="url(#arr-cyan)"/>
-  <text x="410" y="80" text-anchor="middle" fill="#00cccc" font-size="11">input / fire</text>
-
-  <!-- Server → Client arrow -->
-  <line x1="506" y1="237" x2="314" y2="237" stroke="#b366ff" stroke-width="2" marker-end="url(#arr-purple)"/>
-  <text x="410" y="228" text-anchor="middle" fill="#b366ff" font-size="11">state / hit results</text>
-
-  <!-- WebSocket label -->
-  <rect x="378" y="144" width="64" height="24" rx="4" fill="#161633" stroke="#555" stroke-width="0.8"/>
-  <text x="410" y="160" text-anchor="middle" fill="#999" font-size="10">WebSocket</text>
-
-  <!-- Shared -->
-  <rect x="30" y="320" width="760" height="36" rx="6" fill="#111e11" stroke="#44bb44" stroke-width="1"/>
-  <text x="410" y="343" text-anchor="middle" fill="#44bb44" font-size="12" font-weight="600">Shared:  CharacterController  ·  Physics Constants  ·  Collision Groups  ·  Map Data</text>
+  <!-- Shared bar -->
+  <rect x="24" y="466" width="872" height="38" rx="6" fill="#1e241c" stroke="#5a7a4a" stroke-width="1"/>
+  <text x="460" y="490" text-anchor="middle" fill="#8aaa6a" font-size="12">Shared: CharacterController · capsule / hitbox constants · shoot-house collision</text>
 </svg>

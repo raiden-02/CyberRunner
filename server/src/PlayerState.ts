@@ -8,18 +8,13 @@ export class PlayerState extends Schema {
   @type("number") z: number = 0;
   @type("number") rotationY: number = 0;
   @type("number") pitch: number = 0;  // Camera pitch for weapon aiming
-  // Server ack: last input sequence number processed/accepted for this player.
-  // Client uses this to reconcile predicted movement.
+  // Server ack: last input seq consumed by a simulation tick.
+  // Colyseus "number" is a float64 and holds every u32 integer exactly.
   @type("number") lastProcessedInputSeq: number = 0;
-  @type("number") velX: number = 0;
-  @type("number") velY: number = 0;
-  @type("number") velZ: number = 0;
   @type("uint8") movementState: MovementState = MovementState.Walking;
   @type("boolean") isSprinting: boolean = false;
   @type("boolean") isCrouching: boolean = false;
   @type("boolean") isSliding: boolean = false;
-  @type("boolean") canJump: boolean = false;
-  @type("boolean") wallRight: boolean = false;
   
   // Health state
   @type("uint8") health: number = 100;

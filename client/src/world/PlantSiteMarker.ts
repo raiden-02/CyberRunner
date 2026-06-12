@@ -33,7 +33,7 @@ export class PlantSiteMarker {
     // Outer perimeter ring
     const outerGeom = new THREE.RingGeometry(config.radius - 0.1, config.radius, 48);
     const outerMat = new THREE.MeshBasicMaterial({
-      color: config.id === "A" ? 0x00ffff : 0xff00ff,
+      color: config.id === "A" ? 0x4a8b8a : 0xd4893a,
       transparent: true,
       opacity: 0.5,
       side: THREE.DoubleSide,
@@ -45,7 +45,7 @@ export class PlantSiteMarker {
     // Inner fill circle (subtle)
     const innerGeom = new THREE.CircleGeometry(config.radius - 0.1, 48);
     const innerMat = new THREE.MeshBasicMaterial({
-      color: config.id === "A" ? 0x00ffff : 0xff00ff,
+      color: config.id === "A" ? 0x4a8b8a : 0xd4893a,
       transparent: true,
       opacity: 0.1,
       side: THREE.DoubleSide,
@@ -58,7 +58,7 @@ export class PlantSiteMarker {
     // Corner markers (4 corners of the zone)
     const cornerGeom = new THREE.PlaneGeometry(0.5, 0.5);
     const cornerMat = new THREE.MeshBasicMaterial({
-      color: config.id === "A" ? 0x00ffff : 0xff00ff,
+      color: config.id === "A" ? 0x4a8b8a : 0xd4893a,
       transparent: true,
       opacity: 0.7,
       side: THREE.DoubleSide,
@@ -92,7 +92,7 @@ export class PlantSiteMarker {
     // Terminal top platform
     const topGeom = new THREE.CylinderGeometry(0.5, 0.3, 0.2, 8);
     const topMat = new THREE.MeshBasicMaterial({
-      color: config.id === "A" ? 0x00ffff : 0xff00ff,
+      color: config.id === "A" ? 0x4a8b8a : 0xd4893a,
       transparent: true,
       opacity: 0.8,
     });
@@ -105,7 +105,7 @@ export class PlantSiteMarker {
     labelCanvas.width = 128;
     labelCanvas.height = 128;
     const ctx = labelCanvas.getContext("2d")!;
-    ctx.fillStyle = config.id === "A" ? "#00ffff" : "#ff00ff";
+    ctx.fillStyle = config.id === "A" ? "#4a8b8a" : "#d4893a";
     ctx.font = "bold 80px Arial";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -133,17 +133,17 @@ export class PlantSiteMarker {
 
     switch (state) {
       case "inactive":
-        outerMat.color.setHex(this.config.id === "A" ? 0x00ffff : 0xff00ff);
+        outerMat.color.setHex(this.config.id === "A" ? 0x4a8b8a : 0xd4893a);
         innerMat.opacity = 0.1;
         break;
       case "uploading":
-        outerMat.color.setHex(0xff6600);
-        innerMat.color.setHex(0xff6600);
+        outerMat.color.setHex(0xc45c3a);
+        innerMat.color.setHex(0xc45c3a);
         innerMat.opacity = 0.3;
         break;
       case "uploaded":
-        outerMat.color.setHex(0xff0000);
-        innerMat.color.setHex(0xff0000);
+        outerMat.color.setHex(0x8a3a2e);
+        innerMat.color.setHex(0x8a3a2e);
         innerMat.opacity = 0.4;
         break;
     }

@@ -64,7 +64,7 @@ export abstract class BaseLevel {
     this.addMesh(floor);
 
     if (showGrid) {
-      const grid = new THREE.GridHelper(size, gridDivisions, 0x00444a, 0x1a1828);
+      const grid = new THREE.GridHelper(size, gridDivisions, 0x8a8274, 0x6a6862);
       grid.position.y = 0.01;
       this.scene.add(grid);
     }

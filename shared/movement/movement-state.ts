@@ -21,7 +21,12 @@ export class StateMachine {
     }
   }
   
-  snapshot() { 
-    return this.current; 
+  snapshot() {
+    return this.current;
+  }
+
+  /** Replace the current state without enter/exit. Used to restore a snapshot. */
+  replaceSilent(state: IMovementState): void {
+    this.current = state;
   }
 }

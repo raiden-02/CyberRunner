@@ -3,9 +3,8 @@ import { buildMapColliders, createPlayerPhysics } from "@shared/world/map-physic
 import { SHOOT_HOUSE_NEON_COLLISION } from "@shared/world/maps/shoot-house-neon.js";
 import { CharacterController } from "@shared/movement/character-controller.js";
 import { CAPSULE } from "@shared/physics/constants.js";
-import type { InputMsg } from "@shared/movement/types.js";
-
-const FIXED_DT = 1 / 60;
+import type { CharacterControllerSnapshot, InputMsg, MovementState } from "@shared/movement/types.js";
+import { FIXED_DT } from "@shared/net/fixed-tick.js";
 
 let rapierInitialized = false;
 
@@ -16,9 +15,8 @@ export async function initRapier(): Promise<void> {
 }
 
 /**
- * Client-side RAPIER physics world for prediction.
- * Uses the same map geometry, player capsule, and CharacterController as the server
- * to guarantee identical simulation outcomes.
+ * Client prediction world: local capsule plus static map colliders.
+ * Other players are not simulated here.
  */
 export class PhysicsWorld {
   private world: RAPIER.World;
@@ -28,6 +26,7 @@ export class PhysicsWorld {
 
   constructor() {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    this.world.timestep = FIXED_DT;
     buildMapColliders(RAPIER, this.world, SHOOT_HOUSE_NEON_COLLISION);
 
     const { body, collider, controller } = createPlayerPhysics(
@@ -40,9 +39,25 @@ export class PhysicsWorld {
     this.ctrl = new CharacterController(body, collider, controller);
   }
 
-  setPosition(x: number, y: number, z: number): void {
-    this.body.setNextKinematicTranslation({ x, y, z });
+  /** Spawn / respawn / real teleport. Resets controller state. */
+  hardResetTo(x: number, y: number, z: number): void {
+    this.ctrl.resetAfterTeleport();
+    this.placeAt(x, y, z);
     this.world.step();
+  }
+
+  /** Move the body without touching movement-state internals. */
+  placeAt(x: number, y: number, z: number): void {
+    this.body.setTranslation({ x, y, z }, true);
+    this.body.setNextKinematicTranslation({ x, y, z });
+  }
+
+  capture(): CharacterControllerSnapshot {
+    return this.ctrl.capture();
+  }
+
+  restore(snap: CharacterControllerSnapshot): void {
+    this.ctrl.applySnapshot(snap);
   }
 
   getPosition(): { x: number; y: number; z: number } {
@@ -54,10 +69,6 @@ export class PhysicsWorld {
     this.ctrl.setSpeedMultiplier(mult);
   }
 
-  /**
-   * Simulate one fixed-timestep tick: feed input -> advance controller -> step world.
-   * Mirrors the exact sequence the server runs per authoritative tick.
-   */
   simulateTick(input: InputMsg, now: number): void {
     this.ctrl.updateInput(input);
     this.ctrl.update(this.world, FIXED_DT, now);
@@ -67,6 +78,14 @@ export class PhysicsWorld {
 
   getTickTime(): number {
     return this.tickTime;
+  }
+
+  currentState(): MovementState {
+    return this.ctrl.currentState();
+  }
+
+  capsuleHalfHeight(): number {
+    return this.ctrl.collider.halfHeight();
   }
 
   dispose(): void {

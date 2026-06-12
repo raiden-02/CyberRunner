@@ -1,7 +1,8 @@
 import { BaseState } from "./base.js";
-import type { MovementCtx, IMovementState } from "../types.js";
+import type { MovementCtx, IMovementState, MovementStateSnapshot } from "../types.js";
 import { MovementState } from "../types.js";
 import { SLIDE, CAPSULE } from "../../physics/constants.js";
+import { CROUCH_CAPSULE_HALF, SLIDE_CAPSULE_HALF } from "../capsule.js";
 
 export class SlidingState extends BaseState {
   kind = MovementState.Sliding;
@@ -11,6 +12,25 @@ export class SlidingState extends BaseState {
 
   setInitialVelocity(velocity: { x: number; z: number }): void {
     this.currentVelocity = { x: velocity.x, z: velocity.z };
+  }
+
+  capture(): MovementStateSnapshot {
+    return {
+      kind: MovementState.Sliding,
+      vx: this.currentVelocity.x,
+      vz: this.currentVelocity.z,
+      vy: this.verticalVelocity,
+      crouchHoldStart: -1,
+      prevCrouchHeld: false,
+      slideDirX: this.slideDirection.x,
+      slideDirZ: this.slideDirection.z,
+    };
+  }
+
+  applySnapshot(data: MovementStateSnapshot): void {
+    this.currentVelocity = { x: data.vx, z: data.vz };
+    this.verticalVelocity = data.vy;
+    this.slideDirection = { x: data.slideDirX, z: data.slideDirZ };
   }
 
   enter(ctx: MovementCtx) {
@@ -25,8 +45,7 @@ export class SlidingState extends BaseState {
     }
     
     ctx.setFriction(0.7 * SLIDE.FrictionFactor);
-    ctx.setGravityScale(1.0);
-    ctx.setCapsuleHalfHeight(CAPSULE.HalfHeight * 0.4);
+    ctx.setCapsuleHalfHeight(SLIDE_CAPSULE_HALF);
     
     const slideBoostSpeed = Math.max(currentHorizontalSpeed, SLIDE.MinSlideSpeed) + SLIDE.EnterImpulse;
     this.currentVelocity.x = this.slideDirection.x * slideBoostSpeed;
@@ -37,17 +56,14 @@ export class SlidingState extends BaseState {
     const input = ctx.input;
 
     if (!ctx.isGrounded()) {
-      return this.transitionToWalking();
+      return this.exitSlideAirborne(ctx);
     }
 
     this.processSlideMovement(ctx);
 
     const currentSpeed = Math.hypot(this.currentVelocity.x, this.currentVelocity.z);
     if (currentSpeed < SLIDE.ExitThreshold) {
-      if (input.crouchHeld) {
-        return this.transitionToProne();
-      }
-      return this.transitionToCrouching();
+      return this.exitSlideGrounded(ctx, input.crouchHeld);
     }
 
     return null;
@@ -55,7 +71,6 @@ export class SlidingState extends BaseState {
 
   exit(ctx: MovementCtx) {
     ctx.setFriction(0.7);
-    ctx.setCapsuleHalfHeight(CAPSULE.HalfHeight);
   }
 
   private processSlideMovement(ctx: MovementCtx) {
@@ -119,6 +134,26 @@ export class SlidingState extends BaseState {
     const desiredVelZ = (input.moveZ * forwardZ + input.moveX * rightZ) * maxSteerSpeed;
 
     return { x: desiredVelX, z: desiredVelZ };
+  }
+
+  private exitSlideGrounded(ctx: MovementCtx, crouchHeld: boolean): IMovementState {
+    if (crouchHeld) {
+      return this.transitionToProne();
+    }
+    if (ctx.hasCapsuleClearance(CROUCH_CAPSULE_HALF)) {
+      return this.transitionToCrouching();
+    }
+    return this.transitionToProne();
+  }
+
+  private exitSlideAirborne(ctx: MovementCtx): IMovementState {
+    if (ctx.hasCapsuleClearance(CAPSULE.HalfHeight)) {
+      return this.transitionToWalking();
+    }
+    if (ctx.hasCapsuleClearance(CROUCH_CAPSULE_HALF)) {
+      return this.transitionToCrouching();
+    }
+    return this.transitionToProne();
   }
 
   private transitionToWalking(): IMovementState {
