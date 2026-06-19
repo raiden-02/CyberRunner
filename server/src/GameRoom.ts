@@ -11,13 +11,13 @@ import { FIXED_DT, FIXED_TICK_HZ, authoritativeMovementDt, simulationTimeSec } f
 import { CharacterController } from "@shared/movement/character-controller.js";
 import { CAPSULE } from "@shared/physics/constants.js";
 import { buildMapColliders, createPlayerPhysics } from "@shared/world/map-physics.js";
-import { SHOOT_HOUSE_NEON_COLLISION } from "@shared/world/maps/shoot-house-neon.js";
 import { HealthSystem } from "./systems/health-system.js";
 import { WeaponSystem } from "./systems/weapon-system.js";
 import { getWeaponConfig } from "./weapons/weapon-config.js";
 import { createHitboxes, removeHitboxes, HitboxRegistry } from "./physics/hitbox-system.js";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { calculateSpawnFacing, getCurrentMap, setCurrentMap, type MapId } from "./world/maps/map-registry.js";
+import { calculateSpawnFacing, resolveRoomMapId, getGameplayMap, assertDeathmatchMap, assertSearchDestroyMap } from "./world/maps/map-registry.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { LobbyService } from "./services/lobby-service.js";
 import {
   BaseGameMode,
@@ -52,6 +52,7 @@ export class GameRoom extends Room<GameState> {
   private projectileManager!: ProjectileManager;
   private serverTick = 0;
   private match!: MatchLifecycle;
+  map!: GameplayMapDefinition;
 
   private joinCode: string = "";
   private hostId: string = "";
@@ -82,6 +83,7 @@ export class GameRoom extends Room<GameState> {
       schedule: (fn, ms) => { room.clock.setTimeout(fn, ms); },
       placePlayerAt: (player, x, y, z) => room.placePlayerAt(player, x, y, z),
       pickSpawnPoint: (sessionId) => room.pickSpawnPoint(sessionId),
+      get map() { return room.map; },
     });
   }
 
@@ -93,7 +95,7 @@ export class GameRoom extends Room<GameState> {
     return true;
   }
 
-  async onCreate(options: { gameMode?: string } = {}) {
+  async onCreate(options: { gameMode?: string; mapId?: string } = {}) {
     this.setState(new GameState());
 
     const roomInfo = LobbyService.registerRoom(this.roomId);
@@ -105,12 +107,17 @@ export class GameRoom extends Room<GameState> {
     }
     this.maxClients = this.maxPlayers;
 
-    const mapId = (process.env.MAP_ID || "shoot-house-neon") as MapId;
-    setCurrentMap(mapId);
-    const currentMap = getCurrentMap();
+    const mapId = resolveRoomMapId(options.mapId, process.env.MAP_ID);
+    this.map = getGameplayMap(mapId);
+    this.state.mapId = this.map.id;
 
     const modeId = options.gameMode || "deathmatch";
-    this.gameMode = createGameMode(modeId, currentMap.uploadTerminals || []);
+    if (modeId === "search_destroy") {
+      assertSearchDestroyMap(this.map);
+    } else {
+      assertDeathmatchMap(this.map);
+    }
+    this.gameMode = createGameMode(modeId, this.map.uploadTerminals || []);
     const modeConfig = this.gameMode.getConfig();
 
     this.state.gameMode = modeConfig.id;
@@ -128,16 +135,16 @@ export class GameRoom extends Room<GameState> {
       this.gameMode.startGame();
     }
 
-    console.log(`[GameRoom] Created (code: ${roomInfo.joinCode}, mode: ${modeConfig.name})`);
+    console.log(`[GameRoom] Created (code: ${roomInfo.joinCode}, mode: ${modeConfig.name}, map: ${this.map.id})`);
 
     await RAPIER.init();
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
 
-    const { breakableColliders } = buildMapColliders(RAPIER, this.world, SHOOT_HOUSE_NEON_COLLISION);
+    const { breakableColliders } = buildMapColliders(RAPIER, this.world, this.map);
 
     breakableColliders.forEach((collider, idx) => {
-      const b = SHOOT_HOUSE_NEON_COLLISION.breakables[idx];
+      const b = this.map.breakables[idx];
       const runtime: BreakableRuntime = {
         id: idx,
         hp: b.hp,
@@ -537,7 +544,7 @@ export class GameRoom extends Room<GameState> {
       }
 
       if (!player.schema.isDead && player.schema.spawnProtectionTime > 0) {
-        const inSpawnZone = isInSpawnProtectionZone(player.schema.x, player.schema.y, player.schema.z);
+        const inSpawnZone = isInSpawnProtectionZone(this.map, player.schema.x, player.schema.y, player.schema.z);
         player.schema.isSpawnProtected = inSpawnZone;
       } else if (!player.schema.isDead) {
         player.schema.isSpawnProtected = false;
@@ -645,6 +652,7 @@ export class GameRoom extends Room<GameState> {
   private pickSpawnPoint(sessionId?: string): { x: number; y: number; z: number } {
     const sdMode = this.getSDMode();
     return pickSpawnPoint(
+      this.map,
       this.players,
       sessionId,
       (id) => sdMode?.getTeamManager().getPlayerTeam(id),

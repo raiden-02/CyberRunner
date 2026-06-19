@@ -6,7 +6,8 @@
 import * as THREE from "three";
 import { MaterialFactory, MATERIAL_PRESETS, type MaterialParams } from "./MaterialFactory.js";
 import type { NeonColorKey } from "./NeonColors.js";
-import type { BoxObstacle, MapDefinition } from "../maps/map-types.js";
+import type { BoxObstacle } from "@shared/world/map-types.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 
 /**
  * Abstract base class for all game levels.
@@ -20,10 +21,9 @@ export abstract class BaseLevel {
   protected clock = new THREE.Clock();
   protected meshes: THREE.Object3D[] = [];
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, protected readonly gameplayMap: GameplayMapDefinition) {
     this.scene = scene;
     this.materialFactory = new MaterialFactory();
-    this.build();
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -33,10 +33,12 @@ export abstract class BaseLevel {
   /**
    * Get the map definition for this level
    */
-  protected abstract getMapDefinition(): MapDefinition;
+  protected getMapDefinition(): GameplayMapDefinition {
+    return this.gameplayMap;
+  }
 
   /**
-   * Build the level geometry. Called by constructor.
+   * Build the level geometry. Subclasses must call this after super().
    */
   protected abstract build(): void;
 

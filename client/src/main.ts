@@ -34,6 +34,8 @@ mainMenu.setOnGameStart(async (options) => {
     await currentGame.start(options.action);
   } catch (err) {
     console.error("Failed to start game:", err);
+    currentGame.stop();
+    currentGame = null;
     mainMenu.showLobby();
   }
 });

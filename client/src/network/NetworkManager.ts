@@ -104,6 +104,7 @@ export class NetworkManager {
   private client: Client;
   private room?: Room;
   private pingInterval?: number;
+  private messageHandlersReady = false;
   public latencyMs = 50;
   public jitterMs = 10;
 
@@ -177,21 +178,24 @@ export class NetworkManager {
         this.room = await this.client.joinOrCreate("game_room", roomOptions);
       }
 
-      if (this.onConnected) {
-        this.onConnected(this.sessionId);
-      }
-
       this.setupMessageHandlers();
 
       this.room.onLeave((code) => {
         console.warn(`[Network] Room left (code: ${code})`);
         this.stopPingInterval();
+        this.messageHandlersReady = false;
         this.room = undefined;
       });
 
       this.room.onError((code, message) => {
         console.error(`[Network] Room error ${code}: ${message}`);
       });
+
+      await this.waitForMapId();
+
+      if (this.onConnected) {
+        this.onConnected(this.sessionId);
+      }
     } catch (e) {
       console.error("Join error", e);
       if (this.onError) {
@@ -201,8 +205,50 @@ export class NetworkManager {
     }
   }
 
+  /** Join can resolve before the first schema patch. Map apply needs mapId. */
+  private waitForMapId(timeoutMs = 8000): Promise<void> {
+    const room = this.room;
+    if (!room) {
+      return Promise.reject(new Error("Not in a room"));
+    }
+
+    const existing = (room.state as SyncedGameState | undefined)?.mapId;
+    if (existing) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      const onState = () => {
+        const mapId = (room.state as SyncedGameState | undefined)?.mapId;
+        if (mapId) finish();
+      };
+      const onLeave = () => {
+        finish(new Error("Disconnected while waiting for room mapId"));
+      };
+
+      const finish = (err?: Error) => {
+        if (settled) return;
+        settled = true;
+        if (timer !== undefined) clearTimeout(timer);
+        room.onStateChange.remove(onState);
+        room.onLeave.remove(onLeave);
+        if (err) reject(err);
+        else resolve();
+      };
+
+      timer = setTimeout(() => {
+        finish(new Error("Timed out waiting for room mapId"));
+      }, timeoutMs);
+      room.onStateChange(onState);
+      room.onLeave(onLeave);
+      onState();
+    });
+  }
+
   private setupMessageHandlers(): void {
-    if (!this.room) return;
+    if (!this.room || this.messageHandlersReady) return;
+    this.messageHandlersReady = true;
 
     this.room.onMessage("health_change", (msg: HealthChangeMessage) => {
       if (this.onHealthChange) {

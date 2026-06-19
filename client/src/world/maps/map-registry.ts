@@ -1,66 +1,40 @@
-/**
- * MAP REGISTRY
- * Central registry for all available maps.
- */
-import { SHOOT_HOUSE_NEON } from "./shoot-house-neon.js";
-import type { MapDefinition, ShootHouseMapDefinition } from "./map-types.js";
+import {
+  type MapId,
+  getDefaultMapId,
+  getGameplayMap,
+} from "@shared/world/map-registry.js";
 
-export type MapId = "shoot-house-neon";
+export type { MapId };
+export { getDefaultMapId, getGameplayMap };
 
-export interface MapRegistryEntry {
-  id: MapId;
-  displayName: string;
-  description: string;
-  playerCount: string;
-  isDefault: boolean;
-  definition: MapDefinition | ShootHouseMapDefinition;
-  skyboxPath: string;
+export function isShootHouseNeonMap(mapId: string): boolean {
+  return mapId === "shoot-house-neon";
 }
 
-export const MAP_REGISTRY: Record<MapId, MapRegistryEntry> = {
-  "shoot-house-neon": {
-    id: "shoot-house-neon",
-    displayName: "Shoot House Neon",
-    description: "Compact three-lane arena inspired by Shoot House with cyberpunk pub district aesthetic",
-    playerCount: "4-8",
-    isDefault: true,
-    definition: SHOOT_HOUSE_NEON,
-    skyboxPath: "/skybox/cyberpunk",
-  },
+export type MapVisuals = {
+  displayName: string;
+  skyboxPath?: string;
 };
 
-/**
- * Get the default map ID
- */
-export function getDefaultMapId(): MapId {
-  const defaultEntry = Object.values(MAP_REGISTRY).find(entry => entry.isDefault);
-  return defaultEntry?.id ?? "shoot-house-neon";
+/** Shoot House has a custom theme. Every other registered map is unstyled. */
+export function getMapVisuals(mapId: string): MapVisuals {
+  const map = getGameplayMap(mapId);
+  if (isShootHouseNeonMap(map.id)) {
+    return {
+      displayName: "Shoot House Neon",
+      skyboxPath: "/skybox/cyberpunk",
+    };
+  }
+  return { displayName: map.name };
 }
 
-/**
- * Get a map registry entry by ID
- */
-export function getMapEntry(mapId: MapId): MapRegistryEntry | undefined {
-  return MAP_REGISTRY[mapId];
-}
+export type LevelRendererKind = "bespoke" | "core";
 
 /**
- * Get map definition by ID
+ * Registered maps only. Shoot House has its own level. Everyone else uses CoreLevel.
+ * getGameplayMap throws on unknown ids.
  */
-export function getMapDefinition(mapId: MapId): MapDefinition | undefined {
-  return MAP_REGISTRY[mapId]?.definition;
-}
-
-/**
- * Get all available map IDs
- */
-export function getAllMapIds(): MapId[] {
-  return Object.keys(MAP_REGISTRY) as MapId[];
-}
-
-/**
- * Check if a map ID is the Shoot House Neon map
- */
-export function isShootHouseNeonMap(mapId: MapId): boolean {
-  return mapId === "shoot-house-neon";
+export function resolveLevelRenderer(mapId: string): LevelRendererKind {
+  getGameplayMap(mapId);
+  return isShootHouseNeonMap(mapId) ? "bespoke" : "core";
 }

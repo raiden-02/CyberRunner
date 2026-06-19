@@ -1,6 +1,8 @@
-import type { MapCollisionData } from "../map-types.js";
+import type { GameplayMapDefinition } from "../map-types.js";
 
-export const SHOOT_HOUSE_NEON_COLLISION: MapCollisionData = {
+export const SHOOT_HOUSE_NEON: GameplayMapDefinition = {
+  id: "shoot-house-neon",
+  name: "shoot-house-neon",
   boundsHalfSize: 28,
   wallHeight: 4.5,
   wallThickness: 0.5,
@@ -39,4 +41,43 @@ export const SHOOT_HOUSE_NEON_COLLISION: MapCollisionData = {
     { x: -5, y: 0.8, z: -5, hx: 1, hy: 0.8, hz: 1, hp: 50 },
     { x: 5, y: 0.8, z: 5, hx: 1, hy: 0.8, hz: 1, hp: 50 },
   ],
+
+  spawnProtectionZones: [
+    { x: 0, y: 2, z: -26, hx: 24, hy: 3, hz: 2 },
+    { x: 0, y: 2, z: 26, hx: 24, hy: 3, hz: 2 },
+  ],
+
+  spawnPoints: [
+    { x: -18, y: 1, z: -26 },
+    { x: -8, y: 1, z: -26 },
+    { x: 0, y: 1, z: -26 },
+    { x: 8, y: 1, z: -26 },
+    { x: 18, y: 1, z: -26 },
+    { x: -18, y: 1, z: 26 },
+    { x: -8, y: 1, z: 26 },
+    { x: 0, y: 1, z: 26 },
+    { x: 8, y: 1, z: 26 },
+    { x: 18, y: 1, z: 26 },
+  ],
+
+  uploadTerminals: [
+    { id: "A", x: -16, y: 0, z: 0, radius: 2.5 },
+    { id: "B", x: 16, y: 0, z: 0, radius: 2.5 },
+  ],
+
+  ghostSpawnPoints: [
+    { x: -18, y: 1, z: -26 },
+    { x: -8, y: 1, z: -26 },
+    { x: 0, y: 1, z: -26 },
+    { x: 8, y: 1, z: -26 },
+  ],
+
+  sentinelSpawnPoints: [
+    { x: -18, y: 1, z: 26 },
+    { x: -8, y: 1, z: 26 },
+    { x: 0, y: 1, z: 26 },
+    { x: 8, y: 1, z: 26 },
+  ],
+
+  spikeSpawnLocation: { x: 0, y: 1, z: -24 },
 };

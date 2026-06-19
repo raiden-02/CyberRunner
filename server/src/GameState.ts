@@ -5,6 +5,8 @@ export class GameState extends Schema {
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
   
   // Game mode state
+  @type("string") mapId: string = "";
+
   @type("string") gameMode: string = "deathmatch";
   @type("uint8") scoreLimit: number = 30;
   @type("uint16") timeRemaining: number = 600; // seconds

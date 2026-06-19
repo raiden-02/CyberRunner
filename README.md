@@ -85,6 +85,13 @@ npm run preview       # serves client/dist from the Node process
 
 Two tabs can join the same Deathmatch with the HUD join code.
 
+Default map is `shoot-house-neon`. To boot the internal contract fixture instead (Windows), set `MAP_ID` on the server. The client reads `mapId` from room state. There is no menu entry for this map.
+
+```powershell
+$env:MAP_ID = "map-contract-smoke"; npm run dev:server
+npm run dev:client
+```
+
 | Variable | Default | Role |
 |----------|---------|------|
 | `PORT` | 2567 | Listen port |

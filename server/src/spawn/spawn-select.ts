@@ -1,11 +1,16 @@
-import { getCurrentMap, isPointInsideBox } from "../world/maps/map-registry.js";
+import { isPointInsideBox } from "@shared/world/map-types.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import type { PlayerRuntime } from "../player-runtime.js";
 
 const MIN_SPAWN_DISTANCE = 8;
 
-export function isInSpawnProtectionZone(x: number, y: number, z: number): boolean {
-  const currentMap = getCurrentMap();
-  return currentMap.spawnProtectionZones.some((zone) =>
+export function isInSpawnProtectionZone(
+  map: GameplayMapDefinition,
+  x: number,
+  y: number,
+  z: number,
+): boolean {
+  return map.spawnProtectionZones.some((zone) =>
     x >= zone.x - zone.hx &&
     x <= zone.x + zone.hx &&
     z >= zone.z - zone.hz &&
@@ -16,19 +21,18 @@ export function isInSpawnProtectionZone(x: number, y: number, z: number): boolea
 }
 
 export function pickSpawnPoint(
+  map: GameplayMapDefinition,
   players: Map<string, PlayerRuntime>,
   sessionId: string | undefined,
   getPlayerTeam: (sessionId: string) => string | undefined,
 ): { x: number; y: number; z: number } {
-  const currentMap = getCurrentMap();
-
-  let spawnPoints = currentMap.spawnPoints;
+  let spawnPoints = map.spawnPoints;
   if (sessionId) {
     const teamId = getPlayerTeam(sessionId);
-    if (teamId === "ghosts" && currentMap.ghostSpawnPoints) {
-      spawnPoints = currentMap.ghostSpawnPoints;
-    } else if (teamId === "sentinels" && currentMap.sentinelSpawnPoints) {
-      spawnPoints = currentMap.sentinelSpawnPoints;
+    if (teamId === "ghosts" && map.ghostSpawnPoints) {
+      spawnPoints = map.ghostSpawnPoints;
+    } else if (teamId === "sentinels" && map.sentinelSpawnPoints) {
+      spawnPoints = map.sentinelSpawnPoints;
     }
   }
 
@@ -49,14 +53,14 @@ export function pickSpawnPoint(
 
   for (const point of spawnPoints) {
     let blocked = false;
-    for (const obs of currentMap.obstacles) {
+    for (const obs of map.obstacles) {
       if (isPointInsideBox(point, obs)) {
         blocked = true;
         break;
       }
     }
     if (!blocked) {
-      for (const occ of currentMap.occluders) {
+      for (const occ of map.occluders) {
         if (isPointInsideBox(point, occ)) {
           blocked = true;
           break;
@@ -64,7 +68,7 @@ export function pickSpawnPoint(
       }
     }
     if (!blocked) {
-      for (const br of currentMap.breakables) {
+      for (const br of map.breakables) {
         if (isPointInsideBox(point, br)) {
           blocked = true;
           break;

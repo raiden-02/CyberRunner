@@ -13,7 +13,7 @@ import { initRapier, PhysicsWorld } from "../../client/src/physics/PhysicsWorld.
 import { LocalPlayer } from "../../client/src/player/LocalPlayer.ts";
 import { FIXED_DT, FIXED_TICK_HZ } from "../../shared/net/fixed-tick.js";
 import { createPlayerPhysics, buildMapColliders } from "../../shared/world/map-physics.js";
-import { SHOOT_HOUSE_NEON_COLLISION } from "../../shared/world/maps/shoot-house-neon.js";
+import { getGameplayMap } from "../../shared/world/map-registry.js";
 import { CharacterController } from "../../shared/movement/character-controller.js";
 import { CAPSULE } from "../../shared/physics/constants.js";
 import type { InputMsg } from "../../shared/movement/types.js";
@@ -87,8 +87,10 @@ function estimateBandwidth(inputBytes: number) {
 
 function measurePrediction(latencyMs: number) {
   const delayTicks = Math.round(latencyMs / (1000 / FIXED_TICK_HZ));
+  const map = getGameplayMap("shoot-house-neon");
   const client = new LocalPlayer({} as ConstructorParameters<typeof LocalPlayer>[0]);
-  const server = new PhysicsWorld();
+  client.configureMap(map);
+  const server = new PhysicsWorld(map);
   const spawnY = CAPSULE.HalfHeight + CAPSULE.Radius;
   client.hardResetTo(0, spawnY, 0);
   server.hardResetTo(0, spawnY, 0);
@@ -135,7 +137,7 @@ function measurePrediction(latencyMs: number) {
 function measureServerTick(playerCount: number) {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = FIXED_DT;
-  buildMapColliders(RAPIER, world, SHOOT_HOUSE_NEON_COLLISION);
+  buildMapColliders(RAPIER, world, getGameplayMap("shoot-house-neon"));
   const ctrls: CharacterController[] = [];
   const spawnY = CAPSULE.HalfHeight + CAPSULE.Radius;
   for (let i = 0; i < playerCount; i++) {

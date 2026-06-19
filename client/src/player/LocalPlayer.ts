@@ -3,6 +3,7 @@ import { PhysicsWorld } from "../physics/PhysicsWorld.js";
 import type { CharacterControllerSnapshot, InputMsg, MovementState } from "@shared/movement/types.js";
 import { CAPSULE } from "@shared/physics/constants.js";
 import { discardAckedInputs, FIXED_DT } from "@shared/net/fixed-tick.js";
+import type { MapCollisionData } from "@shared/world/map-types.js";
 
 const CENTER_TO_FOOT = CAPSULE.HalfHeight + CAPSULE.Radius;
 const EYE_HEIGHT = 1.6;
@@ -27,7 +28,7 @@ type PredictionSnapshot = {
  */
 export class LocalPlayer {
   private camera: THREE.PerspectiveCamera;
-  private physics: PhysicsWorld;
+  private physics: PhysicsWorld | null = null;
 
   private predictedPos = new THREE.Vector3(0, CENTER_TO_FOOT, 0);
   private smoothOffset = new THREE.Vector3(0, 0, 0);
@@ -45,7 +46,25 @@ export class LocalPlayer {
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
-    this.physics = new PhysicsWorld();
+  }
+
+  /**
+   * Build the prediction world from the room's canonical map.
+   * Must run after connect, before the first predicted tick.
+   */
+  public configureMap(map: MapCollisionData): void {
+    this.physics?.dispose();
+    this.physics = new PhysicsWorld(map);
+    this.pendingInputs = [];
+    this.snapshots = [];
+    this.lastAckedSeq = 0;
+  }
+
+  private world(): PhysicsWorld {
+    if (!this.physics) {
+      throw new Error("LocalPlayer.configureMap must run before prediction");
+    }
+    return this.physics;
   }
 
   public setInitialPosition(x: number, y: number, z: number): void {
@@ -54,7 +73,7 @@ export class LocalPlayer {
 
   /** Spawn, respawn, or a real teleport. Clears pending prediction. */
   public hardResetTo(x: number, y: number, z: number): void {
-    this.physics.hardResetTo(x, y, z);
+    this.world().hardResetTo(x, y, z);
     this.predictedPos.set(x, y, z);
     this.smoothOffset.set(0, 0, 0);
     this.visualPos.set(x, y + EYE_FROM_CENTER, z);
@@ -70,13 +89,13 @@ export class LocalPlayer {
   public applyFixedTick(input: InputMsg, record: boolean): void {
     if (this.isDead) return;
 
-    this.physics.simulateTick(input, input.seq * FIXED_DT);
-    const pos = this.physics.getPosition();
+    this.world().simulateTick(input, input.seq * FIXED_DT);
+    const pos = this.world().getPosition();
     this.predictedPos.set(pos.x, pos.y, pos.z);
 
     if (record) {
       this.pendingInputs.push({ ...input });
-      this.snapshots.push({ seq: input.seq, snap: this.physics.capture() });
+      this.snapshots.push({ seq: input.seq, snap: this.world().capture() });
       if (this.pendingInputs.length > MAX_PENDING) {
         const drop = this.pendingInputs.length - MAX_PENDING;
         this.pendingInputs.splice(0, drop);
@@ -106,19 +125,19 @@ export class LocalPlayer {
       return;
     }
 
-    this.physics.restore(ackSnap.snap);
-    this.physics.placeAt(serverX, serverY, serverZ);
+    this.world().restore(ackSnap.snap);
+    this.world().placeAt(serverX, serverY, serverZ);
 
     this.pendingInputs = discardAckedInputs(this.pendingInputs, ackSeq);
     this.lastAckedSeq = ackSeq;
 
     this.snapshots = [];
     for (const cmd of this.pendingInputs) {
-      this.physics.simulateTick(cmd, cmd.seq * FIXED_DT);
-      this.snapshots.push({ seq: cmd.seq, snap: this.physics.capture() });
+      this.world().simulateTick(cmd, cmd.seq * FIXED_DT);
+      this.snapshots.push({ seq: cmd.seq, snap: this.world().capture() });
     }
 
-    const pos = this.physics.getPosition();
+    const pos = this.world().getPosition();
     this.predictedPos.set(pos.x, pos.y, pos.z);
 
     this.smoothOffset.set(
@@ -166,8 +185,8 @@ export class LocalPlayer {
   public getCorrectionMag(): number { return this.smoothOffset.length(); }
   public getPendingInputCount(): number { return this.pendingInputs.length; }
   public getSnapshotCount(): number { return this.snapshots.length; }
-  public getMovementState(): MovementState { return this.physics.currentState(); }
-  public getCapsuleHalfHeight(): number { return this.physics.capsuleHalfHeight(); }
+  public getMovementState(): MovementState { return this.world().currentState(); }
+  public getCapsuleHalfHeight(): number { return this.world().capsuleHalfHeight(); }
   public applyToCamera(): void { this.camera.position.copy(this.visualPos); }
 
   public updateHealth(newHealth: number, maxHealth: number, isDead: boolean, respawnTime: number): void {

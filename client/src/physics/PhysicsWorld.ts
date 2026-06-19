@@ -1,10 +1,10 @@
-import RAPIER from "@dimforge/rapier3d-compat";
+import type { MapCollisionData } from "@shared/world/map-types.js";
 import { buildMapColliders, createPlayerPhysics } from "@shared/world/map-physics.js";
-import { SHOOT_HOUSE_NEON_COLLISION } from "@shared/world/maps/shoot-house-neon.js";
 import { CharacterController } from "@shared/movement/character-controller.js";
 import { CAPSULE } from "@shared/physics/constants.js";
 import type { CharacterControllerSnapshot, InputMsg, MovementState } from "@shared/movement/types.js";
 import { FIXED_DT } from "@shared/net/fixed-tick.js";
+import RAPIER from "@dimforge/rapier3d-compat";
 
 let rapierInitialized = false;
 
@@ -15,8 +15,8 @@ export async function initRapier(): Promise<void> {
 }
 
 /**
- * Client prediction world: local capsule plus static map colliders.
- * Other players are not simulated here.
+ * Client prediction world. Collision must come from the same canonical
+ * GameplayMapDefinition the server used for this room.
  */
 export class PhysicsWorld {
   private world: RAPIER.World;
@@ -24,10 +24,10 @@ export class PhysicsWorld {
   private body: RAPIER.RigidBody;
   private tickTime = 0;
 
-  constructor() {
+  constructor(map: MapCollisionData) {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
-    buildMapColliders(RAPIER, this.world, SHOOT_HOUSE_NEON_COLLISION);
+    buildMapColliders(RAPIER, this.world, map);
 
     const { body, collider, controller } = createPlayerPhysics(
       RAPIER, this.world,
@@ -39,14 +39,12 @@ export class PhysicsWorld {
     this.ctrl = new CharacterController(body, collider, controller);
   }
 
-  /** Spawn / respawn / real teleport. Resets controller state. */
   hardResetTo(x: number, y: number, z: number): void {
     this.ctrl.resetAfterTeleport();
     this.placeAt(x, y, z);
     this.world.step();
   }
 
-  /** Move the body without touching movement-state internals. */
   placeAt(x: number, y: number, z: number): void {
     this.body.setTranslation({ x, y, z }, true);
     this.body.setNextKinematicTranslation({ x, y, z });

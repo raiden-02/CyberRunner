@@ -5,6 +5,9 @@ import { FIXED_DT } from "../../shared/net/fixed-tick.js";
 import { CAPSULE } from "../../shared/physics/constants.js";
 import { MovementState, type InputMsg } from "../../shared/movement/types.js";
 import { CROUCH_CAPSULE_HALF, SLIDE_CAPSULE_HALF } from "../../shared/movement/capsule.js";
+import { getGameplayMap } from "../../shared/world/map-registry.js";
+
+const MAP = getGameplayMap("shoot-house-neon");
 
 const SPAWN_Y = CAPSULE.HalfHeight + CAPSULE.Radius;
 const POSE_EPS = 0.001;
@@ -34,7 +37,9 @@ function dist(
 }
 
 function makePlayer(): LocalPlayer {
-  return new LocalPlayer({} as ConstructorParameters<typeof LocalPlayer>[0]);
+  const player = new LocalPlayer({} as ConstructorParameters<typeof LocalPlayer>[0]);
+  player.configureMap(MAP);
+  return player;
 }
 
 describe("reconciliation behavior", () => {
@@ -43,7 +48,7 @@ describe("reconciliation behavior", () => {
   });
 
   it("keeps identical 0-latency worlds within 1 mm after warmup", () => {
-    const server = new PhysicsWorld();
+    const server = new PhysicsWorld(MAP);
     const client = makePlayer();
     server.hardResetTo(0, SPAWN_Y, 0);
     client.hardResetTo(0, SPAWN_Y, 0);
@@ -65,9 +70,9 @@ describe("reconciliation behavior", () => {
   });
 
   it("does not reset sprint acceleration on every ack", () => {
-    const server = new PhysicsWorld();
+    const server = new PhysicsWorld(MAP);
     const client = makePlayer();
-    const reference = new PhysicsWorld();
+    const reference = new PhysicsWorld(MAP);
     server.hardResetTo(0, SPAWN_Y, 0);
     client.hardResetTo(0, SPAWN_Y, 0);
     reference.hardResetTo(0, SPAWN_Y, 0);
@@ -90,9 +95,9 @@ describe("reconciliation behavior", () => {
   });
 
   it("preserves jump / air velocity across reconcile", () => {
-    const server = new PhysicsWorld();
+    const server = new PhysicsWorld(MAP);
     const client = makePlayer();
-    const reference = new PhysicsWorld();
+    const reference = new PhysicsWorld(MAP);
     server.hardResetTo(0, SPAWN_Y, 0);
     client.hardResetTo(0, SPAWN_Y, 0);
     reference.hardResetTo(0, SPAWN_Y, 0);
@@ -126,7 +131,7 @@ describe("reconciliation behavior", () => {
 
   it("keeps crouch, prone, and slide across reconcile", () => {
     const client = makePlayer();
-    const server = new PhysicsWorld();
+    const server = new PhysicsWorld(MAP);
     client.hardResetTo(0, SPAWN_Y, 0);
     server.hardResetTo(0, SPAWN_Y, 0);
 
@@ -149,7 +154,7 @@ describe("reconciliation behavior", () => {
     expect(client.getCapsuleHalfHeight()).toBeCloseTo(CROUCH_CAPSULE_HALF, 4);
 
     const client2 = makePlayer();
-    const server2 = new PhysicsWorld();
+    const server2 = new PhysicsWorld(MAP);
     client2.hardResetTo(0, SPAWN_Y, 0);
     server2.hardResetTo(0, SPAWN_Y, 0);
     for (let seq = 1; seq <= 20; seq++) {
@@ -169,7 +174,7 @@ describe("reconciliation behavior", () => {
     expect(client2.getCapsuleHalfHeight()).toBeCloseTo(SLIDE_CAPSULE_HALF, 4);
 
     const client3 = makePlayer();
-    const server3 = new PhysicsWorld();
+    const server3 = new PhysicsWorld(MAP);
     client3.hardResetTo(0, SPAWN_Y, 0);
     server3.hardResetTo(0, SPAWN_Y, 0);
     let seq = 1;
@@ -197,8 +202,8 @@ describe("reconciliation behavior", () => {
   });
 
   it("restores ack state and replays newer commands once", () => {
-    const reference = new PhysicsWorld();
-    const server = new PhysicsWorld();
+    const reference = new PhysicsWorld(MAP);
+    const server = new PhysicsWorld(MAP);
     const client = makePlayer();
     reference.hardResetTo(0, SPAWN_Y, 0);
     server.hardResetTo(0, SPAWN_Y, 0);

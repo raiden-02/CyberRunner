@@ -3,6 +3,15 @@ import { LocalPlayer } from "../../client/src/player/LocalPlayer.ts";
 import { initRapier } from "../../client/src/physics/PhysicsWorld.ts";
 import { FIXED_DT, seqsAreUniqueAndIncreasing } from "../../shared/net/fixed-tick.js";
 import type { InputMsg } from "../../shared/movement/types.js";
+import { getGameplayMap } from "../../shared/world/map-registry.js";
+
+const MAP = getGameplayMap("shoot-house-neon");
+
+function makePlayer(): LocalPlayer {
+  const player = new LocalPlayer({} as ConstructorParameters<typeof LocalPlayer>[0]);
+  player.configureMap(MAP);
+  return player;
+}
 
 function holdForward(seq: number): InputMsg {
   return {
@@ -26,7 +35,7 @@ describe("prediction / reconcile bookkeeping", () => {
   });
 
   it("stores one unique seq per recorded tick", () => {
-    const player = new LocalPlayer({} as any);
+    const player = makePlayer();
     player.setInitialPosition(0, 1.25, 0);
     const seqs: number[] = [];
     for (let seq = 1; seq <= 12; seq++) {
@@ -38,7 +47,7 @@ describe("prediction / reconcile bookkeeping", () => {
   });
 
   it("drops acked commands and keeps newer ones for a single replay", () => {
-    const player = new LocalPlayer({} as any);
+    const player = makePlayer();
     player.setInitialPosition(0, 1.25, 0);
     for (let seq = 1; seq <= 6; seq++) {
       player.applyFixedTick(holdForward(seq), true);
@@ -54,7 +63,7 @@ describe("prediction / reconcile bookkeeping", () => {
   });
 
   it("snaps a large correction and keeps a mid-size offset for smoothing", () => {
-    const snap = new LocalPlayer({} as any);
+    const snap = makePlayer();
     snap.setInitialPosition(0, 1.25, 0);
     for (let seq = 1; seq <= 8; seq++) {
       snap.applyFixedTick(holdForward(seq), true);
@@ -64,7 +73,7 @@ describe("prediction / reconcile bookkeeping", () => {
     expect(snap.getCorrectionMag()).toBe(0);
     expect(snap.getCapsuleCenter().x).toBeCloseTo(12, 3);
 
-    const smooth = new LocalPlayer({} as any);
+    const smooth = makePlayer();
     smooth.setInitialPosition(0, 1.25, 0);
     for (let seq = 1; seq <= 8; seq++) {
       smooth.applyFixedTick(holdForward(seq), true);
@@ -76,7 +85,7 @@ describe("prediction / reconcile bookkeeping", () => {
   });
 
   it("dead-zones a tiny correction", () => {
-    const player = new LocalPlayer({} as any);
+    const player = makePlayer();
     player.setInitialPosition(0, 1.25, 0);
     player.applyFixedTick(holdForward(1), true);
     const pred = player.getCapsuleCenter();

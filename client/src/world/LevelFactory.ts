@@ -1,30 +1,21 @@
-/**
- * LEVEL FACTORY
- * Creates the appropriate Level class based on map ID.
- */
 import * as THREE from "three";
-import type { MapId } from "./maps/map-registry.js";
-import { isShootHouseNeonMap } from "./maps/map-registry.js";
+import type { MapId } from "@shared/world/map-registry.js";
+import { getGameplayMap } from "@shared/world/map-registry.js";
 import { ShootHouseNeonLevel } from "./levels/ShootHouseNeonLevel.js";
+import { CoreLevel } from "./levels/CoreLevel.js";
 
-/**
- * Level instance interface.
- * All levels implement these methods.
- */
+export { resolveLevelRenderer } from "./maps/map-registry.js";
+
 export interface LevelInstance {
   update(): void;
   destroyBreakable(id: number): void;
   dispose(): void;
 }
 
-/**
- * Create a level instance for the specified map.
- */
 export function createLevel(scene: THREE.Scene, mapId: MapId): LevelInstance {
-  if (isShootHouseNeonMap(mapId)) {
-    return new ShootHouseNeonLevel(scene);
+  const map = getGameplayMap(mapId);
+  if (mapId === "shoot-house-neon") {
+    return new ShootHouseNeonLevel(scene, map);
   }
-
-  // Default to Shoot House Neon (only map available)
-  return new ShootHouseNeonLevel(scene);
+  return new CoreLevel(scene, map);
 }

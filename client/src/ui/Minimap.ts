@@ -4,7 +4,7 @@
  * Shows map layout, player positions, terminals, and objectives
  */
 
-import { SHOOT_HOUSE_NEON } from "../world/maps/shoot-house-neon.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 
 export interface MinimapConfig {
   mapSize: number;      // World units visible on minimap (zoom level)
@@ -55,10 +55,6 @@ export class Minimap {
   constructor(config: Partial<MinimapConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
 
-    // Load map obstacles from the map definition
-    this.loadMapData();
-
-    // Container (circular shape for player-centered minimap)
     this.container = document.createElement("div");
     this.container.style.cssText = `
       position: fixed;
@@ -104,14 +100,12 @@ export class Minimap {
     document.body.appendChild(this.container);
   }
 
-  private loadMapData(): void {
-    // Combine obstacles and occluders for minimap display
-    const map = SHOOT_HOUSE_NEON;
+  setMap(map: GameplayMapDefinition): void {
     this.mapBoundsHalf = map.boundsHalfSize;
-    
+    this.config.mapSize = map.boundsHalfSize * 2;
     this.mapObstacles = [
-      ...map.obstacles.map(o => ({ x: o.x, z: o.z, hx: o.hx, hz: o.hz })),
-      ...map.occluders.map(o => ({ x: o.x, z: o.z, hx: o.hx, hz: o.hz })),
+      ...map.obstacles.map((o) => ({ x: o.x, z: o.z, hx: o.hx, hz: o.hz })),
+      ...map.occluders.map((o) => ({ x: o.x, z: o.z, hx: o.hx, hz: o.hz })),
     ];
   }
 

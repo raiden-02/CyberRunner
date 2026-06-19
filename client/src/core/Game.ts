@@ -10,9 +10,10 @@ import { Scoreboard } from "../ui/Scoreboard.js";
 import { Minimap } from "../ui/Minimap.js";
 import { ActionPrompt } from "../ui/ActionPrompt.js";
 import { Skybox } from "../world/Skybox.js";
-import { SHOOT_HOUSE_NEON } from "../world/maps/shoot-house-neon.js";
 import { WEAPON_RENDER_LAYER } from "../world/lighting/CyberpunkLighting.js";
-import { getDefaultMapId, getMapEntry, isShootHouseNeonMap } from "../world/maps/map-registry.js";
+import { getGameplayMap, getMapVisuals, isShootHouseNeonMap } from "../world/maps/map-registry.js";
+import type { MapId } from "@shared/world/map-registry.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { SHOOT_HOUSE_NEON_LIGHTING_CONFIG } from "../world/lighting/ShootHouseNeonLighting.js";
 import { TeamLobbyScreen } from "../ui/screens/TeamLobbyScreen.js";
 import { PauseMenu } from "../ui/PauseMenu.js";
@@ -47,9 +48,9 @@ export class Game {
   private actionPrompt: ActionPrompt;
   private teamLobbyScreen: TeamLobbyScreen;
   private weaponSystem: WeaponSystem;
-  private level: LevelInstance;
+  private level: LevelInstance | null = null;
   private skybox: Skybox;
-  private currentMapId = getDefaultMapId();
+  private currentMap: GameplayMapDefinition | null = null;
   private hostId: string = "";
   private onReturnToMenu: (() => void) | null = null;
   private pauseMenu: PauseMenu;
@@ -77,11 +78,7 @@ export class Game {
   private activeSlot = 0;
 
   constructor() {
-    const lightingConfig = isShootHouseNeonMap(this.currentMapId)
-      ? SHOOT_HOUSE_NEON_LIGHTING_CONFIG
-      : undefined;
-
-    this.renderer = new GameRenderer(DEFAULT_BLOOM_CONFIG, lightingConfig);
+    this.renderer = new GameRenderer(DEFAULT_BLOOM_CONFIG, SHOOT_HOUSE_NEON_LIGHTING_CONFIG);
     this.input = new InputManager(this.renderer.canvas, this.renderer.camera);
     this.network = new NetworkManager();
     this.localPlayer = new LocalPlayer(this.renderer.camera);
@@ -134,21 +131,6 @@ export class Game {
       this.renderer.applySettingsFromManager();
     });
 
-    this.level = createLevel(this.renderer.scene, this.currentMapId);
-    const mapEntry = getMapEntry(this.currentMapId);
-    console.log(`[Game] Loading map: ${mapEntry?.displayName || this.currentMapId}`);
-
-    if (SHOOT_HOUSE_NEON.uploadTerminals) {
-      this.minimap.setTerminals(
-        SHOOT_HOUSE_NEON.uploadTerminals.map((t) => ({
-          id: t.id,
-          x: t.x,
-          z: t.z,
-          state: "inactive" as const,
-        }))
-      );
-    }
-
     this.weaponSystem = new WeaponSystem(this.renderer.camera, {
       onFireInput: (firing, aimDir) => {
         if (this.network.connected) {
@@ -172,8 +154,6 @@ export class Game {
     this.renderer.camera.layers.enable(WEAPON_RENDER_LAYER);
 
     this.skybox = new Skybox(this.renderer.scene);
-    const skyboxPath = mapEntry?.skyboxPath || "/skybox/cyberpunk";
-    this.skybox.loadFromFolder(skyboxPath).catch(() => undefined);
 
     this.setupCallbacks();
   }
@@ -272,8 +252,8 @@ export class Game {
       this.teamLobbyScreen.setJoinCode(info.joinCode);
       this.hostId = info.hostId;
 
-      if (info.gameMode === "search_destroy") {
-        this.sndView.initIfNeeded(this.currentMapId);
+      if (info.gameMode === "search_destroy" && this.currentMap) {
+        this.sndView.initIfNeeded(this.currentMap);
       }
     };
 
@@ -362,7 +342,7 @@ export class Game {
     };
 
     this.network.onBreakableDestroyed = (msg) => {
-      this.level.destroyBreakable(msg.id);
+      this.level?.destroyBreakable(msg.id);
     };
 
     this.network.onLobbyState = (msg) => {
@@ -481,8 +461,48 @@ export class Game {
       gameMode,
     });
 
+    this.applyAuthoritativeMap();
+
     this.updateCameraRotation();
     this.animate();
+  }
+
+  private applyAuthoritativeMap(): void {
+    const mapId = this.network.state?.mapId;
+    if (!mapId) {
+      const msg = "Room state has no mapId. Cannot build prediction or level.";
+      this.debug.setStatus(msg);
+      throw new Error(msg);
+    }
+
+    const map = getGameplayMap(mapId);
+    const visuals = getMapVisuals(map.id as MapId);
+    this.currentMap = map;
+
+    this.localPlayer.configureMap(map);
+    this.minimap.setMap(map);
+    if (map.uploadTerminals) {
+      this.minimap.setTerminals(
+        map.uploadTerminals.map((t) => ({
+          id: t.id,
+          x: t.x,
+          z: t.z,
+          state: "inactive" as const,
+        })),
+      );
+    }
+
+    this.level?.dispose();
+    this.level = createLevel(this.renderer.scene, map.id as MapId);
+    console.log(`[Game] Authoritative map: ${visuals.displayName} (${map.id})`);
+
+    if (isShootHouseNeonMap(map.id) && visuals.skyboxPath) {
+      this.skybox.loadFromFolder(visuals.skyboxPath).catch(() => undefined);
+    }
+
+    if (this.network.state?.gameMode === "search_destroy") {
+      this.sndView.initIfNeeded(map);
+    }
   }
 
   private buildInputMsg(seq: number, state: InputState): InputMsg {
@@ -705,7 +725,7 @@ export class Game {
     this.renderer.camera.fov = this.currentFov;
     this.renderer.camera.updateProjectionMatrix();
 
-    if (this.level.update) {
+    if (this.level?.update) {
       this.level.update();
     }
 
@@ -740,9 +760,7 @@ export class Game {
     this.hud.destroy();
     this.scoreboard.destroy();
     this.teamLobbyScreen.destroy();
-    if (this.level.dispose) {
-      this.level.dispose();
-    }
+    this.level?.dispose();
     this.renderer.dispose();
   }
 }

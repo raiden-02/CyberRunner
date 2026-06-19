@@ -1,8 +1,7 @@
 import * as THREE from "three";
 import { SpikeObject, type SpikeState } from "./SpikeObject.js";
 import { PlantSiteMarker, type PlantSiteState } from "./PlantSiteMarker.js";
-import { SHOOT_HOUSE_NEON } from "./maps/shoot-house-neon.js";
-import { isShootHouseNeonMap, type MapId } from "./maps/map-registry.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import type { Minimap, PlayerMarker, TerminalInfo } from "../ui/Minimap.js";
 import type { ActionPrompt } from "../ui/ActionPrompt.js";
 import type { SyncedGameState, SyncedPlayer, SyncedPlayerMap } from "../network/synced-state.js";
@@ -10,6 +9,7 @@ import type { SyncedGameState, SyncedPlayer, SyncedPlayerMap } from "../network/
 export class SearchDestroyView {
   private spikeObject: SpikeObject | null = null;
   private plantSiteMarkers: PlantSiteMarker[] = [];
+  private map: GameplayMapDefinition | null = null;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -17,13 +17,14 @@ export class SearchDestroyView {
     private readonly actionPrompt: ActionPrompt,
   ) {}
 
-  initIfNeeded(mapId: MapId): void {
+  initIfNeeded(map: GameplayMapDefinition): void {
+    this.map = map;
     if (this.spikeObject) return;
 
     this.spikeObject = new SpikeObject(this.scene);
 
-    const terminals = SHOOT_HOUSE_NEON.uploadTerminals;
-    if (isShootHouseNeonMap(mapId) && terminals) {
+    const terminals = map.uploadTerminals;
+    if (terminals) {
       for (const t of terminals) {
         const marker = new PlantSiteMarker(this.scene, {
           id: t.id,
@@ -54,6 +55,7 @@ export class SearchDestroyView {
     this.minimap.show();
 
     const isSD = state.gameMode === "search_destroy";
+    const terminalsSrc = this.map?.uploadTerminals || [];
 
     let myTeam = "";
     if (players && typeof players.forEach === "function") {
@@ -65,7 +67,7 @@ export class SearchDestroyView {
     }
 
     const isGhost = myTeam === "ghosts";
-    const terminals: TerminalInfo[] = (SHOOT_HOUSE_NEON.uploadTerminals || []).map((t) => {
+    const terminals: TerminalInfo[] = terminalsSrc.map((t) => {
       let termState: "inactive" | "uploading" | "uploaded" = "inactive";
 
       if (isSD && state.spikeTerminalId === t.id) {
@@ -120,7 +122,7 @@ export class SearchDestroyView {
           let spikeZ = state.spikeZ ?? 0;
 
           if (spikeState === "uploading" || spikeState === "uploaded" || spikeState === "decrypting") {
-            const terminal = (SHOOT_HOUSE_NEON.uploadTerminals || []).find((t) => t.id === state.spikeTerminalId);
+            const terminal = terminalsSrc.find((t) => t.id === state.spikeTerminalId);
             if (terminal) {
               spikeX = terminal.x;
               spikeZ = terminal.z;
@@ -197,7 +199,7 @@ export class SearchDestroyView {
       }
     }
 
-    const terminals = SHOOT_HOUSE_NEON.uploadTerminals || [];
+    const terminals = this.map?.uploadTerminals || [];
     for (const terminal of terminals) {
       const dx = playerX - terminal.x;
       const dz = playerZ - terminal.z;
@@ -226,5 +228,6 @@ export class SearchDestroyView {
       marker.dispose();
     }
     this.plantSiteMarkers = [];
+    this.map = null;
   }
 }

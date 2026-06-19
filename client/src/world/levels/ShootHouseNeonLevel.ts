@@ -7,10 +7,9 @@ import * as THREE from "three";
 import { BaseLevel } from "../core/BaseLevel.js";
 import { MATERIAL_PRESETS } from "../core/MaterialFactory.js";
 import type { NeonColorKey } from "../core/NeonColors.js";
-import { SHOOT_HOUSE_NEON } from "../maps/shoot-house-neon.js";
+import { SHOOT_HOUSE_VISUALS } from "../maps/shoot-house-neon.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import type {
-  MapDefinition,
-  ShootHouseMapDefinition,
   Building,
   Connector,
   NeonSign,
@@ -20,36 +19,27 @@ import { UploadTerminalMesh } from "../components/upload-terminal.js";
 export class ShootHouseNeonLevel extends BaseLevel {
   private terminals: UploadTerminalMesh[] = [];
 
-  constructor(scene: THREE.Scene) {
-    super(scene);
-  }
-
-  protected getMapDefinition(): MapDefinition {
-    return SHOOT_HOUSE_NEON;
-  }
-
-  private getFullMapDef(): ShootHouseMapDefinition {
-    return SHOOT_HOUSE_NEON;
+  constructor(scene: THREE.Scene, map: GameplayMapDefinition) {
+    super(scene, map);
+    this.build();
   }
 
   protected build(): void {
-    const map = this.getFullMapDef();
+    const map = this.gameplayMap;
+    const visuals = SHOOT_HOUSE_VISUALS;
 
-    // Core geometry
     this.createGround(map);
     this.createWalls(map);
     this.createObstaclesFromData(map.obstacles);
     this.createOccludersFromData(map.occluders);
     this.createBreakablesFromData(map.breakables);
 
-    // Visual elements (minimal)
-    this.createBuildings(map.buildings);
-    this.createConnectors(map.connectors);
-    this.createNeonSigns(map.neonSigns);
-    this.createLaneLights(map.laneLights);
-    this.createSpawnMarkers(map.spawnLightColors);
+    this.createBuildings(visuals.buildings);
+    this.createConnectors(visuals.connectors);
+    this.createNeonSigns(visuals.neonSigns);
+    this.createLaneLights(visuals.laneLights);
+    this.createSpawnMarkers(visuals.spawnLightColors);
 
-    // S&D Objective terminals
     this.createUploadTerminals(map);
   }
 
@@ -57,7 +47,7 @@ export class ShootHouseNeonLevel extends BaseLevel {
   // GROUND
   // ═══════════════════════════════════════════════════════════════════════════
 
-  private createGround(map: ShootHouseMapDefinition): void {
+  private createGround(map: GameplayMapDefinition): void {
     const size = map.boundsHalfSize * 2;
     this.createGroundPlane(size + 4, "floorWet", true, 50);
   }
@@ -66,7 +56,7 @@ export class ShootHouseNeonLevel extends BaseLevel {
   // WALLS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  private createWalls(map: ShootHouseMapDefinition): void {
+  private createWalls(map: GameplayMapDefinition): void {
     this.createBoundaryWalls(map.boundsHalfSize, map.wallHeight, map.wallThickness, "wall");
 
     const y = map.wallHeight * 0.9;
@@ -287,7 +277,7 @@ export class ShootHouseNeonLevel extends BaseLevel {
   // UPLOAD TERMINALS (S&D Objectives)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  private createUploadTerminals(map: ShootHouseMapDefinition): void {
+  private createUploadTerminals(map: GameplayMapDefinition): void {
     if (!map.uploadTerminals || map.uploadTerminals.length === 0) return;
 
     try {

@@ -5,7 +5,8 @@ import {
   SearchDestroyMode,
   type TeamId,
 } from "../game-modes/index.js";
-import { calculateSpawnFacing, getCurrentMap } from "../world/maps/map-registry.js";
+import { calculateSpawnFacing } from "../world/maps/map-registry.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 
 export type MatchBroadcast = (type: string, message?: unknown) => void;
 
@@ -22,6 +23,7 @@ export type MatchRoomAccess = {
   schedule: (fn: () => void, ms: number) => void;
   placePlayerAt: (player: PlayerRuntime, x: number, y: number, z: number) => void;
   pickSpawnPoint: (sessionId?: string) => { x: number; y: number; z: number };
+  map: GameplayMapDefinition;
 };
 
 export class MatchLifecycle {
@@ -138,13 +140,13 @@ export class MatchLifecycle {
   }
 
   spawnSpikeOnGround(): void {
-    const currentMap = getCurrentMap();
-    if (currentMap.spikeSpawnLocation) {
-      this.room.state.spikeX = currentMap.spikeSpawnLocation.x;
-      this.room.state.spikeZ = currentMap.spikeSpawnLocation.z;
-    } else if (currentMap.ghostSpawnPoints && currentMap.ghostSpawnPoints.length > 0) {
-      const spawnIdx = Math.floor(Math.random() * currentMap.ghostSpawnPoints.length);
-      const spawnPoint = currentMap.ghostSpawnPoints[spawnIdx];
+    const map = this.room.map;
+    if (map.spikeSpawnLocation) {
+      this.room.state.spikeX = map.spikeSpawnLocation.x;
+      this.room.state.spikeZ = map.spikeSpawnLocation.z;
+    } else if (map.ghostSpawnPoints && map.ghostSpawnPoints.length > 0) {
+      const spawnIdx = Math.floor(Math.random() * map.ghostSpawnPoints.length);
+      const spawnPoint = map.ghostSpawnPoints[spawnIdx];
       this.room.state.spikeX = spawnPoint.x;
       this.room.state.spikeZ = spawnPoint.z;
     } else {

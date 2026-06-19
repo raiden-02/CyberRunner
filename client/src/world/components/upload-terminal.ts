@@ -4,7 +4,7 @@
  */
 
 import * as THREE from "three";
-import type { UploadTerminal } from "../maps/map-types.js";
+import type { UploadTerminal } from "@shared/world/map-types.js";
 
 const TERMINAL_HEIGHT = 1.2;
 const TERMINAL_WIDTH = 0.8;

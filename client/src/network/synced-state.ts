@@ -30,6 +30,7 @@ export type SyncedPlayerMap = {
 };
 
 export type SyncedGameState = {
+  mapId?: string;
   gameMode?: string;
   scoreLimit?: number;
   timeRemaining?: number;

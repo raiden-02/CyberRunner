@@ -1,46 +1,19 @@
-/**
- * MAP TYPE DEFINITIONS
- * Shared types for all map definitions.
- */
+export type {
+  BoxObstacle,
+  SpawnPoint,
+  BreakableCover,
+  VolumeBox,
+  UploadTerminal,
+  GameplayMapDefinition,
+} from "@shared/world/map-types.js";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// BASE GEOMETRY TYPES
-// ═══════════════════════════════════════════════════════════════════════════
-
-export type BoxObstacle = {
+export type Building = {
   x: number;
   y: number;
   z: number;
   hx: number;
   hy: number;
   hz: number;
-};
-
-export type SpawnPoint = {
-  x: number;
-  y: number;
-  z: number;
-};
-
-export type BreakableCover = BoxObstacle & {
-  hp: number;
-};
-
-export type VolumeBox = BoxObstacle;
-
-export type UploadTerminal = {
-  id: "A" | "B";
-  x: number;
-  y: number;
-  z: number;
-  radius: number;
-};
-
-// ═══════════════════════════════════════════════════════════════════════════
-// STRUCTURE TYPES
-// ═══════════════════════════════════════════════════════════════════════════
-
-export type Building = BoxObstacle & {
   type: "pub" | "bar" | "shop" | "warehouse" | "tower" | "billboard";
   hasInterior?: boolean;
   windowColor?: number;
@@ -78,10 +51,6 @@ export type Connector = {
   lighting?: "warm" | "cool" | "neutral";
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
-// VISUAL ELEMENT TYPES
-// ═══════════════════════════════════════════════════════════════════════════
-
 export type NeonSign = {
   x: number;
   y: number;
@@ -113,33 +82,7 @@ export type LaneLight = {
   decay: number;
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
-// MAP DEFINITION INTERFACES
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Base map definition - required for all maps
- */
-export interface MapDefinition {
-  name: string;
-  displayName: string;
-  boundsHalfSize: number;
-  wallHeight: number;
-  wallThickness: number;
-  groundThickness: number;
-  obstacles: BoxObstacle[];
-  occluders: BoxObstacle[];
-  breakables: BreakableCover[];
-  spawnProtectionZones: VolumeBox[];
-  spawnPoints: SpawnPoint[];
-  uploadTerminals?: UploadTerminal[];
-}
-
-/**
- * Full Shoot House Neon map definition
- * Extends base with all cyberpunk visual elements
- */
-export interface ShootHouseMapDefinition extends MapDefinition {
+export interface ShootHouseVisuals {
   buildings: Building[];
   catwalks: Catwalk[];
   ramps: Ramp[];

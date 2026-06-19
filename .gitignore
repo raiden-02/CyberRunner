@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-ssr/
+.vite/
 logs/
 *.log
 npm-debug.log*
