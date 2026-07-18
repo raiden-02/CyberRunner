@@ -4,6 +4,8 @@ import type { ArenaEvaluation, ArenaMap } from "./types.js";
  * Detached snapshot for a later agent. No design advice.
  * Mutating the return value cannot change the source map or evaluation.
  */
+export type ArenaInspection = ReturnType<typeof inspectArena>;
+
 export function inspectArena(map: ArenaMap, evaluation?: ArenaEvaluation) {
   return structuredClone({
     sourceMapId: map.sourceMapId,
