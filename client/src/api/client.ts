@@ -28,6 +28,14 @@ export interface JoinResult {
   maxPlayers: number;
 }
 
+export interface ForgeCatalogEntry {
+  id: string;
+  suite: "p4a" | "p4b" | "run";
+  title: string;
+  subtitle: string;
+  which: "initial" | "final";
+}
+
 class ApiClient {
   private baseUrl = "/api";
 
@@ -106,6 +114,16 @@ class ApiClient {
       throw new Error(err.error || "Quick play failed");
     }
     return res.json();
+  }
+
+  async listForgeMaps(): Promise<ForgeCatalogEntry[]> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/maps`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || "Failed to list Forge maps");
+    }
+    const data = (await res.json()) as { maps: ForgeCatalogEntry[] };
+    return data.maps;
   }
 
   async joinByCode(joinCode: string): Promise<JoinResult> {

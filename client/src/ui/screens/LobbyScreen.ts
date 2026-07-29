@@ -9,6 +9,8 @@ export interface PlayAction {
   roomId?: string;
   joinCode?: string;
   gameMode?: GameModeId;
+  mapId?: string;
+  forgeMapId?: string;
 }
 
 const GAME_MODES: Array<{ value: GameModeId; label: string; description: string }> = [
@@ -22,6 +24,7 @@ export class LobbyScreen extends BaseScreen {
   private onLogout: () => void = () => {};
   private onEditProfile: () => void = () => {};
   private onSettings: () => void = () => {};
+  private onForge: () => void = () => {};
   private errorDiv!: HTMLDivElement;
   private joinCodeInput!: HTMLInputElement;
   private playerInfo!: HTMLDivElement;
@@ -100,10 +103,23 @@ export class LobbyScreen extends BaseScreen {
     this.gameModeSelect.style.marginBottom = "12px";
     panel.appendChild(this.gameModeSelect);
 
-    // Create Game button
     const createBtn = this.createButton("Create Game", false);
     createBtn.onclick = () => this.handleCreate();
     panel.appendChild(createBtn);
+
+    const forgeBtn = this.createButton("Forge", false);
+    forgeBtn.onclick = () => this.onForge();
+    panel.appendChild(forgeBtn);
+    const forgeHint = document.createElement("div");
+    forgeHint.textContent = "Walk ArenaForge P4-A and P4-B maps, plus recorded model results.";
+    forgeHint.style.cssText = `
+      color: ${THEME.muted};
+      font-size: 12px;
+      text-align: center;
+      margin: 6px 0 8px 0;
+      line-height: 1.4;
+    `;
+    panel.appendChild(forgeHint);
 
     // Join by code
     const joinRow = document.createElement("div");
@@ -196,6 +212,10 @@ export class LobbyScreen extends BaseScreen {
 
   setOnSettings(callback: () => void): void {
     this.onSettings = callback;
+  }
+
+  setOnForge(callback: () => void): void {
+    this.onForge = callback;
   }
 
   private updatePlayerInfo(): void {

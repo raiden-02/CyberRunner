@@ -12,6 +12,7 @@ export class TeamManager {
   private teams: Map<TeamId, TeamState> = new Map();
   private playerTeams: Map<string, TeamId> = new Map();
   private maxPlayersPerTeam: number;
+  private allowSoloStart = false;
 
   constructor(maxPlayersPerTeam: number = 4) {
     this.maxPlayersPerTeam = maxPlayersPerTeam;
@@ -174,11 +175,16 @@ export class TeamManager {
     }
   }
 
-  // Check if teams are balanced enough to start
+  setAllowSoloStart(allowed: boolean): void {
+    this.allowSoloStart = allowed;
+  }
+
   canStartGame(): boolean {
     const ghostsCount = this.getGhostsCount();
     const sentinelsCount = this.getSentinelsCount();
-    // Need at least 1 player on each team
+    if (this.allowSoloStart) {
+      return ghostsCount + sentinelsCount >= 1;
+    }
     return ghostsCount >= 1 && sentinelsCount >= 1;
   }
 

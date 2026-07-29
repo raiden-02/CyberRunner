@@ -1,6 +1,7 @@
 import { api, type UserProfile } from "../api/client.js";
 import { AuthScreen } from "./screens/AuthScreen.js";
 import { ProfileScreen } from "./screens/ProfileScreen.js";
+import { ForgeScreen } from "./screens/ForgeScreen.js";
 import { LobbyScreen, type PlayAction } from "./screens/LobbyScreen.js";
 import { SettingsScreen } from "./screens/SettingsScreen.js";
 
@@ -13,6 +14,7 @@ export class MainMenu {
   private authScreen: AuthScreen;
   private profileScreen: ProfileScreen;
   private lobbyScreen: LobbyScreen;
+  private forgeScreen: ForgeScreen;
   private settingsScreen: SettingsScreen;
   private currentUser: UserProfile | null = null;
   private onGameStart: (options: GameStartOptions) => void = () => {};
@@ -21,6 +23,7 @@ export class MainMenu {
     this.authScreen = new AuthScreen();
     this.profileScreen = new ProfileScreen();
     this.lobbyScreen = new LobbyScreen();
+    this.forgeScreen = new ForgeScreen();
     this.settingsScreen = new SettingsScreen();
 
     this.setupCallbacks();
@@ -76,6 +79,23 @@ export class MainMenu {
       });
       this.lobbyScreen.hide();
       this.settingsScreen.show();
+    });
+
+    this.lobbyScreen.setOnForge(() => {
+      this.lobbyScreen.hide();
+      this.forgeScreen.show();
+    });
+
+    this.forgeScreen.setOnBack(() => {
+      this.forgeScreen.hide();
+      this.lobbyScreen.show();
+    });
+
+    this.forgeScreen.setOnPlay((action) => {
+      if (this.currentUser) {
+        this.forgeScreen.hide();
+        this.onGameStart({ user: this.currentUser, action });
+      }
     });
   }
 
@@ -133,6 +153,7 @@ export class MainMenu {
     this.authScreen.hide();
     this.profileScreen.hide();
     this.lobbyScreen.hide();
+    this.forgeScreen.hide();
     this.settingsScreen.hide();
   }
 
@@ -153,6 +174,7 @@ export class MainMenu {
     this.authScreen.destroy();
     this.profileScreen.destroy();
     this.lobbyScreen.destroy();
+    this.forgeScreen.destroy();
     this.settingsScreen.destroy();
   }
 }

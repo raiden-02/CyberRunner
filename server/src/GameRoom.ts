@@ -16,6 +16,8 @@ import { WeaponSystem } from "./systems/weapon-system.js";
 import { getWeaponConfig } from "./weapons/weapon-config.js";
 import { createHitboxes, removeHitboxes, HitboxRegistry } from "./physics/hitbox-system.js";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
+import { catalogIdFromMapId, isArenaForgePreviewMapId, loadForgeMap } from "./arena-forge/preview.js";
 import { calculateSpawnFacing, resolveRoomMapId, getGameplayMap, assertDeathmatchMap, assertSearchDestroyMap } from "./world/maps/map-registry.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { LobbyService } from "./services/lobby-service.js";
@@ -95,7 +97,7 @@ export class GameRoom extends Room<GameState> {
     return true;
   }
 
-  async onCreate(options: { gameMode?: string; mapId?: string } = {}) {
+  async onCreate(options: { gameMode?: string; mapId?: string; forgeMapId?: string } = {}) {
     this.setState(new GameState());
 
     const roomInfo = LobbyService.registerRoom(this.roomId);
@@ -107,9 +109,18 @@ export class GameRoom extends Room<GameState> {
     }
     this.maxClients = this.maxPlayers;
 
-    const mapId = resolveRoomMapId(options.mapId, process.env.MAP_ID);
-    this.map = getGameplayMap(mapId);
-    this.state.mapId = this.map.id;
+    const requestedMap = options.mapId || process.env.MAP_ID || "";
+    if (options.forgeMapId || isArenaForgePreviewMapId(requestedMap)) {
+      const catalogId = options.forgeMapId || catalogIdFromMapId(requestedMap);
+      this.map = loadForgeMap(catalogId);
+      this.state.mapId = catalogId
+        ? `${ARENA_FORGE_PREVIEW_MAP_ID}::${catalogId}`
+        : ARENA_FORGE_PREVIEW_MAP_ID;
+    } else {
+      const mapId = resolveRoomMapId(options.mapId, process.env.MAP_ID);
+      this.map = getGameplayMap(mapId);
+      this.state.mapId = this.map.id;
+    }
 
     const modeId = options.gameMode || "deathmatch";
     if (modeId === "search_destroy") {
@@ -118,6 +129,9 @@ export class GameRoom extends Room<GameState> {
       assertDeathmatchMap(this.map);
     }
     this.gameMode = createGameMode(modeId, this.map.uploadTerminals || []);
+    if (options.forgeMapId || isArenaForgePreviewMapId(requestedMap)) {
+      this.getSDMode()?.getTeamManager().setAllowSoloStart(true);
+    }
     const modeConfig = this.gameMode.getConfig();
 
     this.state.gameMode = modeConfig.id;

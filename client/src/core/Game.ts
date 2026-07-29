@@ -4,7 +4,8 @@ import { NetworkManager } from "../network/NetworkManager.js";
 import { LocalPlayer } from "../player/LocalPlayer.js";
 import { RemotePlayers } from "../player/RemotePlayers.js";
 import { HUD } from "../ui/HUD.js";
-import { createLevel, type LevelInstance } from "../world/LevelFactory.js";
+import { createLevelFromMap, type LevelInstance } from "../world/LevelFactory.js";
+import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
 import { WeaponSystem } from "../weapons/weapon-system.js";
 import { Scoreboard } from "../ui/Scoreboard.js";
 import { Minimap } from "../ui/Minimap.js";
@@ -12,7 +13,6 @@ import { ActionPrompt } from "../ui/ActionPrompt.js";
 import { Skybox } from "../world/Skybox.js";
 import { WEAPON_RENDER_LAYER } from "../world/lighting/CyberpunkLighting.js";
 import { getGameplayMap, getMapVisuals, isShootHouseNeonMap } from "../world/maps/map-registry.js";
-import type { MapId } from "@shared/world/map-registry.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { SHOOT_HOUSE_NEON_LIGHTING_CONFIG } from "../world/lighting/ShootHouseNeonLighting.js";
 import { TeamLobbyScreen } from "../ui/screens/TeamLobbyScreen.js";
@@ -35,6 +35,16 @@ import type { InputState } from "../input/InputManager.js";
 import type { SyncedPlayer } from "../network/synced-state.js";
 
 const FOV_LERP_SPEED = 8;
+
+async function fetchArenaForgePreviewMap(catalogId?: string): Promise<GameplayMapDefinition> {
+  const query = catalogId ? `?id=${encodeURIComponent(catalogId)}` : "";
+  const res = await fetch(`/api/arena-forge/preview-map${query}`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error || `ArenaForge preview map failed: ${res.status}`);
+  }
+  return res.json() as Promise<GameplayMapDefinition>;
+}
 
 export class Game {
   private renderer: GameRenderer;
@@ -454,20 +464,22 @@ export class Game {
 
     await this.network.connect({
       roomId: action?.roomId,
-      forceCreate: action?.type === "create",
+      forceCreate: action?.type === "create" || Boolean(action?.forgeMapId),
       displayName,
       primaryWeaponId,
       secondaryWeaponId,
       gameMode,
+      mapId: action?.mapId,
+      forgeMapId: action?.forgeMapId,
     });
 
-    this.applyAuthoritativeMap();
+    await this.applyAuthoritativeMap();
 
     this.updateCameraRotation();
     this.animate();
   }
 
-  private applyAuthoritativeMap(): void {
+  private async applyAuthoritativeMap(): Promise<void> {
     const mapId = this.network.state?.mapId;
     if (!mapId) {
       const msg = "Room state has no mapId. Cannot build prediction or level.";
@@ -475,8 +487,16 @@ export class Game {
       throw new Error(msg);
     }
 
-    const map = getGameplayMap(mapId);
-    const visuals = getMapVisuals(map.id as MapId);
+    const map = mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID)
+      ? await fetchArenaForgePreviewMap(
+          mapId === ARENA_FORGE_PREVIEW_MAP_ID
+            ? undefined
+            : mapId.slice(`${ARENA_FORGE_PREVIEW_MAP_ID}::`.length),
+        )
+      : getGameplayMap(mapId);
+    const visuals = mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID)
+      ? { displayName: map.name }
+      : getMapVisuals(map.id);
     this.currentMap = map;
 
     this.localPlayer.configureMap(map);
@@ -493,7 +513,7 @@ export class Game {
     }
 
     this.level?.dispose();
-    this.level = createLevel(this.renderer.scene, map.id as MapId);
+    this.level = createLevelFromMap(this.renderer.scene, map);
     console.log(`[Game] Authoritative map: ${visuals.displayName} (${map.id})`);
 
     if (isShootHouseNeonMap(map.id) && visuals.skyboxPath) {

@@ -287,6 +287,8 @@ export class TeamLobbyScreen extends BaseScreen {
       
       if (!canStart) {
         this.statusDiv.textContent = "Need at least 1 player on each team to start";
+      } else if (this.lobbyState.ghostPlayers.length === 0 || this.lobbyState.sentinelPlayers.length === 0) {
+        this.statusDiv.textContent = "Forge walk. One player is enough to start.";
       } else {
         this.statusDiv.textContent = "Ready to start!";
       }

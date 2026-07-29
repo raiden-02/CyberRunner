@@ -1,4 +1,6 @@
 import { Router, Request, Response } from "express";
+import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
+import { listForgeCatalog, loadForgeMap } from "../arena-forge/preview.js";
 import { AuthService } from "../services/auth-service.js";
 import { UserService } from "../services/user-service.js";
 import { LobbyService } from "../services/lobby-service.js";
@@ -26,6 +28,20 @@ router.get("/health", (_req: Request, res: Response) => {
     database: isDatabaseEnabled(),
     timestamp: new Date().toISOString(),
   });
+});
+
+router.get("/arena-forge/maps", (_req: Request, res: Response) => {
+  res.json({ maps: listForgeCatalog() });
+});
+
+router.get("/arena-forge/preview-map", (req: Request, res: Response) => {
+  try {
+    const id = typeof req.query.id === "string" ? req.query.id : undefined;
+    res.json(loadForgeMap(id));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(404).json({ error: message, mapId: ARENA_FORGE_PREVIEW_MAP_ID });
+  }
 });
 
 // Auth: Google sign-in

@@ -162,6 +162,8 @@ export class NetworkManager {
     primaryWeaponId?: string;
     secondaryWeaponId?: string;
     gameMode?: string;
+    mapId?: string;
+    forgeMapId?: string;
   } = {}): Promise<void> {
     try {
       const roomOptions: Record<string, any> = {};
@@ -169,6 +171,8 @@ export class NetworkManager {
       if (options.primaryWeaponId) roomOptions.primaryWeaponId = options.primaryWeaponId;
       if (options.secondaryWeaponId) roomOptions.secondaryWeaponId = options.secondaryWeaponId;
       if (options.gameMode) roomOptions.gameMode = options.gameMode;
+      if (options.mapId) roomOptions.mapId = options.mapId;
+      if (options.forgeMapId) roomOptions.forgeMapId = options.forgeMapId;
       
       if (options.roomId) {
         this.room = await this.client.joinById(options.roomId, roomOptions);

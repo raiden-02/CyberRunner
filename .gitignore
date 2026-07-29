@@ -32,3 +32,4 @@ server.env
 notes/
 scratch/
 .scratch/
+server/.arena-forge-results/
