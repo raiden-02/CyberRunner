@@ -14,6 +14,14 @@ const ORTHO: Array<[number, number]> = [
   [0, -1],
 ];
 
+export type NavCell = {
+  index: number;
+  i: number;
+  j: number;
+  x: number;
+  z: number;
+};
+
 /**
  * XZ occupancy grid for standing ground traversal.
  * 4-neighbor only. No diagonal corner-cutting.
@@ -167,6 +175,61 @@ export class NavGrid {
       }
     }
     return null;
+  }
+
+  /**
+   * Reconstruct the shortest 4-neighbor path as cell centers.
+   * Same blocked-cell rules as pathMeters. Does not change distances.
+   */
+  shortestPath(fromIdx: number, goalIdxs: number[]): NavCell[] | null {
+    if (goalIdxs.length === 0) return null;
+    const goals = new Set(goalIdxs);
+    if (goals.has(fromIdx)) return [this.cellAt(fromIdx)];
+
+    const n = this.totalCells;
+    const seen = new Uint8Array(n);
+    const parent = new Int32Array(n).fill(-1);
+    const q: number[] = [fromIdx];
+    seen[fromIdx] = 1;
+    let head = 0;
+    let found = -1;
+
+    while (head < q.length) {
+      const cur = q[head++];
+      const i = cur % this.cols;
+      const j = (cur - i) / this.cols;
+      for (const [di, dj] of ORTHO) {
+        const ni = i + di;
+        const nj = j + dj;
+        if (ni < 0 || nj < 0 || ni >= this.cols || nj >= this.rows) continue;
+        const nxt = this.index(ni, nj);
+        if (!this.walkable[nxt] || seen[nxt]) continue;
+        seen[nxt] = 1;
+        parent[nxt] = cur;
+        if (goals.has(nxt)) {
+          found = nxt;
+          break;
+        }
+        q.push(nxt);
+      }
+      if (found >= 0) break;
+    }
+    if (found < 0) return null;
+
+    const idxs: number[] = [];
+    for (let cur = found; cur >= 0; cur = parent[cur]) {
+      idxs.push(cur);
+      if (cur === fromIdx) break;
+    }
+    idxs.reverse();
+    return idxs.map((idx) => this.cellAt(idx));
+  }
+
+  private cellAt(idx: number): NavCell {
+    const i = idx % this.cols;
+    const j = (idx - i) / this.cols;
+    const { x, z } = this.cellCenter(i, j);
+    return { index: idx, i, j, x, z };
   }
 
   spawnCell(spawn: ArenaSpawn): number | null {
