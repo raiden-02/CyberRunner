@@ -130,3 +130,13 @@ Final solid: `occluder-1` at (-5.5, 1.5, -3.5) hx=1.2 hy=1.5 hz=0.4.
 P0 stayed 0 hard failures and both sites reachable. `ghost-spawn-0` → `sentinel-spawn-0` was clear on the source map and is now blocked by `occluder-1`. The brief said do not open that LOS. The model closed it.
 
 This is not a claim that P5 beats P2 or P3. It shows the agent can query the simulator, edit, and compare paired reports.
+
+## Forge workbench (P6)
+
+The lobby Forge screen runs this same P5 agent behind `POST /api/arena-forge/design`. Jobs are in-memory only. They disappear on server restart. At most one live job at a time.
+
+Live design is off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and a server-side `OPENAI_API_KEY` exist. The API never tells the client whether a key is present, only `liveAgentAvailable`.
+
+A sanitized copy of the development run lives at `server/fixtures/arena-forge/p5-demo.json`. Load it from Forge as **Recorded P5 demo**. No API key required.
+
+Same-seed playtest reports are deterministic. Pairing is strongest while the valid spawn and route sets stay the same. The simulator was not changed to address that.

@@ -195,6 +195,8 @@ export async function runPlaytestAgentDesign(args: {
   requestedModel?: string;
   playtestSeed?: number;
   playtestRollouts?: number;
+  /** Observe after a turn is recorded. Must not change decisions, budgets, or the map. */
+  onTurn?: (turn: PlaytestAgentTurnRecord) => void;
 }): Promise<PlaytestAgentRunResult> {
   const started = Date.now();
   const workspace = new ArenaWorkspace(args.map, args.mode ?? "search_destroy");
@@ -211,6 +213,15 @@ export async function runPlaytestAgentDesign(args: {
   let playtestCalls = 0;
   let modelCalls = 0;
   let lastPlaytest: ArenaPlaytestReport | undefined;
+
+  const commitTurn = (record: PlaytestAgentTurnRecord): void => {
+    turns.push(record);
+    try {
+      args.onTurn?.(record);
+    } catch {
+      // Observer failures must not change the run.
+    }
+  };
 
   const fail = (
     status: PlaytestAgentRunStatus,
@@ -288,11 +299,11 @@ export async function runPlaytestAgentDesign(args: {
     if (call.name === FINISH_DESIGN_TOOL) {
       const summary = parseFinishSummary(call.arguments);
       if (summary === undefined) {
-        turns.push(record);
+        commitTurn(record);
         return fail("invalid_model_output", "finish_design requires a summary string");
       }
       record.evaluationAfter = structuredClone(workspace.evaluation);
-      turns.push(record);
+      commitTurn(record);
       return {
         kind: "playtest_agent",
         brief: args.brief,
@@ -318,7 +329,7 @@ export async function runPlaytestAgentDesign(args: {
     if (call.name === RUN_PLAYTEST_TOOL) {
       if (playtestCalls >= MAX_PLAYTEST_CALLS) {
         record.evaluationAfter = structuredClone(workspace.evaluation);
-        turns.push(record);
+        commitTurn(record);
         return fail(
           "budget_exhausted",
           `playtest calls reached MAX_PLAYTEST_CALLS (${MAX_PLAYTEST_CALLS})`,
@@ -333,7 +344,7 @@ export async function runPlaytestAgentDesign(args: {
       record.playtest = playtest;
       record.evaluationAfter = structuredClone(workspace.evaluation);
       record.outcome = { ok: true };
-      turns.push(record);
+      commitTurn(record);
 
       const output: PlaytestToolOutput = {
         ok: true,
@@ -353,13 +364,13 @@ export async function runPlaytestAgentDesign(args: {
     }
 
     if (!EDIT_TOOLS.has(call.name)) {
-      turns.push(record);
+      commitTurn(record);
       return fail("invalid_model_output", `unknown tool: ${call.name}`);
     }
 
     if (editAttempts >= MAX_PLAYTEST_EDIT_ATTEMPTS) {
       record.evaluationAfter = structuredClone(workspace.evaluation);
-      turns.push(record);
+      commitTurn(record);
       return fail(
         "budget_exhausted",
         `edit attempts reached MAX_PLAYTEST_EDIT_ATTEMPTS (${MAX_PLAYTEST_EDIT_ATTEMPTS})`,
@@ -368,7 +379,7 @@ export async function runPlaytestAgentDesign(args: {
 
     const parsed = parseEditToolArgs(call.name, call.arguments);
     if (typeof parsed === "string") {
-      turns.push(record);
+      commitTurn(record);
       return fail("invalid_model_output", parsed);
     }
 
@@ -379,7 +390,7 @@ export async function runPlaytestAgentDesign(args: {
       ? { ok: true, changedIds: output.changedIds }
       : { ok: false, error: output.error };
     record.evaluationAfter = structuredClone(workspace.evaluation);
-    turns.push(record);
+    commitTurn(record);
 
     try {
       decision = await args.session.continueWithTool({

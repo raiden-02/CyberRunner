@@ -266,3 +266,32 @@ describe("P5 agent J export", () => {
     world.free();
   });
 });
+
+describe("P5 onTurn observer", () => {
+  it("does not change the scripted result", async () => {
+    const turns = [
+      decision("run_playtest", { intent: "look" }),
+      decision("add_solid", { kind: "obstacle", x: 2, y: 1, z: 2, hx: 1, hy: 1, hz: 1, intent: "add" }),
+      decision("finish_design", { summary: "Done." }),
+    ];
+    const map = importGameplayMap(getGameplayMap("map-contract-smoke"));
+    const seen: string[] = [];
+    const withCb = await runPlaytestAgentDesign({
+      map: importGameplayMap(getGameplayMap("map-contract-smoke")),
+      brief,
+      session: new ScriptedPlaytestSession(turns),
+      onTurn: (turn) => {
+        seen.push(turn.tool);
+      },
+    });
+    const without = await runPlaytestAgentDesign({
+      map,
+      brief,
+      session: new ScriptedPlaytestSession(turns),
+    });
+    const { totalLatencyMs: _a, ...a } = withCb;
+    const { totalLatencyMs: _b, ...b } = without;
+    expect(a).toEqual(b);
+    expect(seen).toEqual(["run_playtest", "add_solid", "finish_design"]);
+  });
+});

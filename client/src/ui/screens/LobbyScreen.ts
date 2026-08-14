@@ -111,7 +111,7 @@ export class LobbyScreen extends BaseScreen {
     forgeBtn.onclick = () => this.onForge();
     panel.appendChild(forgeBtn);
     const forgeHint = document.createElement("div");
-    forgeHint.textContent = "Walk ArenaForge P4-A and P4-B maps, plus recorded model results.";
+    forgeHint.textContent = "Write a brief, watch the public trace, play the result. Recorded demo works without an API key.";
     forgeHint.style.cssText = `
       color: ${THEME.muted};
       font-size: 12px;

@@ -1,5 +1,11 @@
 import { Router, Request, Response } from "express";
 import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
+import {
+  getDesignJobView,
+  liveAgentCapability,
+  startDesignJob,
+} from "../arena-forge/design-jobs.js";
+import { recordedDemoView } from "../arena-forge/recorded-demo.js";
 import { listForgeCatalog, loadForgeMap } from "../arena-forge/preview.js";
 import { AuthService } from "../services/auth-service.js";
 import { UserService } from "../services/user-service.js";
@@ -42,6 +48,41 @@ router.get("/arena-forge/preview-map", (req: Request, res: Response) => {
     const message = err instanceof Error ? err.message : String(err);
     res.status(404).json({ error: message, mapId: ARENA_FORGE_PREVIEW_MAP_ID });
   }
+});
+
+router.get("/arena-forge/capability", (_req: Request, res: Response) => {
+  res.json(liveAgentCapability());
+});
+
+router.get("/arena-forge/demo/p5", (_req: Request, res: Response) => {
+  try {
+    res.json(recordedDemoView());
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(404).json({ error: message });
+  }
+});
+
+router.post("/arena-forge/design", (req: Request, res: Response) => {
+  const started = startDesignJob({
+    brief: req.body?.brief,
+    mapId: req.body?.mapId,
+  });
+  if (!started.ok) {
+    res.status(started.status).json({ error: started.error });
+    return;
+  }
+  res.status(started.status).json({ jobId: started.jobId });
+});
+
+router.get("/arena-forge/design/:jobId", (req: Request, res: Response) => {
+  const jobId = Array.isArray(req.params.jobId) ? req.params.jobId[0] : req.params.jobId;
+  const view = jobId ? getDesignJobView(jobId) : undefined;
+  if (!view) {
+    res.status(404).json({ error: "That design job is gone. Jobs live only in memory and disappear on restart." });
+    return;
+  }
+  res.json(view);
 });
 
 // Auth: Google sign-in

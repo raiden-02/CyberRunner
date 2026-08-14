@@ -6,7 +6,10 @@ import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { assertSearchDestroyMap } from "@shared/world/map-registry.js";
 import { allEvalCases, getEvalCase } from "./eval-cases.js";
 import { getP4BCase, p4bHeldOutCases } from "./eval-cases-p4b.js";
+import { getDesignJobMap } from "./design-jobs.js";
 import { exportGameplayMap } from "./export-map.js";
+import { parseDemoCatalogId, parseJobCatalogId } from "./design-view.js";
+import { recordedDemoMap } from "./recorded-demo.js";
 import type { ArenaMap } from "./types.js";
 
 const serverDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -121,6 +124,19 @@ function resolveRunPath(rel: string): string {
 export function loadForgeMap(catalogId?: string): GameplayMapDefinition {
   if (!catalogId) {
     return loadArenaForgePreview();
+  }
+  const jobRef = parseJobCatalogId(catalogId);
+  if (jobRef) {
+    const map = getDesignJobMap(jobRef.jobId, jobRef.which);
+    if (!map) throw new Error(`forge job map not found: ${catalogId}`);
+    const name = `ArenaForge job ${jobRef.which}`;
+    return asPreview(exportGameplayMap(map, { id: ARENA_FORGE_PREVIEW_MAP_ID, name }), name);
+  }
+  const demoWhich = parseDemoCatalogId(catalogId);
+  if (demoWhich) {
+    const map = recordedDemoMap(demoWhich);
+    const name = `Recorded P5 demo ${demoWhich}`;
+    return asPreview(exportGameplayMap(map, { id: ARENA_FORGE_PREVIEW_MAP_ID, name }), name);
   }
   if (catalogId.startsWith("fixture:")) {
     const caseId = catalogId.slice("fixture:".length);

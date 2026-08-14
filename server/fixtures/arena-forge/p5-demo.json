@@ -1,0 +1,614 @@
+{
+  "id": "p5-demo",
+  "source": "recorded",
+  "label": "Recorded P5 demo",
+  "brief": "Use playtest evidence to reduce Ghosts' strong preference for site B so scripted traffic is less one-sided. Keep both sites reachable. Avoid new hard failures and avoid opening ghost-spawn-0 to sentinel-spawn-0 LOS.",
+  "startingMapId": "map-contract-smoke",
+  "modelRequested": "gpt-5.6",
+  "modelReturned": "gpt-5.6-sol",
+  "editAttempts": 2,
+  "successfulEdits": 2,
+  "playtestCalls": 3,
+  "modelCalls": 6,
+  "totalTokens": 56572,
+  "latencyMs": 29550,
+  "finishSummary": "Added and tuned compact A-approach cover. Fixed-seed Ghost traffic improved from 15A/49B to 30A/34B, with lower exposure and only a modest concentration increase. Both sites remain reachable in one connected navigation component, there are no hard failures, all spawns/objectives remain valid, and ghost-spawn-0 to sentinel-spawn-0 LOS is now blocked rather than opened.",
+  "initialMap": {
+    "sourceMapId": "map-contract-smoke",
+    "boundsHalfSize": 12,
+    "wallHeight": 3,
+    "wallThickness": 0.4,
+    "groundThickness": 0.1,
+    "solids": [
+      {
+        "id": "obstacle-0",
+        "kind": "obstacle",
+        "x": 0,
+        "y": 1,
+        "z": 0,
+        "hx": 2,
+        "hy": 1,
+        "hz": 2
+      },
+      {
+        "id": "obstacle-1",
+        "kind": "obstacle",
+        "x": 5,
+        "y": 1,
+        "z": 4,
+        "hx": 1,
+        "hy": 1,
+        "hz": 1
+      },
+      {
+        "id": "occluder-0",
+        "kind": "occluder",
+        "x": -8,
+        "y": 1.5,
+        "z": 0,
+        "hx": 0.4,
+        "hy": 1.5,
+        "hz": 3
+      },
+      {
+        "id": "breakable-0",
+        "kind": "breakable",
+        "x": -4,
+        "y": 0.8,
+        "z": 2,
+        "hx": 0.8,
+        "hy": 0.8,
+        "hz": 0.8,
+        "hp": 50
+      }
+    ],
+    "spawns": [
+      {
+        "id": "spawn-0",
+        "role": "general",
+        "x": -6,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "spawn-1",
+        "role": "general",
+        "x": 0,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "spawn-2",
+        "role": "general",
+        "x": 6,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "spawn-3",
+        "role": "general",
+        "x": -6,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "spawn-4",
+        "role": "general",
+        "x": 0,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "spawn-5",
+        "role": "general",
+        "x": 6,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "ghost-spawn-0",
+        "role": "ghost",
+        "x": -6,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "ghost-spawn-1",
+        "role": "ghost",
+        "x": 0,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "ghost-spawn-2",
+        "role": "ghost",
+        "x": 6,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "sentinel-spawn-0",
+        "role": "sentinel",
+        "x": -6,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "sentinel-spawn-1",
+        "role": "sentinel",
+        "x": 0,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "sentinel-spawn-2",
+        "role": "sentinel",
+        "x": 6,
+        "y": 1,
+        "z": 10
+      }
+    ],
+    "objectives": [
+      {
+        "id": "A",
+        "x": -6,
+        "y": 0,
+        "z": 0,
+        "radius": 2.5
+      },
+      {
+        "id": "B",
+        "x": 6,
+        "y": 0,
+        "z": 0,
+        "radius": 2.5
+      }
+    ],
+    "spawnProtectionZones": [
+      {
+        "id": "zone-0",
+        "x": 0,
+        "y": 2,
+        "z": -10,
+        "hx": 10,
+        "hy": 3,
+        "hz": 1.5
+      },
+      {
+        "id": "zone-1",
+        "x": 0,
+        "y": 2,
+        "z": 10,
+        "hx": 10,
+        "hy": 3,
+        "hz": 1.5
+      }
+    ],
+    "spikeSpawnLocation": {
+      "id": "spike-spawn",
+      "x": 0,
+      "y": 1,
+      "z": -8
+    }
+  },
+  "finalMap": {
+    "sourceMapId": "map-contract-smoke",
+    "boundsHalfSize": 12,
+    "wallHeight": 3,
+    "wallThickness": 0.4,
+    "groundThickness": 0.1,
+    "solids": [
+      {
+        "id": "obstacle-0",
+        "kind": "obstacle",
+        "x": 0,
+        "y": 1,
+        "z": 0,
+        "hx": 2,
+        "hy": 1,
+        "hz": 2
+      },
+      {
+        "id": "obstacle-1",
+        "kind": "obstacle",
+        "x": 5,
+        "y": 1,
+        "z": 4,
+        "hx": 1,
+        "hy": 1,
+        "hz": 1
+      },
+      {
+        "id": "occluder-0",
+        "kind": "occluder",
+        "x": -8,
+        "y": 1.5,
+        "z": 0,
+        "hx": 0.4,
+        "hy": 1.5,
+        "hz": 3
+      },
+      {
+        "id": "breakable-0",
+        "kind": "breakable",
+        "x": -4,
+        "y": 0.8,
+        "z": 2,
+        "hx": 0.8,
+        "hy": 0.8,
+        "hz": 0.8,
+        "hp": 50
+      },
+      {
+        "id": "occluder-1",
+        "kind": "occluder",
+        "x": -5.5,
+        "y": 1.5,
+        "z": -3.5,
+        "hx": 1.2,
+        "hy": 1.5,
+        "hz": 0.4
+      }
+    ],
+    "spawns": [
+      {
+        "id": "spawn-0",
+        "role": "general",
+        "x": -6,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "spawn-1",
+        "role": "general",
+        "x": 0,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "spawn-2",
+        "role": "general",
+        "x": 6,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "spawn-3",
+        "role": "general",
+        "x": -6,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "spawn-4",
+        "role": "general",
+        "x": 0,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "spawn-5",
+        "role": "general",
+        "x": 6,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "ghost-spawn-0",
+        "role": "ghost",
+        "x": -6,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "ghost-spawn-1",
+        "role": "ghost",
+        "x": 0,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "ghost-spawn-2",
+        "role": "ghost",
+        "x": 6,
+        "y": 1,
+        "z": -10
+      },
+      {
+        "id": "sentinel-spawn-0",
+        "role": "sentinel",
+        "x": -6,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "sentinel-spawn-1",
+        "role": "sentinel",
+        "x": 0,
+        "y": 1,
+        "z": 10
+      },
+      {
+        "id": "sentinel-spawn-2",
+        "role": "sentinel",
+        "x": 6,
+        "y": 1,
+        "z": 10
+      }
+    ],
+    "objectives": [
+      {
+        "id": "A",
+        "x": -6,
+        "y": 0,
+        "z": 0,
+        "radius": 2.5
+      },
+      {
+        "id": "B",
+        "x": 6,
+        "y": 0,
+        "z": 0,
+        "radius": 2.5
+      }
+    ],
+    "spawnProtectionZones": [
+      {
+        "id": "zone-0",
+        "x": 0,
+        "y": 2,
+        "z": -10,
+        "hx": 10,
+        "hy": 3,
+        "hz": 1.5
+      },
+      {
+        "id": "zone-1",
+        "x": 0,
+        "y": 2,
+        "z": 10,
+        "hx": 10,
+        "hy": 3,
+        "hz": 1.5
+      }
+    ],
+    "spikeSpawnLocation": {
+      "id": "spike-spawn",
+      "x": 0,
+      "y": 1,
+      "z": -8
+    }
+  },
+  "initialP0": {
+    "hardFailures": 0,
+    "reachablePaths": 12,
+    "totalPaths": 12,
+    "ghostAMedian": 12.5,
+    "ghostBMedian": 12,
+    "sentinelAMedian": 13.5,
+    "sentinelBMedian": 12.5
+  },
+  "finalP0": {
+    "hardFailures": 0,
+    "reachablePaths": 12,
+    "totalPaths": 12,
+    "ghostAMedian": 12.5,
+    "ghostBMedian": 12,
+    "sentinelAMedian": 13.5,
+    "sentinelBMedian": 12.5
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "kind": "playtest",
+      "tool": "run_playtest",
+      "intent": "Establish baseline evidence for Ghost site preference, route timing, exposure, and first-contact patterns before editing.",
+      "mapRevision": 0,
+      "p0": {
+        "hardFailures": 0,
+        "reachablePaths": 12,
+        "totalPaths": 12,
+        "ghostAMedian": 12.5,
+        "ghostBMedian": 12,
+        "sentinelAMedian": 13.5,
+        "sentinelBMedian": 12.5
+      },
+      "playtest": {
+        "seed": 20260831,
+        "rollouts": 64,
+        "ghost": {
+          "siteChoice": {
+            "A": 15,
+            "B": 49
+          },
+          "medianArrivalSeconds": {
+            "A": 1.5,
+            "B": 2.4
+          },
+          "meanRouteExposureFraction": 0.755,
+          "routeConcentration": 0.438
+        },
+        "sentinel": {
+          "siteChoice": {
+            "A": 29,
+            "B": 35
+          },
+          "medianArrivalSeconds": {
+            "A": 1.6,
+            "B": 1.7
+          },
+          "meanRouteExposureFraction": 0.954,
+          "routeConcentration": 0.391
+        },
+        "firstContact": {
+          "occurrenceFraction": 0.594,
+          "medianSeconds": 0,
+          "hotspot": {
+            "x": 5.25,
+            "z": -1.25,
+            "sampleCount": 9
+          }
+        },
+        "mapRevision": 0
+      }
+    },
+    {
+      "turn": 2,
+      "kind": "edit",
+      "tool": "add_solid",
+      "intent": "Add attacker-side approach cover near A to reduce spawn-anchor exposure and make A more competitive, while leaving wide routes around both ends and not altering the existing ghost-spawn-0 to sentinel-spawn-0 lane.",
+      "target": "occluder-1",
+      "mapRevision": 1,
+      "p0": {
+        "hardFailures": 0,
+        "reachablePaths": 12,
+        "totalPaths": 12,
+        "ghostAMedian": 12.5,
+        "ghostBMedian": 12,
+        "sentinelAMedian": 13.5,
+        "sentinelBMedian": 12.5
+      }
+    },
+    {
+      "turn": 3,
+      "kind": "playtest",
+      "tool": "run_playtest",
+      "intent": "Measure whether the new A-side cover reduces Ghosts' B preference without harming reachability or creating problematic timing and contact shifts.",
+      "mapRevision": 1,
+      "p0": {
+        "hardFailures": 0,
+        "reachablePaths": 12,
+        "totalPaths": 12,
+        "ghostAMedian": 12.5,
+        "ghostBMedian": 12,
+        "sentinelAMedian": 13.5,
+        "sentinelBMedian": 12.5
+      },
+      "playtest": {
+        "seed": 20260831,
+        "rollouts": 64,
+        "ghost": {
+          "siteChoice": {
+            "A": 44,
+            "B": 20
+          },
+          "medianArrivalSeconds": {
+            "A": 2.5,
+            "B": 1.5
+          },
+          "meanRouteExposureFraction": 0.445,
+          "routeConcentration": 0.688
+        },
+        "sentinel": {
+          "siteChoice": {
+            "A": 41,
+            "B": 23
+          },
+          "medianArrivalSeconds": {
+            "A": 1.6,
+            "B": 1.7
+          },
+          "meanRouteExposureFraction": 0.457,
+          "routeConcentration": 0.391
+        },
+        "firstContact": {
+          "occurrenceFraction": 0.703,
+          "medianSeconds": 0.5,
+          "hotspot": {
+            "x": -4.25,
+            "z": -1.25,
+            "sampleCount": 19
+          }
+        },
+        "mapRevision": 1
+      }
+    },
+    {
+      "turn": 4,
+      "kind": "edit",
+      "tool": "resize_solid",
+      "intent": "Reduce the A cover's width after playtest overcorrected Ghost choice to 44A/20B; retain useful concealment and blocked spawn-to-spawn LOS while lowering detour and route concentration.",
+      "target": "occluder-1",
+      "mapRevision": 2,
+      "p0": {
+        "hardFailures": 0,
+        "reachablePaths": 12,
+        "totalPaths": 12,
+        "ghostAMedian": 12.5,
+        "ghostBMedian": 12,
+        "sentinelAMedian": 13.5,
+        "sentinelBMedian": 12.5
+      }
+    },
+    {
+      "turn": 5,
+      "kind": "playtest",
+      "tool": "run_playtest",
+      "intent": "Validate the narrowed A-side occluder with paired fixed-seed evidence, focusing on Ghost site split, route concentration, exposure, contact timing, and preserved reachability.",
+      "mapRevision": 2,
+      "p0": {
+        "hardFailures": 0,
+        "reachablePaths": 12,
+        "totalPaths": 12,
+        "ghostAMedian": 12.5,
+        "ghostBMedian": 12,
+        "sentinelAMedian": 13.5,
+        "sentinelBMedian": 12.5
+      },
+      "playtest": {
+        "seed": 20260831,
+        "rollouts": 64,
+        "ghost": {
+          "siteChoice": {
+            "A": 30,
+            "B": 34
+          },
+          "medianArrivalSeconds": {
+            "A": 2.3,
+            "B": 1.5
+          },
+          "meanRouteExposureFraction": 0.635,
+          "routeConcentration": 0.469
+        },
+        "sentinel": {
+          "siteChoice": {
+            "A": 41,
+            "B": 23
+          },
+          "medianArrivalSeconds": {
+            "A": 1.6,
+            "B": 1.7
+          },
+          "meanRouteExposureFraction": 0.457,
+          "routeConcentration": 0.391
+        },
+        "firstContact": {
+          "occurrenceFraction": 0.641,
+          "medianSeconds": 0.7,
+          "hotspot": {
+            "x": 6.25,
+            "z": 0.25,
+            "sampleCount": 9
+          }
+        },
+        "mapRevision": 2
+      }
+    },
+    {
+      "turn": 6,
+      "kind": "finish",
+      "tool": "finish_design",
+      "mapRevision": 2,
+      "p0": {
+        "hardFailures": 0,
+        "reachablePaths": 12,
+        "totalPaths": 12,
+        "ghostAMedian": 12.5,
+        "ghostBMedian": 12,
+        "sentinelAMedian": 13.5,
+        "sentinelBMedian": 12.5
+      },
+      "finishSummary": "Added and tuned compact A-approach cover. Fixed-seed Ghost traffic improved from 15A/49B to 30A/34B, with lower exposure and only a modest concentration increase. Both sites remain reachable in one connected navigation component, there are no hard failures, all spawns/objectives remain valid, and ghost-spawn-0 to sentinel-spawn-0 LOS is now blocked rather than opened."
+    }
+  ]
+}

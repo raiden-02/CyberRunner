@@ -68,6 +68,28 @@ While it is on: teal predicted capsule, orange server capsule, aim ray, last ser
 - Eight weapons, hitscan and projectile
 - Crouch, prone, and slide. Crouch and prone resize the movement capsule
 
+## ArenaForge
+
+ArenaForge is a bounded AI level designer for CyberRunner. It edits real game-domain map structures, checks geometry, navigation, spawn, and LOS deterministically, can run a seeded scripted playtest to observe route, timing, and exposure behavior, and shows the public action and evaluation trace before you play the map in the real game.
+
+Open **Forge** from the lobby.
+
+- **Design:** pick `map-contract-smoke`, write a brief, run the frozen P5 agent if live design is enabled on the server.
+- **Recorded P5 demo:** the committed six-turn development run. Works on a clean clone with no API key.
+- **Play Original / Play Result:** real Search & Destroy rooms through the existing Forge preview path.
+
+Live inference stays on the server. It is off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and `OPENAI_API_KEY` are both set. Do not enable that on a public host unless you intend to pay for those calls. Jobs live in memory only and vanish on restart.
+
+The scripted playtest is not human playtesting and not a balance score. It uses standing-ground shortest paths at walk speed. No combat.
+
+What the evals actually showed:
+
+- P4-A basic repair: one-shot and the static-evaluator agent both 100%. A ceiling, not a win for iteration.
+- P4-B interaction stress: one-shot 88.9%, agent 86.1%. One-shot was slightly better overall. Iteration is not a universal upgrade.
+- P5: one real playtest-driven overcorrection (Ghost 15A/49B → 44A/20B, concentration worse) then a resize that landed at 30A/34B.
+
+Details: [`server/arena-forge-playtest.md`](server/arena-forge-playtest.md), [`server/arena-forge-evaluation.md`](server/arena-forge-evaluation.md), [`server/arena-forge-evaluation-p4b.md`](server/arena-forge-evaluation-p4b.md).
+
 ## Run locally
 
 ```bash
@@ -101,6 +123,8 @@ npm run dev:client
 | `NODE_ENV` | unset locally | `production` ignores god mode, unlimited ammo, and `apply_damage` |
 | `VITE_WS_URL` | unset | Force the client WebSocket URL |
 | `VITE_GOOGLE_CLIENT_ID` | unset | Google sign-in. Guest play works if this is unset |
+| `OPENAI_API_KEY` | unset | Server-only. ArenaForge live design |
+| `ARENA_FORGE_LIVE_AGENT_ENABLED` | unset | Must be `true` plus a key before Forge can start a live job |
 
 Copy `server/.env.example` to `server/.env` for the server. Copy `client/.env.example` to `client/.env.local` if you want local Vite overrides.
 

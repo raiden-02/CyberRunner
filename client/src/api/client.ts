@@ -36,6 +36,82 @@ export interface ForgeCatalogEntry {
   which: "initial" | "final";
 }
 
+export type ForgeDesignStatus = "queued" | "running" | "completed" | "failed";
+
+export interface ForgeP0Summary {
+  hardFailures: number;
+  reachablePaths: number;
+  totalPaths: number;
+  ghostAMedian?: number;
+  ghostBMedian?: number;
+  sentinelAMedian?: number;
+  sentinelBMedian?: number;
+}
+
+export interface ForgePlaytestSummary {
+  seed: number;
+  rollouts: number;
+  ghost: {
+    siteChoice: { A: number; B: number };
+    medianArrivalSeconds: { A?: number; B?: number };
+    meanRouteExposureFraction: number;
+    routeConcentration: number;
+  };
+  sentinel: {
+    siteChoice: { A: number; B: number };
+    medianArrivalSeconds: { A?: number; B?: number };
+    meanRouteExposureFraction: number;
+    routeConcentration: number;
+  };
+  firstContact: {
+    occurrenceFraction: number;
+    medianSeconds?: number;
+    hotspot?: { x: number; z: number; sampleCount: number };
+  };
+  mapRevision: number;
+}
+
+export interface ForgeDesignTurn {
+  turn: number;
+  kind: "edit" | "playtest" | "finish";
+  tool: string;
+  intent?: string;
+  target?: string;
+  rejected?: boolean;
+  p0?: ForgeP0Summary;
+  playtest?: ForgePlaytestSummary;
+  finishSummary?: string;
+  mapRevision: number;
+}
+
+export interface ForgeDesignView {
+  jobId: string;
+  status: ForgeDesignStatus;
+  source: "live" | "recorded";
+  startingMapId: string;
+  brief: string;
+  error?: string;
+  finishSummary?: string;
+  turns: ForgeDesignTurn[];
+  editAttempts: number;
+  successfulEdits: number;
+  playtestCalls: number;
+  modelCalls: number;
+  totalTokens?: number;
+  latencyMs?: number;
+  modelRequested?: string;
+  modelReturned?: string;
+  initialP0: ForgeP0Summary;
+  finalP0?: ForgeP0Summary;
+  firstPlaytest?: ForgePlaytestSummary;
+  lastPlaytest?: ForgePlaytestSummary;
+  lastPlaytestMapRevision?: number;
+  finalMapRevision: number;
+  lastPlaytestIsOnFinalMap: boolean;
+  playOriginalId: string;
+  playResultId?: string;
+}
+
 class ApiClient {
   private baseUrl = "/api";
 
@@ -124,6 +200,38 @@ class ApiClient {
     }
     const data = (await res.json()) as { maps: ForgeCatalogEntry[] };
     return data.maps;
+  }
+
+  async forgeCapability(): Promise<{ liveAgentAvailable: boolean }> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/capability`);
+    if (!res.ok) throw new Error("Failed to read Forge capability");
+    return res.json();
+  }
+
+  async startForgeDesign(input: { brief: string; mapId: string }): Promise<{ jobId: string }> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/design`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };
+    if (!res.ok) throw new Error(body.error || "Failed to start design");
+    if (!body.jobId) throw new Error("Design job id missing");
+    return { jobId: body.jobId };
+  }
+
+  async getForgeDesign(jobId: string): Promise<ForgeDesignView> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/design/${encodeURIComponent(jobId)}`);
+    const body = (await res.json().catch(() => ({}))) as ForgeDesignView & { error?: string };
+    if (!res.ok) throw new Error(body.error || "Design job not found");
+    return body;
+  }
+
+  async getRecordedP5Demo(): Promise<ForgeDesignView> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/demo/p5`);
+    const body = (await res.json().catch(() => ({}))) as ForgeDesignView & { error?: string };
+    if (!res.ok) throw new Error(body.error || "Recorded demo not found");
+    return body;
   }
 
   async joinByCode(joinCode: string): Promise<JoinResult> {
