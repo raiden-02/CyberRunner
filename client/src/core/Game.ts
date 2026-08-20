@@ -574,8 +574,10 @@ export class Game {
     this.inputAccumulator = stepped.accumulator;
     const connected = this.network.connected;
 
+    const inTeamLobby = this.network.state?.lobbyState === "waiting";
     for (let i = 0; i < stepped.ticks; i++) {
       const state = this.input.consumeTickState();
+      if (inTeamLobby) continue;
       const msg = this.buildInputMsg(++this.inputSeq, state);
       this.localPlayer.applyFixedTick(msg, connected);
       if (connected) {

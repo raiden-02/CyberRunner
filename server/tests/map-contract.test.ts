@@ -6,6 +6,8 @@ import {
   assertSearchDestroyMap,
   getDefaultMapId,
   getGameplayMap,
+  getPublicMapIds,
+  isPublicMapId,
   resolveRoomMapId,
 } from "../../shared/world/map-registry.js";
 import { SHOOT_HOUSE_NEON } from "../../shared/world/maps/shoot-house-neon.js";
@@ -42,6 +44,14 @@ describe("canonical map contract", () => {
     expect(shootHouse.occluders.length).toBeGreaterThan(0);
     expect(shootHouse.breakables.length).toBeGreaterThan(0);
     expect(smoke.obstacles.length).toBeGreaterThan(0);
+  });
+
+  it("exposes Shoot House as the only public Create Game map", () => {
+    expect(getPublicMapIds()).toEqual(["shoot-house-neon"]);
+    expect(isPublicMapId("shoot-house-neon")).toBe(true);
+    expect(isPublicMapId("map-contract-smoke")).toBe(false);
+    expect(isPublicMapId("demo:p5:final")).toBe(false);
+    expect(isPublicMapId("arena-forge-preview")).toBe(false);
   });
 
   it("throws on unknown map ids", () => {

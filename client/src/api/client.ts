@@ -71,6 +71,51 @@ export interface ForgePlaytestSummary {
   mapRevision: number;
 }
 
+export interface ForgePublicSolid {
+  id: string;
+  kind: "obstacle" | "occluder" | "breakable";
+  x: number;
+  y: number;
+  z: number;
+  hx: number;
+  hy: number;
+  hz: number;
+  hp?: number;
+}
+
+export interface ForgePublicSpawn {
+  id: string;
+  role: "general" | "ghost" | "sentinel";
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface ForgePublicObjective {
+  id: "A" | "B";
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+}
+
+export interface ForgePublicMapView {
+  boundsHalfSize: number;
+  wallHeight: number;
+  wallThickness: number;
+  groundThickness: number;
+  solids: ForgePublicSolid[];
+  spawns: ForgePublicSpawn[];
+  objectives: ForgePublicObjective[];
+}
+
+export interface ForgePlaytestReplay {
+  seed: number;
+  ghost?: { site: "A" | "B"; spawn: { x: number; z: number }; path: Array<{ x: number; z: number }> };
+  sentinel?: { site: "A" | "B"; spawn: { x: number; z: number }; path: Array<{ x: number; z: number }> };
+  firstContact?: { seconds: number; x: number; z: number };
+}
+
 export interface ForgeDesignTurn {
   turn: number;
   kind: "edit" | "playtest" | "finish";
@@ -110,6 +155,8 @@ export interface ForgeDesignView {
   lastPlaytestIsOnFinalMap: boolean;
   playOriginalId: string;
   playResultId?: string;
+  revisionMaps?: ForgePublicMapView[];
+  revisionReplays?: ForgePlaytestReplay[];
 }
 
 class ApiClient {

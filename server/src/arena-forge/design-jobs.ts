@@ -110,6 +110,7 @@ function jobView(job: DesignJobRecord): PublicDesignView {
       job.status === "completed" || job.status === "failed"
         ? jobCatalogId(job.id, "final")
         : undefined,
+    initialMap: job.initialMap,
   });
 }
 

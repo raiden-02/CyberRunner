@@ -63,32 +63,23 @@ While it is on: teal predicted capsule, orange server capsule, aim ray, last ser
 
 ## Gameplay
 
-- Map: `shoot-house-neon`
+- Public map: Shoot House Neon. Create Game picks mode and this production map. The server owns `mapId`.
 - Modes: Deathmatch (first to 5 kills, 10 min) and Search & Destroy (3 lives, first to 3 rounds)
 - Eight weapons, hitscan and projectile
 - Crouch, prone, and slide. Crouch and prone resize the movement capsule
+- `map-contract-smoke` is an internal fixture. It is not in the Create Game picker.
 
 ## ArenaForge
 
-ArenaForge is a bounded AI level designer for CyberRunner. It edits real game-domain map structures, checks geometry, navigation, spawn, and LOS deterministically, can run a seeded scripted playtest to observe route, timing, and exposure behavior, and shows the public action and evaluation trace before you play the map in the real game.
+ArenaForge is a bounded AI level-design agent inside CyberRunner. It edits the game's real map structures, checks geometry/navigation/spawn/LOS deterministically, runs a seeded scripted playtest to observe route behavior, and can revise the map before launching the result into the real multiplayer runtime.
 
-Open **Forge** from the lobby.
+**Demo flow:** Lobby → Arena Forge → recorded run → Play Result.
 
-- **Design:** pick `map-contract-smoke`, write a brief, run the frozen P5 agent if live design is enabled on the server.
-- **Recorded P5 demo:** the committed six-turn development run. Works on a clean clone with no API key.
-- **Play Original / Play Result:** real Search & Destroy rooms through the existing Forge preview path.
+The recorded P5 run loads with no API key. Live design stays secondary and stays off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and `OPENAI_API_KEY` are both set.
 
-Live inference stays on the server. It is off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and `OPENAI_API_KEY` are both set. Do not enable that on a public host unless you intend to pay for those calls. Jobs live in memory only and vanish on restart.
+The cinematic camera is presentation only. The scripted playtest is an offline navigation proxy, not live GameRoom bots and not a balance score.
 
-The scripted playtest is not human playtesting and not a balance score. It uses standing-ground shortest paths at walk speed. No combat.
-
-What the evals actually showed:
-
-- P4-A basic repair: one-shot and the static-evaluator agent both 100%. A ceiling, not a win for iteration.
-- P4-B interaction stress: one-shot 88.9%, agent 86.1%. One-shot was slightly better overall. Iteration is not a universal upgrade.
-- P5: one real playtest-driven overcorrection (Ghost 15A/49B → 44A/20B, concentration worse) then a resize that landed at 30A/34B.
-
-Details: [`server/arena-forge-playtest.md`](server/arena-forge-playtest.md), [`server/arena-forge-evaluation.md`](server/arena-forge-evaluation.md), [`server/arena-forge-evaluation-p4b.md`](server/arena-forge-evaluation-p4b.md).
+Evaluation method and numbers: [`server/arena-forge-playtest.md`](server/arena-forge-playtest.md), [`server/arena-forge-evaluation.md`](server/arena-forge-evaluation.md), [`server/arena-forge-evaluation-p4b.md`](server/arena-forge-evaluation-p4b.md).
 
 ## Run locally
 
@@ -107,7 +98,7 @@ npm run preview       # serves client/dist from the Node process
 
 Two tabs can join the same Deathmatch with the HUD join code.
 
-Default map is `shoot-house-neon`. To boot the internal contract fixture instead (Windows), set `MAP_ID` on the server. The client reads `mapId` from room state. There is no menu entry for this map.
+Default public map is `shoot-house-neon`. Create Game sends that `mapId`. To boot the internal contract fixture instead (Windows), set `MAP_ID` on the server. The client still reads `mapId` from room state. There is no Create Game card for the fixture.
 
 ```powershell
 $env:MAP_ID = "map-contract-smoke"; npm run dev:server

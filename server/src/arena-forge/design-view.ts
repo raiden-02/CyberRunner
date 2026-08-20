@@ -1,6 +1,11 @@
-import type { ArenaEvaluation } from "./types.js";
+import type { PublicArenaMapView } from "@shared/world/arena-map-view.js";
+import type { ArenaEvaluation, ArenaMap } from "./types.js";
 import type { ArenaPlaytestReport } from "./playtest.js";
 import type { PlaytestAgentRunResult, PlaytestAgentTurnRecord } from "./playtest-agent.js";
+import { publicRevisionMaps, revisionMapsFromTurns } from "./public-map.js";
+import type { PlaytestReplay } from "./playtest-replay.js";
+import { representativeReplay } from "./playtest-replay.js";
+import { PLAYTEST_SEED } from "./playtest.js";
 
 export const DESIGN_BRIEF_MAX = 800;
 export const DESIGN_STARTING_MAPS = ["map-contract-smoke"] as const;
@@ -67,6 +72,8 @@ export type PublicDesignView = {
   lastPlaytestIsOnFinalMap: boolean;
   playOriginalId: string;
   playResultId?: string;
+  revisionMaps: PublicArenaMapView[];
+  revisionReplays?: PlaytestReplay[];
 };
 
 export function isDesignStartingMap(id: string): id is DesignStartingMapId {
@@ -148,14 +155,22 @@ export function viewFromAgentResult(args: {
   initialP0: PublicP0Summary;
   playOriginalId: string;
   playResultId?: string;
+  initialMap?: ArenaMap;
+  revisionMaps?: PublicArenaMapView[];
+  revisionReplays?: PlaytestReplay[];
 }): PublicDesignView {
-  const turns = args.result
-    ? publicTurnsFromRecords(args.result.turns)
-    : publicTurnsFromRecords(args.turns ?? []);
+  const records = args.result?.turns ?? args.turns ?? [];
+  const turns = publicTurnsFromRecords(records);
   const playtests = turns.filter((t) => t.playtest).map((t) => t.playtest!);
   const lastPlaytest = playtests.length ? playtests[playtests.length - 1] : undefined;
   const finalMapRevision = args.result?.successfulEdits ?? turns.reduce((n, t) => (t.kind === "edit" && !t.rejected ? t.mapRevision : n), 0);
   const lastPlaytestMapRevision = lastPlaytest?.mapRevision;
+  const arenaRevisions =
+    args.initialMap !== undefined ? revisionMapsFromTurns(args.initialMap, records) : undefined;
+  const revisionMaps = args.revisionMaps ?? (arenaRevisions ? publicRevisionMaps(arenaRevisions) : []);
+  const revisionReplays =
+    args.revisionReplays ??
+    (arenaRevisions ? arenaRevisions.map((m) => representativeReplay(m, PLAYTEST_SEED)) : undefined);
   return {
     jobId: args.jobId,
     status: args.status,
@@ -185,6 +200,8 @@ export function viewFromAgentResult(args: {
       lastPlaytest !== undefined && lastPlaytestMapRevision === finalMapRevision,
     playOriginalId: args.playOriginalId,
     ...(args.playResultId ? { playResultId: args.playResultId } : {}),
+    revisionMaps,
+    ...(revisionReplays ? { revisionReplays } : {}),
   };
 }
 

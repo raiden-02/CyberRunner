@@ -16,9 +16,8 @@ import { WeaponSystem } from "./systems/weapon-system.js";
 import { getWeaponConfig } from "./weapons/weapon-config.js";
 import { createHitboxes, removeHitboxes, HitboxRegistry } from "./physics/hitbox-system.js";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
-import { catalogIdFromMapId, isArenaForgePreviewMapId, loadForgeMap } from "./arena-forge/preview.js";
-import { calculateSpawnFacing, resolveRoomMapId, getGameplayMap, assertDeathmatchMap, assertSearchDestroyMap } from "./world/maps/map-registry.js";
+import { calculateSpawnFacing } from "./world/maps/map-registry.js";
+import { assertRoomMode, resolveCreatedRoomMap } from "./room-map.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { LobbyService } from "./services/lobby-service.js";
 import {
@@ -109,27 +108,14 @@ export class GameRoom extends Room<GameState> {
     }
     this.maxClients = this.maxPlayers;
 
-    const requestedMap = options.mapId || process.env.MAP_ID || "";
-    if (options.forgeMapId || isArenaForgePreviewMapId(requestedMap)) {
-      const catalogId = options.forgeMapId || catalogIdFromMapId(requestedMap);
-      this.map = loadForgeMap(catalogId);
-      this.state.mapId = catalogId
-        ? `${ARENA_FORGE_PREVIEW_MAP_ID}::${catalogId}`
-        : ARENA_FORGE_PREVIEW_MAP_ID;
-    } else {
-      const mapId = resolveRoomMapId(options.mapId, process.env.MAP_ID);
-      this.map = getGameplayMap(mapId);
-      this.state.mapId = this.map.id;
-    }
+    const resolved = resolveCreatedRoomMap(options, process.env.MAP_ID);
+    this.map = resolved.map;
+    this.state.mapId = resolved.stateMapId;
 
     const modeId = options.gameMode || "deathmatch";
-    if (modeId === "search_destroy") {
-      assertSearchDestroyMap(this.map);
-    } else {
-      assertDeathmatchMap(this.map);
-    }
+    assertRoomMode(this.map, modeId);
     this.gameMode = createGameMode(modeId, this.map.uploadTerminals || []);
-    if (options.forgeMapId || isArenaForgePreviewMapId(requestedMap)) {
+    if (resolved.allowSoloStart) {
       this.getSDMode()?.getTeamManager().setAllowSoloStart(true);
     }
     const modeConfig = this.gameMode.getConfig();

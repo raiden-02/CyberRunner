@@ -10,6 +10,14 @@ import {
   type PublicDesignTurn,
 } from "./design-view.js";
 import { evaluateArena } from "./evaluator.js";
+import {
+  applyRevisionEdits,
+  P5_RECORDED_REVISION_EDITS,
+  publicRevisionMaps,
+  solidsEqual,
+} from "./public-map.js";
+import { PLAYTEST_SEED } from "./playtest.js";
+import { representativeReplay } from "./playtest-replay.js";
 
 export const P5_RECORDED_DEMO_ID = "p5-demo";
 
@@ -54,10 +62,21 @@ export function loadRecordedP5Demo(): RecordedP5Demo {
   return raw;
 }
 
+export function recordedDemoRevisionMaps() {
+  const demo = loadRecordedP5Demo();
+  const maps = applyRevisionEdits(demo.initialMap, P5_RECORDED_REVISION_EDITS);
+  const last = maps[maps.length - 1];
+  if (!last || !solidsEqual(last, demo.finalMap)) {
+    throw new Error("recorded P5 revision edits do not match the committed final map");
+  }
+  return maps;
+}
+
 export function recordedDemoView(): PublicDesignView {
   const demo = loadRecordedP5Demo();
   const playtests = demo.turns.filter((t) => t.playtest).map((t) => t.playtest!);
   const lastPlaytest = playtests[playtests.length - 1];
+  const arenaRevisions = recordedDemoRevisionMaps();
   return {
     jobId: demo.id,
     status: "completed",
@@ -83,6 +102,8 @@ export function recordedDemoView(): PublicDesignView {
     lastPlaytestIsOnFinalMap: lastPlaytest?.mapRevision === demo.successfulEdits,
     playOriginalId: demoCatalogId("initial"),
     playResultId: demoCatalogId("final"),
+    revisionMaps: publicRevisionMaps(arenaRevisions),
+    revisionReplays: arenaRevisions.map((m) => representativeReplay(m, PLAYTEST_SEED)),
   };
 }
 

@@ -30,6 +30,41 @@ export function getRegisteredMapIds(): MapId[] {
   return Object.keys(GAMEPLAY_MAPS) as MapId[];
 }
 
+export type PublicGameMode = "deathmatch" | "search_destroy";
+
+export type PublicMapInfo = {
+  id: MapId;
+  title: string;
+  blurb: string;
+  modes: PublicGameMode[];
+};
+
+/** Maps shown in ordinary Create Game. Registered fixtures stay loadable by id. */
+const PUBLIC_MAPS: readonly PublicMapInfo[] = [
+  {
+    id: "shoot-house-neon",
+    title: "Shoot House Neon",
+    blurb: "Compact close-quarters arena",
+    modes: ["deathmatch", "search_destroy"],
+  },
+];
+
+export function getPublicMaps(): readonly PublicMapInfo[] {
+  return PUBLIC_MAPS;
+}
+
+export function getPublicMapIds(): MapId[] {
+  return PUBLIC_MAPS.map((m) => m.id);
+}
+
+export function isPublicMapId(id: string): id is MapId {
+  return PUBLIC_MAPS.some((m) => m.id === id);
+}
+
+export function getPublicMap(id: string): PublicMapInfo | undefined {
+  return PUBLIC_MAPS.find((m) => m.id === id);
+}
+
 export function assertDeathmatchMap(map: GameplayMapDefinition): void {
   if (map.spawnPoints.length === 0) {
     throw new Error(`Map "${map.id}" has no spawnPoints`);
