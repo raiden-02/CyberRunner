@@ -1,15 +1,15 @@
 import { Router, Request, Response } from "express";
 import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
-import {
-  getDesignJobView,
-  liveAgentCapability,
-  startDesignJob,
-} from "../arena-forge/design-jobs.js";
+import { getDesignJobView } from "../arena-forge/design-jobs.js";
+import { getForgeQuotaStore } from "../arena-forge/forge-quota.js";
+import { admitLiveDesign, publicLiveCapability } from "../arena-forge/live-design-admission.js";
+import { resolveLiveForgePolicy } from "../arena-forge/live-forge-policy.js";
 import { recordedDemoView } from "../arena-forge/recorded-demo.js";
 import { listForgeCatalog, loadForgeMap } from "../arena-forge/preview.js";
 import { AuthService } from "../services/auth-service.js";
 import { UserService } from "../services/user-service.js";
 import { LobbyService } from "../services/lobby-service.js";
+import { resolveQuickPlay } from "../services/quickplay.js";
 import { requireAuth, requireProfile, requireLobbyAccess, getSessionCookieName } from "./middleware.js";
 import { isDatabaseEnabled } from "../db/pool.js";
 
@@ -50,8 +50,25 @@ router.get("/arena-forge/preview-map", (req: Request, res: Response) => {
   }
 });
 
-router.get("/arena-forge/capability", (_req: Request, res: Response) => {
-  res.json(liveAgentCapability());
+router.get("/arena-forge/capability", async (req: Request, res: Response) => {
+  const policy = resolveLiveForgePolicy(process.env, { databaseAvailable: isDatabaseEnabled() });
+  let remainingRunsToday: number | undefined;
+  if (policy.mode === "hosted" && policy.runnable && req.user) {
+    const store = getForgeQuotaStore();
+    if (store) {
+      try {
+        remainingRunsToday = await store.remaining(req.user.id);
+      } catch {
+        remainingRunsToday = undefined;
+      }
+    }
+  }
+  res.json(publicLiveCapability({
+    liveAvailable: policy.runnable,
+    accessMode: policy.mode,
+    requiresSignIn: policy.requiresAuth,
+    remainingRunsToday,
+  }));
 });
 
 router.get("/arena-forge/demo/p5", (_req: Request, res: Response) => {
@@ -63,11 +80,36 @@ router.get("/arena-forge/demo/p5", (_req: Request, res: Response) => {
   }
 });
 
-router.post("/arena-forge/design", (req: Request, res: Response) => {
-  const started = startDesignJob({
-    brief: req.body?.brief,
-    mapId: req.body?.mapId,
-  });
+router.post("/arena-forge/design", async (req: Request, res: Response) => {
+  const policy = resolveLiveForgePolicy(process.env, { databaseAvailable: isDatabaseEnabled() });
+  if (!policy.liveEnabled) {
+    res.status(403).json({
+      error: "Live design is off on this server. Load the recorded P5 demo instead.",
+    });
+    return;
+  }
+  if (!policy.runnable) {
+    res.status(503).json({
+      error: "Live design is unavailable. Quota storage is not configured.",
+    });
+    return;
+  }
+  if (policy.requiresAuth && !req.user) {
+    res.status(401).json({ error: "Sign in to run live ArenaForge." });
+    return;
+  }
+
+  const started = await admitLiveDesign(
+    {
+      brief: req.body?.brief,
+      mapId: req.body?.mapId,
+    },
+    {
+      userId: req.user?.id,
+      quota: policy.requiresQuota ? getForgeQuotaStore() : null,
+      policy,
+    },
+  );
   if (!started.ok) {
     res.status(started.status).json({ error: started.error });
     return;
@@ -195,18 +237,30 @@ router.get("/lobby/rooms", requireLobbyAccess, (_req: Request, res: Response) =>
   res.json({ rooms });
 });
 
-// Lobby: Quick play (find or create room)
-router.post("/lobby/quickplay", requireLobbyAccess, (req: Request, res: Response) => {
-  const available = LobbyService.findAvailableRoom();
-  if (available) {
+// Lobby: Quick play. Public like join-by-code. Body must name mode + public map.
+router.post("/lobby/quickplay", (req: Request, res: Response) => {
+  const decision = resolveQuickPlay(req.body);
+  if (!decision.ok) {
+    res.status(400).json({ error: decision.error });
+    return;
+  }
+  if (decision.action === "join" && decision.room) {
     res.json({
       action: "join",
-      roomId: available.roomId,
-      joinCode: available.joinCode,
+      roomId: decision.room.roomId,
+      joinCode: decision.room.joinCode,
+      gameMode: decision.room.gameMode,
+      mapId: decision.room.mapId,
     });
-  } else {
-    res.json({ action: "create", roomId: null, joinCode: null });
+    return;
   }
+  res.json({
+    action: "create",
+    roomId: null,
+    joinCode: null,
+    gameMode: decision.preference.gameMode,
+    mapId: decision.preference.mapId,
+  });
 });
 
 // Lobby: Join by code (public)

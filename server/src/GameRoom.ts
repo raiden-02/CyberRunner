@@ -17,7 +17,10 @@ import { getWeaponConfig } from "./weapons/weapon-config.js";
 import { createHitboxes, removeHitboxes, HitboxRegistry } from "./physics/hitbox-system.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { calculateSpawnFacing } from "./world/maps/map-registry.js";
-import { assertRoomMode, resolveCreatedRoomMap } from "./room-map.js";
+import { assertCreatedRoomMode, resolveCreatedRoomMap } from "./room-map.js";
+import { teamMaySpikeAction } from "./game-modes/spike-rules.js";
+import { isGameplayActive } from "@shared/net/gameplay-input.js";
+import { applyFireCommand, enqueueIfGameplayActive } from "./net/gameplay-commands.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { LobbyService } from "./services/lobby-service.js";
 import {
@@ -62,6 +65,25 @@ export class GameRoom extends Room<GameState> {
     return this.gameMode instanceof SearchDestroyMode;
   }
 
+  private gameplayActivity() {
+    return {
+      lobbyState: this.state.lobbyState,
+      isRoundActive: this.state.isRoundActive,
+      isGameOver: this.state.isGameOver,
+    };
+  }
+
+  private gameplayActive(): boolean {
+    return isGameplayActive(this.gameplayActivity());
+  }
+
+  private silenceGameplay(): void {
+    for (const player of this.players.values()) {
+      if (player.schema.firing) player.schema.firing = false;
+      player.inputQueue.discardUnsimulated();
+    }
+  }
+
   private getSDMode(): SearchDestroyMode | null {
     return this.gameMode instanceof SearchDestroyMode ? this.gameMode : null;
   }
@@ -99,9 +121,6 @@ export class GameRoom extends Room<GameState> {
   async onCreate(options: { gameMode?: string; mapId?: string; forgeMapId?: string } = {}) {
     this.setState(new GameState());
 
-    const roomInfo = LobbyService.registerRoom(this.roomId);
-    this.joinCode = roomInfo.joinCode;
-
     this.maxPlayers = Number(process.env.MAX_PLAYERS || DEFAULT_MAX_PLAYERS);
     if (!Number.isFinite(this.maxPlayers) || this.maxPlayers <= 0) {
       this.maxPlayers = DEFAULT_MAX_PLAYERS;
@@ -112,9 +131,14 @@ export class GameRoom extends Room<GameState> {
     this.map = resolved.map;
     this.state.mapId = resolved.stateMapId;
 
-    const modeId = options.gameMode || "deathmatch";
-    assertRoomMode(this.map, modeId);
+    const modeId = assertCreatedRoomMode(options, this.map, process.env.MAP_ID);
     this.gameMode = createGameMode(modeId, this.map.uploadTerminals || []);
+
+    const roomInfo = LobbyService.registerRoom(this.roomId, {
+      gameMode: modeId,
+      mapId: resolved.stateMapId,
+    });
+    this.joinCode = roomInfo.joinCode;
     if (resolved.allowSoloStart) {
       this.getSDMode()?.getTeamManager().setAllowSoloStart(true);
     }
@@ -171,6 +195,7 @@ export class GameRoom extends Room<GameState> {
     });
 
     this.onMessage("weapon_switch", (client, data: WeaponSwitchMsg) => {
+      if (!this.gameplayActive()) return;
       const player = this.players.get(client.sessionId);
       if (!player) return;
       if (player.schema.reloading) return;
@@ -222,6 +247,7 @@ export class GameRoom extends Room<GameState> {
     });
 
     this.onMessage("reload_input", (client, data: ReloadInputMsg) => {
+      if (!this.gameplayActive()) return;
       const player = this.players.get(client.sessionId);
       if (!player) return;
 
@@ -238,7 +264,7 @@ export class GameRoom extends Room<GameState> {
 
     this.onMessage("spike_action", (client, data: SpikeActionMsg) => {
       if (this.state.gameMode !== "search_destroy") return;
-      if (this.state.lobbyState !== "playing") return;
+      if (!this.gameplayActive()) return;
 
       const player = this.players.get(client.sessionId);
       if (!player || player.schema.isDead) return;
@@ -251,7 +277,7 @@ export class GameRoom extends Room<GameState> {
 
       switch (data.action) {
         case "upload": {
-          if (playerTeam !== "ghosts") return;
+          if (!teamMaySpikeAction(playerTeam, "upload")) return;
           const terminal = spikeManager.getNearbyTerminal(player.schema.x, player.schema.z);
           if (terminal) {
             spikeManager.startUpload(client.sessionId, this.state, player.schema, terminal);
@@ -259,12 +285,12 @@ export class GameRoom extends Room<GameState> {
           break;
         }
         case "decrypt": {
-          if (playerTeam !== "sentinels") return;
+          if (!teamMaySpikeAction(playerTeam, "decrypt")) return;
           spikeManager.startDecrypt(client.sessionId, this.state, player.schema);
           break;
         }
         case "pickup": {
-          if (playerTeam !== "ghosts") return;
+          if (!teamMaySpikeAction(playerTeam, "pickup")) return;
           spikeManager.pickupSpike(client.sessionId, this.state, player.schema);
           break;
         }
@@ -500,7 +526,12 @@ export class GameRoom extends Room<GameState> {
     const player = this.players.get(client.sessionId);
     if (!player) return;
 
-    const result = player.inputQueue.enqueue(this.sanitizeInput(data));
+    const result = enqueueIfGameplayActive(
+      player.inputQueue,
+      this.sanitizeInput(data),
+      this.gameplayActivity(),
+    );
+    if (result === "inactive") return;
     if (result === "overflow") {
       client.leave(4002, "input queue overflow");
     }
@@ -510,12 +541,17 @@ export class GameRoom extends Room<GameState> {
     const player = this.players.get(client.sessionId);
     if (!player) return;
 
-    player.schema.firing = data.firing;
-    player.aimDir = data.aimDir;
+    applyFireCommand(player.schema, data.firing, this.gameplayActivity());
+    if (this.gameplayActive()) {
+      player.aimDir = data.aimDir;
+    }
   }
 
   private update() {
-    if (this.state.isGameOver) return;
+    if (this.state.isGameOver) {
+      this.silenceGameplay();
+      return;
+    }
 
     this.serverTick += 1;
     const dt = authoritativeMovementDt();
@@ -531,11 +567,22 @@ export class GameRoom extends Room<GameState> {
 
     if (this.gameMode.isGameEnded()) {
       this.match.handleGameOver(this.gameMode.getWinner());
+      this.silenceGameplay();
       return;
     }
 
     if (result.ended && result.winnerTeam) {
       this.match.handleTeamRoundEnd(result.winnerTeam as "ghosts" | "sentinels", result.reason || "");
+    }
+
+    if (!this.gameplayActive()) {
+      this.silenceGameplay();
+      for (const player of this.players.values()) {
+        if (player.schema.reloading && wallNow >= player.schema.reloadEndTime) {
+          WeaponSystem.completeReload(player.schema, player.schema.equippedWeapon);
+        }
+      }
+      return;
     }
 
     for (const [sessionId, player] of this.players) {

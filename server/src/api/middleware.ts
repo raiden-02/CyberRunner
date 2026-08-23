@@ -45,6 +45,15 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
+/** Persistent signed-in user. Guests have no session and never pass this. */
+export function requireLiveForgeUser(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user) {
+    res.status(401).json({ error: "Sign in to run live ArenaForge." });
+    return;
+  }
+  next();
+}
+
 // Middleware: Require completed profile
 export function requireProfile(req: Request, res: Response, next: NextFunction): void {
   if (!req.user) {

@@ -31,6 +31,7 @@ import type { UserProfile } from "../api/client.js";
 import type { PlayAction } from "../ui/screens/LobbyScreen.js";
 import type { InputMsg } from "@shared/movement/types.js";
 import { consumeFixedTicks } from "@shared/net/fixed-tick.js";
+import { shouldSendGameplayInput } from "@shared/net/gameplay-input.js";
 import type { InputState } from "../input/InputManager.js";
 import type { SyncedPlayer } from "../network/synced-state.js";
 
@@ -83,6 +84,7 @@ export class Game {
   private inputSeq = 0;
   private hasInitialPosition = false;
   private needsRespawnSnap = false;
+  private wasGameplayActive = false;
   private currentFov = 75;
   private userProfile: UserProfile | null = null;
   private activeSlot = 0;
@@ -143,14 +145,17 @@ export class Game {
 
     this.weaponSystem = new WeaponSystem(this.renderer.camera, {
       onFireInput: (firing, aimDir) => {
-        if (this.network.connected) {
+        if (this.network.connected && this.clientGameplayActive()) {
           this.network.sendFireInput(firing, aimDir);
         }
       },
       onWeaponSwitch: (weaponId) => {
-        this.network.sendWeaponSwitch(weaponId);
+        if (this.clientGameplayActive()) {
+          this.network.sendWeaponSwitch(weaponId);
+        }
       },
       onReload: (weaponId) => {
+        if (!this.clientGameplayActive()) return;
         this.network.sendReload(weaponId);
         this.audioManager.playReload();
       },
@@ -189,10 +194,13 @@ export class Game {
 
       this.weaponSystem.switchWeapon(weaponId);
       this.hud.setWeapon(weaponId);
-      this.network.sendWeaponSwitch(weaponId);
+      if (this.clientGameplayActive()) {
+        this.network.sendWeaponSwitch(weaponId);
+      }
     };
 
     this.input.onReload = () => {
+      if (!this.clientGameplayActive()) return;
       this.weaponSystem.startReload(performance.now() / 1000);
     };
 
@@ -383,6 +391,11 @@ export class Game {
       this.teamLobbyScreen.hide();
       this.hud.show();
       this.minimap.show();
+      this.localPlayer.clearPendingInputs();
+    };
+
+    this.network.onRoundStart = (_msg) => {
+      this.localPlayer.clearPendingInputs();
     };
 
     this.network.onGameOver = (msg) => {
@@ -464,7 +477,10 @@ export class Game {
 
     await this.network.connect({
       roomId: action?.roomId,
-      forceCreate: action?.type === "create" || Boolean(action?.forgeMapId),
+      forceCreate:
+        action?.type === "create" ||
+        action?.type === "quickplay" ||
+        Boolean(action?.forgeMapId),
       displayName,
       primaryWeaponId,
       secondaryWeaponId,
@@ -569,15 +585,33 @@ export class Game {
     this.localPlayer.isDead = !!serverPlayer.isDead;
   }
 
+  private clientGameplayActivity() {
+    const state = this.network.state;
+    return {
+      lobbyState: state?.lobbyState,
+      isRoundActive: state?.isRoundActive,
+      isGameOver: state?.isGameOver,
+    };
+  }
+
+  private clientGameplayActive(): boolean {
+    return shouldSendGameplayInput(this.clientGameplayActivity());
+  }
+
   private stepSimulationTicks(dt: number): void {
     const stepped = consumeFixedTicks(this.inputAccumulator, dt);
     this.inputAccumulator = stepped.accumulator;
     const connected = this.network.connected;
+    const sendInput = this.clientGameplayActive();
 
-    const inTeamLobby = this.network.state?.lobbyState === "waiting";
+    if (!sendInput && this.wasGameplayActive) {
+      this.localPlayer.clearPendingInputs();
+    }
+    this.wasGameplayActive = sendInput;
+
     for (let i = 0; i < stepped.ticks; i++) {
       const state = this.input.consumeTickState();
-      if (inTeamLobby) continue;
+      if (!sendInput) continue;
       const msg = this.buildInputMsg(++this.inputSeq, state);
       this.localPlayer.applyFixedTick(msg, connected);
       if (connected) {

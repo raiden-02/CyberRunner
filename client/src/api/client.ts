@@ -19,6 +19,15 @@ export interface QuickPlayResult {
   action: "join" | "create";
   roomId: string | null;
   joinCode: string | null;
+  gameMode?: string;
+  mapId?: string;
+}
+
+export interface ForgeCapability {
+  liveAgentAvailable: boolean;
+  accessMode?: "hosted" | "self_host";
+  requiresSignIn?: boolean;
+  remainingRunsToday?: number;
 }
 
 export interface JoinResult {
@@ -227,9 +236,11 @@ class ApiClient {
     return data.rooms;
   }
 
-  async quickPlay(): Promise<QuickPlayResult> {
+  async quickPlay(prefs: { gameMode: string; mapId: string }): Promise<QuickPlayResult> {
     const res = await fetch(`${this.baseUrl}/lobby/quickplay`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(prefs),
       credentials: "include",
     });
     if (!res.ok) {
@@ -249,8 +260,10 @@ class ApiClient {
     return data.maps;
   }
 
-  async forgeCapability(): Promise<{ liveAgentAvailable: boolean }> {
-    const res = await fetch(`${this.baseUrl}/arena-forge/capability`);
+  async forgeCapability(): Promise<ForgeCapability> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/capability`, {
+      credentials: "include",
+    });
     if (!res.ok) throw new Error("Failed to read Forge capability");
     return res.json();
   }
@@ -260,6 +273,7 @@ class ApiClient {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
+      credentials: "include",
     });
     const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };
     if (!res.ok) throw new Error(body.error || "Failed to start design");

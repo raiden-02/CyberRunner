@@ -1,4 +1,5 @@
 import { getPublicMaps, type PublicMapInfo } from "@shared/world/map-registry.js";
+import { quickPlayFollowThrough } from "@shared/net/quickplay-action.js";
 import { api, type UserProfile } from "../../api/client.js";
 import { THEME } from "../../theme.js";
 import { BaseScreen } from "./BaseScreen.js";
@@ -15,7 +16,7 @@ export interface PlayAction {
 }
 
 const GAME_MODES: Array<{ value: GameModeId; label: string; description: string }> = [
-  { value: "deathmatch", label: "Deathmatch", description: "FFA - First to 30 kills" },
+  { value: "deathmatch", label: "Deathmatch", description: "FFA - First to 5 kills" },
   { value: "search_destroy", label: "Search & Destroy", description: "3 lives per round" },
 ];
 
@@ -328,10 +329,6 @@ export class LobbyScreen extends BaseScreen {
     this.renderMapCards();
   }
 
-  private isGuest(): boolean {
-    return this.user?.id.startsWith("guest-") ?? false;
-  }
-
   private selectedCreate(): { gameMode: GameModeId; mapId: string } | undefined {
     const gameMode = this.gameModeSelect.value as GameModeId;
     const map = getPublicMaps().find((m) => m.id === this.selectedMapId);
@@ -351,20 +348,27 @@ export class LobbyScreen extends BaseScreen {
     const selected = this.selectedCreate();
     if (!selected) return;
 
-    if (this.isGuest()) {
-      this.onPlay({ type: "quickplay", gameMode: selected.gameMode, mapId: selected.mapId });
-      return;
-    }
-
     try {
-      const result = await api.quickPlay();
-      if (result.action === "join" && result.roomId) {
-        this.onPlay({ type: "join", roomId: result.roomId, joinCode: result.joinCode || undefined });
-      } else {
-        this.onPlay({ type: "create", gameMode: selected.gameMode, mapId: selected.mapId });
+      const result = await api.quickPlay({
+        gameMode: selected.gameMode,
+        mapId: selected.mapId,
+      });
+      const follow = quickPlayFollowThrough(result);
+      if (follow === "join") {
+        this.onPlay({ type: "join", roomId: result.roomId!, joinCode: result.joinCode || undefined });
+        return;
       }
+      if (follow === "create") {
+        this.onPlay({
+          type: "create",
+          gameMode: selected.gameMode,
+          mapId: selected.mapId,
+        });
+        return;
+      }
+      this.errorDiv.textContent = "Quick Play did not return a room.";
     } catch (err: any) {
-      this.errorDiv.textContent = err.message || "Quick play failed";
+      this.errorDiv.textContent = err.message || "Quick Play failed.";
     }
   }
 

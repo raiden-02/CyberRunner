@@ -33,6 +33,65 @@ systemd reads `/opt/CyberRunner/server.env`. Local `npm run dev:server` reads `s
 | `GOOGLE_CLIENT_ID` | Google Cloud web client ID | Must match the client build (`VITE_GOOGLE_CLIENT_ID` or the `google-client-id` meta tag) |
 | `DATABASE_URL` | local Postgres URL | If unset, the database is off and Google sign-in fails |
 
+### ArenaForge (optional)
+
+Leave live design off on the public site unless you intend to pay for server-owned inference. The recorded demo works with no key.
+
+| Variable | Production | Notes |
+|----------|------------|--------|
+| `OPENAI_API_KEY` | unset | Server-owned key only. Never put this in browser JavaScript or a public UI |
+| `ARENA_FORGE_MODEL` | unset | Default if unset: `gpt-5.6` |
+| `ARENA_FORGE_LIVE_AGENT_ENABLED` | unset / `false` | Must be exactly `true` and a key must exist |
+| `ARENA_FORGE_ACCESS_MODE` | `hosted` or omit | `hosted` is the safe public default. `self_host` is an explicit private-server opt-in |
+| `ARENA_FORGE_USER_DAILY_LIMIT` | `1` | Hosted mode only. Successful live starts per signed-in user per UTC day |
+| `ARENA_FORGE_GLOBAL_DAILY_LIMIT` | `10` | Hosted mode only. Successful live starts on this server per UTC day |
+
+## Public hosted
+
+```text
+Caddy
+  -> Node
+  -> Postgres
+  -> Google sign-in
+  -> server-owned OpenAI key
+  -> quota
+```
+
+Recommended public mode: `hosted` (or omit `ARENA_FORGE_ACCESS_MODE`).
+
+Hosted live design needs all of:
+
+* `ARENA_FORGE_LIVE_AGENT_ENABLED=true`
+* server-owned `OPENAI_API_KEY`
+* `DATABASE_URL` (quota rows in `arena_forge_usage`)
+* Google sign-in (persistent user id)
+* per-user and global daily caps
+* one active job
+
+If the database is down, `liveAgentAvailable` is false and live design fails closed. The recorded demo stays up. A down database does not switch the server to self-host.
+
+## Self-host / local experimentation
+
+```text
+Node
+  -> server-side OpenAI key
+  -> ARENA_FORGE_ACCESS_MODE=self_host
+```
+
+Require all three:
+
+* `ARENA_FORGE_LIVE_AGENT_ENABLED=true`
+* `OPENAI_API_KEY=...`
+* `ARENA_FORGE_ACCESS_MODE=self_host`
+
+Then live design does not need Google sign-in or Postgres. One active job, brief/map validation, and the P5 edit/model/playtest budgets still apply. The key stays on the server.
+
+Use this only on a server you control. Anyone who can reach the live-design endpoint can consume the configured server key. For a publicly exposed deployment, use `hosted`.
+
+Google and Postgres can still be configured if you want user accounts for other features. They are not required solely for live Forge in self-host mode.
+
+Never put an OpenAI key in browser JavaScript, a form, or localStorage. There is no browser BYOK.
+
 Client build-time vars (set when you run `npm run build`):
 
 | Variable | Notes |
@@ -52,6 +111,7 @@ Guest play works if Google is not configured.
 cd /opt/CyberRunner
 sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/001_init.sql
 sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/002_loadout.sql
+sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/003_arena_forge_usage.sql
 ```
 
 4. Write `/opt/CyberRunner/server.env` with the table above. `chmod 600` that file. URL-encode the DB password if it contains `/`, `+`, or `@`.
@@ -117,7 +177,7 @@ New SQL files under `server/src/db/migrations/` must be applied once:
 sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/00X_name.sql
 ```
 
-`001_init.sql` and `002_loadout.sql` use `IF NOT EXISTS` and are safe to re-run.
+`001_init.sql`, `002_loadout.sql`, and `003_arena_forge_usage.sql` use `IF NOT EXISTS` and are safe to re-run.
 
 ## Smoke test
 

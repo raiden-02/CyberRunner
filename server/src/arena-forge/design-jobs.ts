@@ -56,6 +56,26 @@ export function isLiveAgentAvailable(env: NodeJS.ProcessEnv = process.env): bool
   return env.ARENA_FORGE_LIVE_AGENT_ENABLED === "true" && Boolean(readOpenAIApiKey(env));
 }
 
+export function liveAgentGate(
+  env: NodeJS.ProcessEnv = process.env,
+): { ok: true } | { ok: false; status: 403; error: string } {
+  if (env.ARENA_FORGE_LIVE_AGENT_ENABLED !== "true") {
+    return {
+      ok: false,
+      status: 403,
+      error: "Live design is off on this server. Load the recorded P5 demo instead.",
+    };
+  }
+  if (!readOpenAIApiKey(env)) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Live design is not configured on this server.",
+    };
+  }
+  return { ok: true };
+}
+
 export async function defaultLiveRunner(args: {
   map: ArenaMap;
   brief: string;
@@ -80,6 +100,10 @@ function hasActiveJob(): boolean {
   if (!activeJobId) return false;
   const job = jobs.get(activeJobId);
   return job !== undefined && (job.status === "queued" || job.status === "running");
+}
+
+export function hasActiveDesignJob(): boolean {
+  return hasActiveJob();
 }
 
 function evictOldJobs(): void {
@@ -135,10 +159,10 @@ export type StartDesignResult =
   | { ok: true; status: 202; jobId: string }
   | { ok: false; status: 400 | 403 | 409; error: string };
 
-export function startDesignJob(
+export function validateDesignJobStart(
   input: { brief?: unknown; mapId?: unknown },
   deps: DesignJobDeps = {},
-): StartDesignResult {
+): { ok: true } | { ok: false; status: 400 | 403 | 409; error: string } {
   if (!liveAvailable(deps)) {
     return {
       ok: false,
@@ -164,6 +188,18 @@ export function startDesignJob(
     return { ok: false, status: 409, error: "A design job is already running. Wait for it to finish." };
   }
 
+  return { ok: true };
+}
+
+export function startDesignJob(
+  input: { brief?: unknown; mapId?: unknown },
+  deps: DesignJobDeps = {},
+): StartDesignResult {
+  const validated = validateDesignJobStart(input, deps);
+  if (!validated.ok) return validated;
+
+  const brief = typeof input.brief === "string" ? input.brief.trim() : "";
+  const mapId = typeof input.mapId === "string" ? input.mapId : "";
   const initialMap = importGameplayMap(getGameplayMap(mapId));
   const id = (deps.createId ?? randomUUID)();
   const job: DesignJobRecord = {

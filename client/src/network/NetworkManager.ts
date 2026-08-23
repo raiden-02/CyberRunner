@@ -1,4 +1,5 @@
 import { Client, Room } from "colyseus.js";
+import { isGameplayActive } from "@shared/net/gameplay-input.js";
 import { encodeInputCmd, encodeFireCmd } from "./BinaryCodec.js";
 import type { SyncedGameState } from "./synced-state.js";
 
@@ -390,8 +391,16 @@ export class NetworkManager {
     return this.room?.state as SyncedGameState | undefined;
   }
 
+  private gameplaySendable(): boolean {
+    return isGameplayActive({
+      lobbyState: this.state?.lobbyState,
+      isRoundActive: this.state?.isRoundActive,
+      isGameOver: this.state?.isGameOver,
+    });
+  }
+
   public sendInput(data: any): void {
-    if (!this.connected) return;
+    if (!this.connected || !this.gameplaySendable()) return;
     this.room!.send("input_bin", encodeInputCmd(data));
   }
 
@@ -399,15 +408,17 @@ export class NetworkManager {
     firing: boolean,
     aimDir: { x: number; y: number; z: number },
   ): void {
-    if (!this.connected) return;
+    if (!this.connected || !this.gameplaySendable()) return;
     this.room!.send("fire_bin", encodeFireCmd({ firing, aimDir }));
   }
 
   public sendWeaponSwitch(weaponId: string): void {
+    if (!this.gameplaySendable()) return;
     this.room?.send("weapon_switch", { weaponId });
   }
 
   public sendReload(weaponId: string): void {
+    if (!this.gameplaySendable()) return;
     this.room?.send("reload_input", { weaponId });
   }
 

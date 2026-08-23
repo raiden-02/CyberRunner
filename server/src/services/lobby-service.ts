@@ -1,16 +1,24 @@
+export type RoomGameMode = "deathmatch" | "search_destroy";
+
 export interface RoomInfo {
   roomId: string;
   joinCode: string;
   playerCount: number;
   maxPlayers: number;
   createdAt: Date;
+  gameMode: RoomGameMode;
+  mapId: string;
 }
+
+export type RoomMetadata = {
+  gameMode: RoomGameMode;
+  mapId: string;
+};
 
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS) || 8;
 
-// Generate a short join code (6 alphanumeric chars)
 function generateJoinCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Avoid confusing chars like 0/O, 1/I
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let i = 0; i < 6; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
@@ -19,18 +27,21 @@ function generateJoinCode(): string {
 }
 
 export class LobbyService {
-  // Track active rooms: roomId -> RoomInfo
   private static rooms = new Map<string, RoomInfo>();
-  // Track join codes: joinCode -> roomId
   private static joinCodes = new Map<string, string>();
 
   static getMaxPlayers(): number {
     return MAX_PLAYERS;
   }
 
-  static registerRoom(roomId: string): RoomInfo {
+  /** Test helper. Clears in-memory rooms. */
+  static reset(): void {
+    this.rooms.clear();
+    this.joinCodes.clear();
+  }
+
+  static registerRoom(roomId: string, meta: RoomMetadata): RoomInfo {
     let joinCode = generateJoinCode();
-    // Ensure unique join code
     while (this.joinCodes.has(joinCode)) {
       joinCode = generateJoinCode();
     }
@@ -41,6 +52,8 @@ export class LobbyService {
       playerCount: 0,
       maxPlayers: MAX_PLAYERS,
       createdAt: new Date(),
+      gameMode: meta.gameMode,
+      mapId: meta.mapId,
     };
 
     this.rooms.set(roomId, info);
@@ -74,11 +87,12 @@ export class LobbyService {
     return this.rooms.get(roomId) || null;
   }
 
-  static findAvailableRoom(): RoomInfo | null {
+  static findAvailableRoom(filter: { gameMode: RoomGameMode; mapId: string }): RoomInfo | null {
     for (const info of this.rooms.values()) {
-      if (info.playerCount < info.maxPlayers) {
-        return info;
-      }
+      if (info.playerCount >= info.maxPlayers) continue;
+      if (info.gameMode !== filter.gameMode) continue;
+      if (info.mapId !== filter.mapId) continue;
+      return info;
     }
     return null;
   }

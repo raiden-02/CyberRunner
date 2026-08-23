@@ -28,6 +28,9 @@ export class ForgeScreen extends BaseScreen {
   private onPlay: (action: PlayAction) => void = () => {};
   private onBack: () => void = () => {};
   private liveAvailable = false;
+  private liveRequiresSignIn = true;
+  private liveAccessMode: "hosted" | "self_host" = "hosted";
+  private remainingRunsToday: number | undefined;
   private view: ForgeDesignView | null = null;
   private pollId: ReturnType<typeof setInterval> | null = null;
   private replayId: ReturnType<typeof setInterval> | null = null;
@@ -312,6 +315,9 @@ export class ForgeScreen extends BaseScreen {
     try {
       const cap = await api.forgeCapability();
       this.liveAvailable = cap.liveAgentAvailable;
+      this.liveAccessMode = cap.accessMode === "self_host" ? "self_host" : "hosted";
+      this.liveRequiresSignIn = cap.requiresSignIn !== false;
+      this.remainingRunsToday = cap.remainingRunsToday;
     } catch {
       this.liveAvailable = false;
     }
@@ -341,12 +347,30 @@ export class ForgeScreen extends BaseScreen {
   }
 
   private renderCapability(): void {
-    this.runBtn.disabled = !this.liveAvailable || this.busy;
+    const quotaGone = this.remainingRunsToday === 0;
+    const needsSignIn =
+      this.liveRequiresSignIn && this.remainingRunsToday === undefined && this.liveAvailable;
+    this.runBtn.disabled = !this.liveAvailable || this.busy || quotaGone || needsSignIn;
     this.runBtn.style.opacity = this.runBtn.disabled ? "0.55" : "1";
     this.runBtn.style.cursor = this.runBtn.disabled ? "default" : "pointer";
-    this.liveHint.textContent = this.liveAvailable
-      ? "Live design uses the frozen P5 agent on the server. One job at a time."
-      : "Live design is disabled on this server. The recorded run above uses the same P5 agent.";
+    if (!this.liveAvailable) {
+      this.liveHint.textContent =
+        this.liveAccessMode === "hosted"
+          ? "Live design is unavailable. The recorded demo stays available."
+          : "Live design is disabled on this server. The recorded run above uses the same P5 agent.";
+      return;
+    }
+    if (needsSignIn) {
+      this.liveHint.textContent = "Sign in to run live design.";
+      return;
+    }
+    if (quotaGone) {
+      this.liveHint.textContent = "No live runs left today.";
+      return;
+    }
+    this.liveHint.textContent = this.liveRequiresSignIn
+      ? "Live design uses the server key. Sign in required. One job at a time. Guests use the recorded demo."
+      : "Live design is on for this private server. No sign-in. One job at a time.";
   }
 
   private async startLive(): Promise<void> {
