@@ -62,8 +62,8 @@ export class Minimap {
       left: 20px;
       width: ${this.config.displaySize}px;
       height: ${this.config.displaySize}px;
-      background: rgba(0, 10, 20, 0.85);
-      border: 2px solid #4a433a;
+      background: rgba(7, 9, 13, 0.72);
+      border: 1px solid #2a3848;
       border-radius: 50%;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
       pointer-events: none;
@@ -91,7 +91,7 @@ export class Minimap {
       left: 50%;
       transform: translateX(-50%);
       font-size: 10px;
-      color: #d4893a;
+      color: #5ec8d8;
       font-weight: bold;
     `;
     compass.textContent = "N";
@@ -198,11 +198,11 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
       
-      let color = terminal.id === "A" ? "#4a8b8a" : "#d4893a";
+      let color = terminal.id === "A" ? "#e0a04a" : "#4ec4c8";
       if (terminal.state === "uploading") {
-        color = "#c45c3a";
+        color = "#d4544a";
       } else if (terminal.state === "uploaded") {
-        color = "#8a3a2e";
+        color = "#d4544a";
       }
       
       ctx.fillStyle = color + "33";
@@ -235,7 +235,7 @@ export class Minimap {
         ctx.arc(pos.x, pos.y, 6 * pulse, 0, Math.PI * 2);
         ctx.fillStyle = "#c45c3a";
         ctx.fill();
-        ctx.strokeStyle = "#d4893a";
+        ctx.strokeStyle = "#e0a04a";
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -261,8 +261,8 @@ export class Minimap {
       ctx.lineTo(4, 4);
       ctx.closePath();
 
-      ctx.fillStyle = "#4a8b8a";
-      ctx.strokeStyle = "#4a8b8a";
+      ctx.fillStyle = "#4ec4c8";
+      ctx.strokeStyle = "#4ec4c8";
       ctx.fill();
       ctx.lineWidth = 1;
       ctx.stroke();
@@ -288,8 +288,8 @@ export class Minimap {
     ctx.lineTo(-5, 5);
     ctx.lineTo(5, 5);
     ctx.closePath();
-    ctx.fillStyle = "#d4893a";
-    ctx.strokeStyle = "#d4893a";
+    ctx.fillStyle = "#5ec8d8";
+    ctx.strokeStyle = "#5ec8d8";
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.stroke();

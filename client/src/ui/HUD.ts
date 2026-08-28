@@ -1,9 +1,9 @@
 import { WEAPON_DEFINITIONS } from "../weapons/definitions.js";
-import { THEME } from "../theme.js";
 
 export interface GameModeState {
   gameMode: string;
   scoreLimit: number;
+  localKills?: number;
   timeRemaining: number;
   isGameOver: boolean;
   winnerId: string;
@@ -12,12 +12,10 @@ export interface GameModeState {
   roundTimeRemaining: number;
   isRoundActive: boolean;
   livesRemaining: number;
-  // Team state (S&D)
   lobbyState: string;
   ghostsRoundsWon: number;
   sentinelsRoundsWon: number;
   myTeam: string;
-  // Spike state (S&D)
   spikeCarrierId: string;
   spikeState: string;
   spikeTerminalId: string;
@@ -30,7 +28,8 @@ export interface GameModeState {
 }
 
 export class HUD {
-  private element: HTMLDivElement;
+  private weaponEl: HTMLDivElement;
+  private healthEl: HTMLDivElement;
   private roomInfoElement: HTMLDivElement;
   private gameModeElement: HTMLDivElement;
   private currentWeaponId = "AR_1";
@@ -40,63 +39,20 @@ export class HUD {
   private modeState: GameModeState | null = null;
 
   constructor() {
-    this.element = document.createElement("div");
-    this.element.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      color: ${THEME.paper};
-      font-family: ${THEME.font};
-      font-size: 13px;
-      background: ${THEME.hudBg};
-      padding: 14px 18px;
-      border-radius: 3px;
-      border-left: 3px solid ${THEME.accent};
-      pointer-events: none;
-      min-width: 200px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-      line-height: 1.6;
-    `;
-    document.body.appendChild(this.element);
+    this.weaponEl = document.createElement("div");
+    this.weaponEl.className = "cr-hud-weapon";
+    document.body.appendChild(this.weaponEl);
 
-    // Room info display (top right)
+    this.healthEl = document.createElement("div");
+    this.healthEl.className = "cr-hud-health";
+    document.body.appendChild(this.healthEl);
+
     this.roomInfoElement = document.createElement("div");
-    this.roomInfoElement.style.cssText = `
-      position: fixed;
-      top: 50px;
-      right: 20px;
-      color: ${THEME.paper};
-      font-family: ${THEME.font};
-      font-size: 12px;
-      background: ${THEME.hudBg};
-      padding: 10px 14px;
-      border-radius: 3px;
-      border-left: 3px solid ${THEME.teammate};
-      pointer-events: none;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-      display: none;
-    `;
+    this.roomInfoElement.className = "cr-hud-room";
     document.body.appendChild(this.roomInfoElement);
 
-    // Game mode display (top center)
     this.gameModeElement = document.createElement("div");
-    this.gameModeElement.style.cssText = `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: ${THEME.paper};
-      font-family: ${THEME.font};
-      font-size: 14px;
-      background: ${THEME.hudBg};
-      padding: 10px 20px;
-      border-radius: 3px;
-      border-bottom: 2px solid ${THEME.accent};
-      pointer-events: none;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-      text-align: center;
-      display: none;
-    `;
+    this.gameModeElement.className = "cr-hud-match";
     document.body.appendChild(this.gameModeElement);
   }
 
@@ -118,11 +74,7 @@ export class HUD {
       return;
     }
     this.roomInfoElement.style.display = "block";
-    this.roomInfoElement.innerHTML = `
-      <div style="color:${THEME.teammate};font-weight:600;margin-bottom:4px;">JOIN CODE</div>
-      <div style="font-size:18px;font-weight:bold;letter-spacing:2px;margin-bottom:6px;">${this.joinCode}</div>
-      <div style="color:${THEME.muted};">Players: ${this.playerCount}/${this.maxPlayers}</div>
-    `;
+    this.roomInfoElement.innerHTML = `<div class="cr-hud-label">Room</div><div>${this.joinCode} · ${this.playerCount}/${this.maxPlayers}</div>`;
   }
 
   public setWeapon(weaponId: string): void {
@@ -148,152 +100,67 @@ export class HUD {
 
     this.gameModeElement.style.display = "block";
     const s = this.modeState;
-    
-    let html = "";
-    
+
     if (s.isGameOver) {
-      html = `<div style="color:${THEME.accent};font-weight:bold;font-size:18px;">GAME OVER</div>`;
-    } else if (s.gameMode === "deathmatch") {
-      html = `
-        <div style="display:flex;gap:24px;align-items:center;">
-          <div>
-            <div style="color:${THEME.muted};font-size:10px;">MODE</div>
-            <div style="color:${THEME.accent};font-weight:600;">DEATHMATCH</div>
-          </div>
-          <div>
-            <div style="color:${THEME.muted};font-size:10px;">TARGET</div>
-            <div>${s.scoreLimit} kills</div>
-          </div>
-          <div>
-            <div style="color:${THEME.muted};font-size:10px;">TIME</div>
-            <div>${this.formatTime(s.timeRemaining)}</div>
-          </div>
-        </div>
-      `;
-    } else if (s.gameMode === "search_destroy") {
-      // Don't show game UI if in lobby state
+      this.gameModeElement.innerHTML = `<div class="cr-hud-label">Match</div><div class="cr-hud-value">Over</div>`;
+      return;
+    }
+
+    if (s.gameMode === "deathmatch") {
+      this.gameModeElement.innerHTML = `
+        <div class="cr-hud-row">
+          <div><div class="cr-hud-label">Deathmatch</div><div>Kills</div></div>
+          <div><div class="cr-hud-label">Score</div><div class="cr-hud-value">${s.localKills ?? 0} / ${s.scoreLimit}</div></div>
+          <div><div class="cr-hud-label">Time</div><div class="cr-hud-value">${this.formatTime(s.timeRemaining)}</div></div>
+        </div>`;
+      return;
+    }
+
+    if (s.gameMode === "search_destroy") {
       if (s.lobbyState === "waiting") {
         this.gameModeElement.style.display = "none";
         return;
       }
-      
       const isGhost = s.myTeam === "ghosts";
-      const teamColor = isGhost ? THEME.ghosts : THEME.sentinels;
-      const teamName = isGhost ? "GHOSTS" : "SENTINELS";
-      
-      // Spike status
-      let spikeHtml = "";
+      const teamName = isGhost ? "Ghosts" : "Sentinels";
+      const teamColor = isGhost ? "var(--cr-ghost)" : "var(--cr-sentinel)";
+      let spike = "";
       if (s.spikeState === "ground") {
-        if (isGhost) {
-          spikeHtml = `<div style="color:${THEME.accent};">SPIKE ON GROUND - Pick it up!</div>`;
-        } else {
-          spikeHtml = `<div style="color:${THEME.sentinels};">Defend the terminals</div>`;
-        }
+        spike = isGhost ? "Spike on ground" : "Defend the sites";
       } else if (s.spikeState === "carried" || s.spikeState === "dropped") {
-        if (s.hasSpike) {
-          spikeHtml = `<div style="color:${THEME.danger};font-weight:bold;">YOU HAVE THE SPIKE</div>`;
-        } else if (s.spikeState === "dropped") {
-          spikeHtml = `<div style="color:${THEME.accent};">SPIKE DROPPED</div>`;
-        } else if (s.spikeCarrierId) {
-          spikeHtml = isGhost 
-            ? `<div style="color:${THEME.ghosts};">Teammate has spike</div>`
-            : `<div style="color:${THEME.sentinels};">Enemy has spike</div>`;
-        }
+        if (s.hasSpike) spike = "You have the spike";
+        else if (s.spikeState === "dropped") spike = "Spike dropped";
+        else spike = isGhost ? "Teammate has the spike" : "Enemy has the spike";
       } else if (s.spikeState === "uploading") {
-        // Only Ghosts (planting team) see terminal ID during upload
-        if (isGhost) {
-          spikeHtml = `
-            <div style="color:${THEME.danger};">UPLOADING ${s.spikeTerminalId}</div>
-            <div style="background:${THEME.ink};height:6px;width:100px;border-radius:3px;overflow:hidden;">
-              <div style="background:${THEME.danger};height:100%;width:${s.spikeUploadProgress}%;"></div>
-            </div>
-          `;
-        } else {
-          spikeHtml = `<div style="color:${THEME.danger};font-weight:bold;">ENEMY UPLOADING SPIKE!</div>`;
-        }
+        spike = isGhost
+          ? `Upload ${s.spikeTerminalId} ${Math.round(s.spikeUploadProgress)}%`
+          : "Enemy uploading";
       } else if (s.spikeState === "uploaded" || s.spikeState === "decrypting") {
-        const decryptProgress = s.isDecrypting ? s.spikeDecryptProgress : 0;
-        // Ghosts see the terminal ID, Sentinels must find it
-        if (isGhost) {
-          spikeHtml = `<div style="color:${THEME.danger};font-weight:bold;">SPIKE ACTIVE - ${s.spikeTerminalId}</div>`;
-        } else {
-          // Sentinels don't see which terminal - they must search
-          spikeHtml = `
-            <div style="color:${THEME.danger};font-weight:bold;">SPIKE ACTIVE - FIND IT!</div>
-            ${s.isDecrypting ? `
-              <div style="color:${THEME.teammate};">DECRYPTING...</div>
-              <div style="background:${THEME.ink};height:6px;width:100px;border-radius:3px;overflow:hidden;">
-                <div style="background:${THEME.teammate};height:100%;width:${decryptProgress}%;"></div>
-              </div>
-            ` : `<div style="color:${THEME.accent};">Find and decrypt the spike!</div>`}
-          `;
-        }
+        spike = isGhost
+          ? `Spike live · ${s.spikeTerminalId}`
+          : s.isDecrypting
+            ? `Decrypting ${Math.round(s.spikeDecryptProgress)}%`
+            : "Spike live · find it";
       }
 
-      // Show spike detonation timer when planted, otherwise show round timer
       const spikePlanted = s.spikeState === "uploaded" || s.spikeState === "decrypting";
-      const timerLabel = spikePlanted ? "SPIKE" : "TIME";
+      const timerLabel = spikePlanted ? "Detonation" : "Time";
       const timerValue = spikePlanted ? s.spikeDetonationTimer : s.roundTimeRemaining;
-      const timerColor = spikePlanted ? THEME.danger : THEME.paper;
 
-      html = `
-        <div style="display:flex;gap:24px;align-items:center;">
-          <div>
-            <div style="color:${THEME.muted};font-size:10px;">TEAM</div>
-            <div style="color:${teamColor};font-weight:600;">${teamName}</div>
-          </div>
-          <div>
-            <div style="color:${THEME.muted};font-size:10px;">SCORE</div>
-            <div>
-              <span style="color:${THEME.ghosts};">${s.ghostsRoundsWon}</span>
-              <span style="color:${THEME.muted};"> - </span>
-              <span style="color:${THEME.sentinels};">${s.sentinelsRoundsWon}</span>
-            </div>
-          </div>
-          <div>
-            <div style="color:${THEME.muted};font-size:10px;">ROUND</div>
-            <div>${s.currentRound}</div>
-          </div>
-          <div>
-            <div style="color:${THEME.muted};font-size:10px;">${timerLabel}</div>
-            <div style="color:${timerColor};${spikePlanted ? "font-weight:bold;" : ""}">${this.formatTime(timerValue)}</div>
-          </div>
+      this.gameModeElement.innerHTML = `
+        <div class="cr-hud-row">
+          <div><div class="cr-hud-label">Team</div><div style="color:${teamColor}">${teamName}</div></div>
+          <div><div class="cr-hud-label">Score</div><div><span style="color:var(--cr-ghost)">${s.ghostsRoundsWon}</span> — <span style="color:var(--cr-sentinel)">${s.sentinelsRoundsWon}</span></div></div>
+          <div><div class="cr-hud-label">Round</div><div class="cr-hud-value">${s.currentRound}</div></div>
+          <div><div class="cr-hud-label">${timerLabel}</div><div class="cr-hud-value">${this.formatTime(timerValue)}</div></div>
+          <div><div class="cr-hud-label">Lives</div><div class="cr-hud-value">${s.livesRemaining}</div></div>
         </div>
-        <div style="margin-top:8px;text-align:center;">${spikeHtml}</div>
-      `;
+        <div class="cr-hud-label" style="margin-top:6px">${spike}</div>`;
     }
-    
-    this.gameModeElement.innerHTML = html;
   }
 
   private getWeaponDisplayName(weaponId: string): string {
-    const def = WEAPON_DEFINITIONS[weaponId];
-    return def ? def.name : weaponId;
-  }
-
-  private getWeaponFamily(weaponId: string): string {
-    const def = WEAPON_DEFINITIONS[weaponId];
-    if (!def) return "";
-    const family = def.family;
-    switch (family) {
-      case "AssaultRifle": return "Assault Rifle";
-      case "SMG": return "SMG";
-      case "LMG": return "LMG";
-      case "DMR": return "DMR";
-      case "Sniper": return "Sniper Rifle";
-      case "Shotgun": return "Shotgun";
-      case "Pistol": return "Pistol";
-      case "MachinePistol": return "Machine Pistol";
-      case "RocketLauncher": return "Rocket Launcher";
-      case "GrenadeLauncher": return "Grenade Launcher";
-      case "Launcher": return "Launcher";
-      case "Melee": return "Melee";
-      case "Energy": return "Energy";
-      case "Charge": return "Charge";
-      case "Beam": return "Beam";
-      case "Bow": return "Bow";
-      default: return family;
-    }
+    return WEAPON_DEFINITIONS[weaponId]?.name ?? weaponId;
   }
 
   public update(
@@ -303,60 +170,52 @@ export class HUD {
     maxHealth?: number,
     isDead?: boolean,
     respawnTime?: number,
-    isReloading?: boolean
+    isReloading?: boolean,
   ): void {
     const weaponName = this.getWeaponDisplayName(this.currentWeaponId);
-    const weaponType = this.getWeaponFamily(this.currentWeaponId);
-    
-    let html = `<div style="color:${THEME.accent};font-weight:500;margin-bottom:6px;">WEAPON</div>`;
-    html += `<div style="margin-bottom:10px;">${weaponName} <span style="color:${THEME.muted};">(${weaponType})</span></div>`;
-
+    let ammo = "";
     if (ammoInMag !== undefined && ammoReserve !== undefined) {
-      html += `<div style="color:${THEME.accent};font-weight:500;margin-bottom:4px;">AMMO</div>`;
-      if (isReloading) {
-        html += `<div style="color:${THEME.accent};margin-bottom:10px;">RELOADING...</div>`;
-      } else {
-        html += `<div style="margin-bottom:10px;">${ammoInMag} / ${ammoReserve}</div>`;
-      }
+      ammo = isReloading ? "Reloading" : `${ammoInMag} / ${ammoReserve}`;
     }
+    this.weaponEl.innerHTML = `
+      <div class="cr-hud-label">Weapon</div>
+      <div>${weaponName}</div>
+      <div class="cr-hud-label">Ammo</div>
+      <div class="cr-hud-value">${ammo}</div>`;
 
     if (health !== undefined && maxHealth !== undefined) {
-      html += `<div style="color:${THEME.accent};font-weight:500;margin-bottom:4px;">HEALTH</div>`;
       const percent = Math.round((health / maxHealth) * 100);
-      const healthBar = this.createHealthBar(percent);
-      html += `<div>${health} / ${maxHealth} ${healthBar}</div>`;
-
+      let extra = "";
       if (isDead && respawnTime !== undefined && respawnTime > 0) {
-        html += `<div style="color:${THEME.danger};margin-top:8px;font-weight:500;">DEAD - Respawn: ${respawnTime.toFixed(1)}s</div>`;
+        extra = `<div class="cr-hud-label">Respawn ${respawnTime.toFixed(1)}s</div>`;
       } else if (isDead) {
-        html += `<div style="color:${THEME.danger};margin-top:8px;font-weight:500;">DEAD</div>`;
+        extra = `<div class="cr-hud-label">Down</div>`;
       }
+      this.healthEl.innerHTML = `
+        <div class="cr-hud-label">Health</div>
+        <div class="cr-hud-value">${health} / ${maxHealth}</div>
+        <div class="cr-hud-label">${percent}%</div>
+        ${extra}`;
     }
-
-    this.element.innerHTML = html;
-  }
-
-  private createHealthBar(percent: number): string {
-    const filled = Math.round(percent / 10);
-    const empty = 10 - filled;
-    const color = percent > 60 ? THEME.teammate : percent > 30 ? THEME.accent : THEME.danger;
-    return `<span style="color:${color}">${'█'.repeat(filled)}${'░'.repeat(empty)}</span>`;
   }
 
   show(): void {
-    this.element.style.display = "block";
+    this.weaponEl.style.display = "block";
+    this.healthEl.style.display = "block";
     this.roomInfoElement.style.display = "block";
     this.gameModeElement.style.display = "block";
   }
 
   hide(): void {
-    this.element.style.display = "none";
+    this.weaponEl.style.display = "none";
+    this.healthEl.style.display = "none";
     this.roomInfoElement.style.display = "none";
     this.gameModeElement.style.display = "none";
   }
 
   destroy(): void {
-    this.element.remove();
+    this.weaponEl.remove();
+    this.healthEl.remove();
     this.roomInfoElement.remove();
     this.gameModeElement.remove();
   }

@@ -5,13 +5,13 @@ import {
   type ForgeDesignTurn,
   type ForgeDesignView,
   type ForgeP0Summary,
+  type ForgePlaytestSummary,
   type ForgePublicMapView,
 } from "../../api/client.js";
 import { THEME } from "../../theme.js";
 import { MapShowcase } from "../../world/MapShowcase.js";
 import {
   formatP0Line,
-  formatPlaytestLines,
   formatTurnCard,
   forgeActivityText,
   recordedStoryLine,
@@ -64,25 +64,14 @@ export class ForgeScreen extends BaseScreen {
   private tactical = new TacticalMap();
 
   constructor() {
-    super("forge-screen");
-    this.container.style.alignItems = "stretch";
-    this.container.style.justifyContent = "flex-start";
+    super("forge-screen", true);
     this.container.style.overflow = "auto";
-    this.container.style.padding = "20px 16px 32px";
     this.buildUI();
   }
 
   private buildUI(): void {
     this.workbench = document.createElement("div");
-    this.workbench.style.cssText = `
-      background: ${THEME.panel};
-      border: 1px solid ${THEME.panelBorder};
-      border-radius: 4px;
-      padding: 24px 28px 28px;
-      width: min(1180px, 96vw);
-      margin: 0 auto;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
-    `;
+    this.workbench.className = "cr-panel cr-forge";
 
     const header = document.createElement("div");
     header.style.cssText = "display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;";
@@ -110,7 +99,7 @@ export class ForgeScreen extends BaseScreen {
 
     const intro = document.createElement("p");
     intro.textContent =
-      "Bounded AI level designer inside CyberRunner. It edits real map structures, checks geometry and routes, runs a seeded scripted playtest, then launches the result in the real game.";
+      "Design a Search & Destroy variant. The recorded run below is the same agent: edit, evaluate, playtest, revise.";
     intro.style.cssText = mutedBlock();
     this.workbench.appendChild(intro);
 
@@ -132,15 +121,7 @@ export class ForgeScreen extends BaseScreen {
     this.workbench.appendChild(this.storyEl);
 
     this.showcaseHost = document.createElement("div");
-    this.showcaseHost.style.cssText = `
-      width: 100%;
-      height: min(46vh, 420px);
-      min-height: 220px;
-      border: 1px solid ${THEME.panelBorder};
-      border-radius: 3px;
-      overflow: hidden;
-      background: ${THEME.ink};
-    `;
+    this.showcaseHost.className = "cr-forge__showcase";
     this.workbench.appendChild(this.showcaseHost);
 
     this.revisionRow = document.createElement("div");
@@ -150,56 +131,33 @@ export class ForgeScreen extends BaseScreen {
     this.revisionLabel.style.cssText = `color:${THEME.muted};font-size:12px;letter-spacing:0.06em;text-transform:uppercase;`;
     this.workbench.appendChild(this.revisionLabel);
 
-    const timeHead = sectionLabel("Agent run");
+    const timeHead = sectionLabel("Recorded agent run");
     this.workbench.appendChild(timeHead);
     this.timeline = document.createElement("div");
-    this.timeline.style.cssText = `
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
-      margin-bottom: 16px;
-    `;
+    this.timeline.className = "cr-forge__timeline";
     this.workbench.appendChild(this.timeline);
 
     const split = document.createElement("div");
-    split.className = "forge-split";
-    split.style.cssText = `
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    `;
-    const responsive = document.createElement("style");
-    responsive.textContent = `
-      @media (max-width: 860px) {
-        .forge-split { grid-template-columns: 1fr !important; }
-      }
-    `;
-    this.workbench.appendChild(responsive);
+    split.className = "cr-forge__split";
     const left = document.createElement("div");
     const tacLabel = sectionLabel("Tactical map");
     tacLabel.style.marginTop = "0";
     left.appendChild(tacLabel);
     const tacNote = document.createElement("div");
-    tacNote.textContent = "Scripted playtest · offline navigation proxy";
+    tacNote.textContent = "Scripted playtest";
     tacNote.style.cssText = `color:${THEME.muted};font-size:12px;margin-bottom:8px;`;
     left.appendChild(tacNote);
     this.tacticalHost = document.createElement("div");
-    this.tacticalHost.style.cssText = `
-      height: 280px;
-      border: 1px solid ${THEME.panelBorder};
-      border-radius: 3px;
-      overflow: hidden;
-    `;
+    this.tacticalHost.style.cssText = "height:280px;overflow:hidden;border:1px solid var(--cr-border);";
     this.tacticalHost.appendChild(this.tactical.canvas);
     left.appendChild(this.tacticalHost);
     const replayHint = document.createElement("div");
-    replayHint.textContent = "Representative scripted rollout. Offline navigation proxy — not live players.";
+    replayHint.textContent = "Offline navigation proxy. Not live players.";
     replayHint.style.cssText = `color:${THEME.muted};font-size:12px;margin-top:8px;`;
     left.appendChild(replayHint);
     const replayBtn = document.createElement("button");
     replayBtn.textContent = "Pause rollout";
-    replayBtn.style.cssText = secondaryBtn();
+    replayBtn.className = "cr-button cr-button--ghost";
     replayBtn.onclick = () => {
       this.replayPlaying = !this.replayPlaying;
       replayBtn.textContent = this.replayPlaying ? "Pause rollout" : "Play rollout";
@@ -217,7 +175,7 @@ export class ForgeScreen extends BaseScreen {
     this.workbench.appendChild(split);
 
     const playNote = document.createElement("div");
-    playNote.textContent = "Opens the selected map in the real CyberRunner Search & Destroy runtime.";
+    playNote.textContent = "Launch this generated map in CyberRunner Search & Destroy.";
     playNote.style.cssText = `color:${THEME.muted};font-size:13px;margin-bottom:8px;`;
     this.workbench.appendChild(playNote);
     this.playRow = document.createElement("div");
@@ -236,13 +194,13 @@ export class ForgeScreen extends BaseScreen {
     fixSum.style.cssText = summaryCss();
     fixtures.appendChild(fixSum);
     const fixHint = document.createElement("p");
-    fixHint.textContent = "P4-A and P4-B start fixtures, plus any local recorded eval runs.";
+    fixHint.textContent = "Starting maps used for evaluation cases.";
     fixHint.style.cssText = mutedBlock();
     fixtures.appendChild(fixHint);
     const evalNote = document.createElement("div");
     evalNote.style.cssText = `color:${THEME.muted};font-size:12px;line-height:1.5;margin-bottom:8px;`;
     evalNote.textContent =
-      "Basic repair: one-shot 100%, agent 100%. Interaction stress: one-shot 88.9%, agent 86.1%. Iteration was not universally better.";
+      "Inspection maps for the recorded evaluation cases.";
     fixtures.appendChild(evalNote);
     this.inspectList = document.createElement("div");
     this.inspectList.style.cssText = "display:flex;flex-direction:column;gap:8px;";
@@ -272,20 +230,8 @@ export class ForgeScreen extends BaseScreen {
     this.briefInput.rows = 3;
     this.briefInput.placeholder =
       "Use playtest evidence to make attacker routing less one-sided while keeping both sites reachable.";
-    this.briefInput.style.cssText = `
-      width: 100%;
-      box-sizing: border-box;
-      padding: 12px 14px;
-      margin: 8px 0;
-      border: 1px solid ${THEME.panelBorder};
-      border-radius: 3px;
-      background: ${THEME.ink};
-      color: ${THEME.paper};
-      font-size: 14px;
-      line-height: 1.4;
-      font-family: ${THEME.font};
-      resize: vertical;
-    `;
+    this.briefInput.className = "cr-field";
+    this.briefInput.style.resize = "vertical";
     details.appendChild(this.briefInput);
 
     this.runBtn = this.createButton("Run ArenaForge", true);
@@ -357,7 +303,7 @@ export class ForgeScreen extends BaseScreen {
       this.liveHint.textContent =
         this.liveAccessMode === "hosted"
           ? "Live design is unavailable. The recorded demo stays available."
-          : "Live design is disabled on this server. The recorded run above uses the same P5 agent.";
+          : "Live design is unavailable on this server. The recorded run remains playable.";
       return;
     }
     if (needsSignIn) {
@@ -369,8 +315,8 @@ export class ForgeScreen extends BaseScreen {
       return;
     }
     this.liveHint.textContent = this.liveRequiresSignIn
-      ? "Live design uses the server key. Sign in required. One job at a time. Guests use the recorded demo."
-      : "Live design is on for this private server. No sign-in. One job at a time.";
+      ? "Live design uses the server's configured model key. Sign in required."
+      : "Live design uses the server's configured model key.";
   }
 
   private async startLive(): Promise<void> {
@@ -500,37 +446,29 @@ export class ForgeScreen extends BaseScreen {
     if (view.status === "failed" && view.error) this.errorDiv.textContent = view.error;
 
     this.revisionRow.replaceChildren();
+    const currentRev = this.currentRevision();
     const original = chipButton("Original");
     const result = chipButton("Result");
+    original.classList.toggle("is-selected", currentRev <= 0);
+    result.classList.toggle("is-selected", currentRev >= view.finalMapRevision && view.finalMapRevision > 0);
     original.onclick = () => this.selectRevision(0);
     result.onclick = () => this.selectRevision(view.finalMapRevision);
     this.revisionRow.appendChild(original);
     for (let i = 1; i < view.finalMapRevision; i++) {
       const mid = chipButton(`Revision ${i}`);
+      mid.classList.toggle("is-selected", currentRev === i);
       mid.onclick = () => this.selectRevision(i);
       this.revisionRow.appendChild(mid);
     }
     this.revisionRow.appendChild(result);
-    this.revisionLabel.textContent = revisionCaption(this.currentRevision(), view.finalMapRevision);
+    this.revisionLabel.textContent = revisionCaption(currentRev, view.finalMapRevision);
 
     this.timeline.replaceChildren();
     view.turns.forEach((turn, index) => {
       const card = document.createElement("button");
       card.type = "button";
-      const selected = index === this.selectedTurn;
-      card.style.cssText = `
-        text-align: left;
-        border: 1px solid ${selected ? THEME.accent : THEME.panelBorder};
-        background: ${selected ? THEME.accentDim : "transparent"};
-        border-radius: 3px;
-        padding: 10px 12px;
-        white-space: pre-wrap;
-        font-size: 13px;
-        line-height: 1.45;
-        color: ${THEME.paper};
-        cursor: pointer;
-      `;
-      card.textContent = `Turn ${turn.turn}\n${formatTurnCard(turn)}`;
+      card.className = index === this.selectedTurn ? "cr-forge__turn is-selected" : "cr-forge__turn";
+      card.textContent = formatTurnCard(turn);
       card.onclick = () => {
         this.selectedTurn = index;
         this.replayProgress = 0;
@@ -542,10 +480,9 @@ export class ForgeScreen extends BaseScreen {
 
     this.evidence.replaceChildren();
     const turn = this.currentTurn();
-    if (turn?.playtest) {
-      this.evidence.appendChild(metricCard("Selected playtest", formatPlaytestLines(turn.playtest).join("\n")));
-    } else if (view.lastPlaytest) {
-      this.evidence.appendChild(metricCard("Last observed playtest", formatPlaytestLines(view.lastPlaytest).join("\n")));
+    const playtest = turn?.playtest ?? view.lastPlaytest;
+    if (playtest) {
+      this.evidence.appendChild(playtestTiles(playtest));
     }
     this.evidence.appendChild(this.p0Cards(view));
 
@@ -594,7 +531,7 @@ export class ForgeScreen extends BaseScreen {
             return !prev || prev.hx !== s.hx || prev.hz !== s.hz || prev.x !== s.x;
           })
         : undefined);
-    this.showcase.setMap(
+    this.showcase.setForgeView(
       map,
       changed && this.currentRevision() > 0
         ? { x: changed.x, y: changed.y, z: changed.z, hx: changed.hx, hy: changed.hy, hz: changed.hz }
@@ -667,10 +604,10 @@ export class ForgeScreen extends BaseScreen {
     for (const entry of maps) {
       const group =
         entry.suite === "p4a"
-          ? "P4-A start fixtures"
+          ? "Evaluation cases"
           : entry.suite === "p4b"
-            ? "P4-B start fixtures"
-            : "Local recorded runs";
+            ? "More evaluation cases"
+            : "Recorded runs";
       if (group !== lastGroup) {
         lastGroup = group;
         const header = document.createElement("div");
@@ -692,7 +629,7 @@ export class ForgeScreen extends BaseScreen {
       `;
       row.innerHTML = `
         <div style="font-weight: 600;">${entry.title}</div>
-        <div style="color: ${THEME.muted}; font-size: 12px; margin-top: 4px;">${entry.subtitle}</div>
+        <div style="color: ${THEME.muted}; font-size: 12px; margin-top: 4px;">${publicCatalogSubtitle(entry)}</div>
       `;
       row.onmouseenter = () => {
         row.style.borderColor = THEME.accent;
@@ -752,35 +689,41 @@ function summaryCss(): string {
   `;
 }
 
-function secondaryBtn(): string {
-  return `
-    margin-top: 8px;
-    padding: 8px 12px;
-    border: 1px solid ${THEME.panelBorder};
-    background: transparent;
-    color: ${THEME.paper};
-    cursor: pointer;
-    border-radius: 3px;
-    font-size: 12px;
-  `;
+function publicCatalogSubtitle(entry: ForgeCatalogEntry): string {
+  if (entry.suite === "p4a" || entry.suite === "p4b") return "Starting map";
+  return entry.which === "final" ? "After edits" : "Before edits";
 }
 
 function chipButton(text: string): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.type = "button";
+  btn.className = "cr-chip";
   btn.textContent = text;
-  btn.style.cssText = `
-    padding: 8px 14px;
-    border: 1px solid ${THEME.panelBorder};
-    background: transparent;
-    color: ${THEME.paper};
-    cursor: pointer;
-    border-radius: 3px;
-    font-size: 12px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  `;
   return btn;
+}
+
+function playtestTiles(pt: ForgePlaytestSummary): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = "cr-forge__metrics";
+  const tiles = [
+    ["Ghost routes", `A ${pt.ghost.siteChoice.A} / B ${pt.ghost.siteChoice.B}`],
+    ["Exposure", String(pt.ghost.meanRouteExposureFraction)],
+    ["Concentration", String(pt.ghost.routeConcentration)],
+    ["First contact", `${Math.round(pt.firstContact.occurrenceFraction * 100)}%`],
+  ];
+  for (const [label, value] of tiles) {
+    const tile = document.createElement("div");
+    tile.className = "cr-stat";
+    const l = document.createElement("div");
+    l.className = "cr-stat__label";
+    l.textContent = label;
+    const v = document.createElement("div");
+    v.className = "cr-stat__value";
+    v.textContent = value;
+    tile.append(l, v);
+    row.appendChild(tile);
+  }
+  return row;
 }
 
 function medianLine(p0: ForgeP0Summary): string {

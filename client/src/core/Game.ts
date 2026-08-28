@@ -32,6 +32,11 @@ import type { PlayAction } from "../ui/screens/LobbyScreen.js";
 import type { InputMsg } from "@shared/movement/types.js";
 import { consumeFixedTicks } from "@shared/net/fixed-tick.js";
 import { shouldSendGameplayInput } from "@shared/net/gameplay-input.js";
+import {
+  shouldApplyLocalWeaponSwitch,
+  shouldSendSpikeClientAction,
+  shouldSimulateLocalFire,
+} from "@shared/net/local-gameplay.js";
 import type { InputState } from "../input/InputManager.js";
 import type { SyncedPlayer } from "../network/synced-state.js";
 
@@ -175,6 +180,8 @@ export class Game {
 
   private setupCallbacks(): void {
     this.input.onWeaponSwitch = (slot: string) => {
+      if (!shouldApplyLocalWeaponSwitch(this.clientGameplayActive())) return;
+
       const primary = this.userProfile?.primaryWeaponId || "AR_1";
       const secondary = this.userProfile?.secondaryWeaponId || "PISTOL_1";
 
@@ -194,9 +201,6 @@ export class Game {
 
       this.weaponSystem.switchWeapon(weaponId);
       this.hud.setWeapon(weaponId);
-      if (this.clientGameplayActive()) {
-        this.network.sendWeaponSwitch(weaponId);
-      }
     };
 
     this.input.onReload = () => {
@@ -236,7 +240,7 @@ export class Game {
     this.input.onSpikeInteract = () => {
       const state = this.network.state;
       if (!state || state.gameMode !== "search_destroy") return;
-      if (state.lobbyState !== "playing") return;
+      if (!shouldSendSpikeClientAction(this.clientGameplayActivity())) return;
 
       const myId = this.network.sessionId;
       const myPlayer = state.players?.get(myId);
@@ -256,6 +260,7 @@ export class Game {
     this.input.onSpikeCancel = () => {
       const state = this.network.state;
       if (!state || state.gameMode !== "search_destroy") return;
+      if (!shouldSendSpikeClientAction(this.clientGameplayActivity())) return;
       this.network.sendSpikeAction("cancel");
     };
 
@@ -399,12 +404,14 @@ export class Game {
     };
 
     this.network.onGameOver = (msg) => {
+      const myTeam = this.network.state?.players?.get(this.network.sessionId)?.teamId;
       this.matchOverlays.showGameOver(
         msg,
         this.network.sessionId,
         this.hostId,
         () => this.network.sendRestartGame(),
         () => this.network.sendDisbandLobby(),
+        myTeam,
       );
     };
 
@@ -654,8 +661,13 @@ export class Game {
       this.audioManager.updateFootsteps(dt, isMoving, isGrounded, isSprintingNow, isCrouching);
     }
 
+    const gameplayActive = this.clientGameplayActive();
     const canFire = !this.localPlayer.isReloading && !this.localPlayer.isDead;
-    const firingNow = inputState.firing && canFire;
+    const firingNow = shouldSimulateLocalFire({
+      gameplayActive,
+      inputFiring: inputState.firing,
+      canFire,
+    });
     this.weaponSystem.setFiring(firingNow);
     this.weaponSystem.setAiming(inputState.aiming);
 
@@ -676,7 +688,8 @@ export class Game {
       const myPlayer = players?.get(myId);
       this.hud.setGameModeState({
         gameMode: state.gameMode || "deathmatch",
-        scoreLimit: state.scoreLimit || 30,
+        scoreLimit: state.scoreLimit || 5,
+        localKills: Number((myPlayer as { kills?: number } | undefined)?.kills ?? 0),
         timeRemaining: state.timeRemaining || 0,
         isGameOver: state.isGameOver || false,
         winnerId: state.winnerId || "",

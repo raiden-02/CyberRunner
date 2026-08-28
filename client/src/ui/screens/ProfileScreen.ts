@@ -1,6 +1,5 @@
 import { BaseScreen } from "./BaseScreen.js";
 import { api, type UserProfile } from "../../api/client.js";
-import { THEME } from "../../theme.js";
 
 const PRIMARY_WEAPONS = [
   { value: "AR_1", label: "Assault Rifle" },
@@ -35,41 +34,36 @@ export class ProfileScreen extends BaseScreen {
   }
 
   private buildUI(): void {
-    const panel = this.createPanel();
-    
-    this.titleEl = this.createTitle("Create Profile");
+    const panel = this.createPanel("cr-profile");
+    this.titleEl = this.createTitle("Operator");
     panel.appendChild(this.titleEl);
 
-    panel.appendChild(this.createLabel("Display Name"));
-    this.nameInput = this.createInput("Enter your name...");
+    panel.appendChild(this.createLabel("Display name"));
+    this.nameInput = this.createInput("Enter your name");
     this.nameInput.maxLength = 20;
+    this.nameInput.setAttribute("aria-label", "Display name");
     panel.appendChild(this.nameInput);
 
-    const loadoutTitle = document.createElement("div");
-    loadoutTitle.textContent = "Loadout";
-    loadoutTitle.style.cssText = `
-      color: ${THEME.accent};
-      font-size: 14px;
-      font-weight: 600;
-      margin: 16px 0 8px 0;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    `;
-    panel.appendChild(loadoutTitle);
+    const loadout = document.createElement("div");
+    loadout.className = "cr-kicker";
+    loadout.textContent = "Loadout";
+    panel.appendChild(loadout);
 
-    panel.appendChild(this.createLabel("Primary Weapon"));
+    panel.appendChild(this.createLabel("Primary weapon"));
     this.primarySelect = this.createSelect(PRIMARY_WEAPONS);
+    this.primarySelect.setAttribute("aria-label", "Primary weapon");
     panel.appendChild(this.primarySelect);
 
-    panel.appendChild(this.createLabel("Secondary Weapon"));
+    panel.appendChild(this.createLabel("Secondary weapon"));
     this.secondarySelect = this.createSelect(SECONDARY_WEAPONS);
+    this.secondarySelect.setAttribute("aria-label", "Secondary weapon");
     panel.appendChild(this.secondarySelect);
 
     this.errorDiv = this.createError();
     panel.appendChild(this.errorDiv);
 
-    this.saveBtn = this.createButton("Save & Continue");
-    this.saveBtn.onclick = () => this.handleSave();
+    this.saveBtn = this.createButton("Save & Continue", true);
+    this.saveBtn.onclick = () => void this.handleSave();
     panel.appendChild(this.saveBtn);
 
     this.container.appendChild(panel);
@@ -88,7 +82,7 @@ export class ProfileScreen extends BaseScreen {
 
   setEditMode(isEdit: boolean): void {
     this.isEditMode = isEdit;
-    this.titleEl.textContent = isEdit ? "Edit Profile" : "Create Profile";
+    this.titleEl.textContent = isEdit ? "Loadout" : "Operator";
     this.saveBtn.textContent = isEdit ? "Save Changes" : "Save & Continue";
   }
 
@@ -103,12 +97,12 @@ export class ProfileScreen extends BaseScreen {
     const secondaryWeaponId = this.secondarySelect.value;
 
     if (displayName.length < 2) {
-      this.errorDiv.textContent = "Name must be at least 2 characters";
+      this.errorDiv.textContent = "Name must be at least 2 characters.";
       return;
     }
 
     this.saveBtn.disabled = true;
-    this.saveBtn.textContent = "Saving...";
+    this.saveBtn.textContent = "Saving…";
 
     try {
       if (this.user?.id.startsWith("dev-user-") || this.user?.id.startsWith("guest-")) {

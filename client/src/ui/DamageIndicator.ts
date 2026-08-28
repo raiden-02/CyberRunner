@@ -6,7 +6,7 @@ interface DamageIndicatorConfig {
 }
 
 const DEFAULT_CONFIG: DamageIndicatorConfig = {
-  color: "#c45c3a",
+  color: "#d4544a",
   fadeTime: 1000,
   size: 60,
   distance: 80,

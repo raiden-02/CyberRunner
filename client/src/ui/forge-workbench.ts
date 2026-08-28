@@ -60,17 +60,19 @@ export function recordedStoryLine(view: ForgeDesignView): string | undefined {
 }
 
 export function formatTurnCard(turn: ForgeDesignTurn): string {
+  const n = String(turn.turn).padStart(2, "0");
   if (turn.kind === "playtest" && turn.playtest) {
-    return ["Playtest", ...formatPlaytestLines(turn.playtest)].join("\n");
+    const g = turn.playtest.ghost.siteChoice;
+    return `${n} PLAYTEST\nA ${g.A} / B ${g.B}`;
   }
   if (turn.kind === "finish") {
-    return `Finished\n${turn.finishSummary ?? ""}`.trim();
+    return `${n} COMPLETE\n${turn.finishSummary ?? ""}`.trim();
   }
   const title = turn.target ? `${turn.tool} ${turn.target}` : turn.tool;
-  const lines = ["Edit", title];
-  if (turn.intent) lines.push(`Intent: ${turn.intent}`);
-  if (turn.rejected) lines.push("Rejected by P1.");
-  if (turn.p0) lines.push(`P0: ${formatP0Line(turn.p0)}`);
+  const lines = [`${n} MAP EDIT`, title];
+  if (turn.intent) lines.push(turn.intent);
+  if (turn.rejected) lines.push("Rejected.");
+  if (turn.p0) lines.push(`Static checks: ${formatP0Line(turn.p0)}`);
   return lines.join("\n");
 }
 

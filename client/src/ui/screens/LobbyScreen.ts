@@ -1,7 +1,8 @@
-import { getPublicMaps, type PublicMapInfo } from "@shared/world/map-registry.js";
+import { getGameplayMap, getPublicMaps, type PublicMapInfo } from "@shared/world/map-registry.js";
 import { quickPlayFollowThrough } from "@shared/net/quickplay-action.js";
+import { lobbyModeCopy } from "@shared/ui/mode-copy.js";
 import { api, type UserProfile } from "../../api/client.js";
-import { THEME } from "../../theme.js";
+import { MapShowcase } from "../../world/MapShowcase.js";
 import { BaseScreen } from "./BaseScreen.js";
 
 export type GameModeId = "deathmatch" | "search_destroy";
@@ -15,11 +16,6 @@ export interface PlayAction {
   forgeMapId?: string;
 }
 
-const GAME_MODES: Array<{ value: GameModeId; label: string; description: string }> = [
-  { value: "deathmatch", label: "Deathmatch", description: "FFA - First to 5 kills" },
-  { value: "search_destroy", label: "Search & Destroy", description: "3 lives per round" },
-];
-
 export class LobbyScreen extends BaseScreen {
   private user: UserProfile | null = null;
   private onPlay: (action: PlayAction) => void = () => {};
@@ -30,238 +26,193 @@ export class LobbyScreen extends BaseScreen {
   private errorDiv!: HTMLDivElement;
   private joinCodeInput!: HTMLInputElement;
   private playerInfo!: HTMLDivElement;
-  private gameModeSelect!: HTMLSelectElement;
   private mapList!: HTMLDivElement;
+  private previewHost!: HTMLDivElement;
+  private previewTitle!: HTMLDivElement;
   private selectedMapId = getPublicMaps()[0]?.id ?? "shoot-house-neon";
+  private selectedMode: GameModeId = "deathmatch";
+  private modeButtons: HTMLButtonElement[] = [];
+  private showcase = new MapShowcase();
 
   constructor() {
-    super("lobby-screen");
+    super("lobby-screen", true);
     this.buildUI();
   }
 
   private buildUI(): void {
-    const panel = this.createPanel("520px");
+    const shell = document.createElement("div");
+    shell.className = "cr-lobby";
 
-    const title = this.createTitle("CYBER RUNNER");
-    panel.appendChild(title);
-
-    const netHint = document.createElement("p");
-    netHint.textContent = "Same live room. Two tabs is enough to see prediction and remote players.";
-    netHint.style.cssText = `
-      color: ${THEME.muted};
-      text-align: center;
-      margin: -8px 0 20px 0;
-      font-size: 13px;
-      line-height: 1.4;
-    `;
-    panel.appendChild(netHint);
-
+    const top = document.createElement("div");
+    top.className = "cr-lobby__top";
+    const brand = document.createElement("div");
+    brand.className = "cr-lobby__brand";
+    brand.textContent = "CyberRunner";
     this.playerInfo = document.createElement("div");
-    this.playerInfo.style.cssText = `
-      background: ${THEME.accentDim};
-      border: 1px solid ${THEME.panelBorder};
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    `;
-    panel.appendChild(this.playerInfo);
+    this.playerInfo.className = "cr-lobby__player";
+    const actions = document.createElement("div");
+    actions.className = "cr-row";
+    const settingsBtn = this.createButton("Settings", false);
+    settingsBtn.classList.add("cr-button--ghost");
+    settingsBtn.onclick = () => this.onSettings();
+    const logoutBtn = this.createButton("Sign Out", false);
+    logoutBtn.classList.add("cr-button--ghost");
+    logoutBtn.onclick = () => void this.handleLogout();
+    actions.append(settingsBtn, logoutBtn);
+    top.append(brand, this.playerInfo, actions);
+    shell.appendChild(top);
 
-    const playHead = sectionLabel("Play");
-    playHead.style.marginTop = "0";
-    panel.appendChild(playHead);
+    const body = document.createElement("div");
+    body.className = "cr-lobby__body";
 
-    const quickPlayBtn = this.createButton("⚡ QUICK PLAY");
-    quickPlayBtn.style.fontSize = "18px";
-    quickPlayBtn.style.padding = "18px 24px";
-    quickPlayBtn.onclick = () => this.handleQuickPlay();
-    panel.appendChild(quickPlayBtn);
+    const play = this.createPanel("cr-lobby__play");
+    const playKicker = document.createElement("div");
+    playKicker.className = "cr-kicker";
+    playKicker.textContent = "Play";
+    play.appendChild(playKicker);
 
-    const separator = document.createElement("div");
-    separator.style.cssText = `
-      display: flex;
-      align-items: center;
-      margin: 20px 0;
-      color: #666;
-    `;
-    separator.innerHTML = `
-      <div style="flex: 1; height: 1px; background: #333;"></div>
-      <span style="padding: 0 16px;">OR</span>
-      <div style="flex: 1; height: 1px; background: #333;"></div>
-    `;
-    panel.appendChild(separator);
+    play.appendChild(this.label("Mode"));
+    const modes = document.createElement("div");
+    modes.className = "cr-segmented";
+    for (const mode of ["deathmatch", "search_destroy"] as const) {
+      const copy = lobbyModeCopy(mode);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cr-button cr-mode-btn";
+      btn.dataset.mode = mode;
+      btn.innerHTML = `<strong>${copy.title}</strong><span>${copy.detail}</span>`;
+      btn.onclick = () => {
+        this.selectedMode = mode;
+        this.syncModeButtons();
+        this.renderMapCards();
+      };
+      this.modeButtons.push(btn);
+      modes.appendChild(btn);
+    }
+    play.appendChild(modes);
 
-    panel.appendChild(fieldLabel("Mode"));
-    this.gameModeSelect = this.createSelect(
-      GAME_MODES.map((m) => ({ value: m.value, label: `${m.label} - ${m.description}` })),
-    );
-    this.gameModeSelect.style.marginBottom = "12px";
-    this.gameModeSelect.onchange = () => this.renderMapCards();
-    panel.appendChild(this.gameModeSelect);
-
-    panel.appendChild(fieldLabel("Map"));
+    play.appendChild(this.label("Map"));
     this.mapList = document.createElement("div");
-    this.mapList.style.cssText = "display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px 0;";
-    panel.appendChild(this.mapList);
-    this.renderMapCards();
+    this.mapList.style.cssText = "display:flex;flex-direction:column;gap:8px;margin:4px 0 12px;";
+    play.appendChild(this.mapList);
 
-    const createBtn = this.createButton("Create Game", false);
-    createBtn.onclick = () => this.handleCreate();
-    panel.appendChild(createBtn);
+    const quick = this.createButton("Quick Play", true);
+    quick.onclick = () => void this.handleQuickPlay();
+    play.appendChild(quick);
 
+    const create = this.createButton("Create Game", false);
+    create.onclick = () => this.handleCreate();
+    play.appendChild(create);
+
+    play.appendChild(this.label("Join code"));
     const joinRow = document.createElement("div");
-    joinRow.style.cssText = "display: flex; gap: 8px; margin-top: 8px;";
-    this.joinCodeInput = this.createInput("Enter join code...");
+    joinRow.className = "cr-row";
+    this.joinCodeInput = this.createInput("Enter join code");
     this.joinCodeInput.style.flex = "1";
     this.joinCodeInput.style.textTransform = "uppercase";
     this.joinCodeInput.maxLength = 6;
-    joinRow.appendChild(this.joinCodeInput);
+    this.joinCodeInput.setAttribute("aria-label", "Join code");
     const joinBtn = this.createButton("Join", false);
-    joinBtn.style.width = "auto";
-    joinBtn.style.padding = "12px 24px";
-    joinBtn.onclick = () => this.handleJoin();
-    joinRow.appendChild(joinBtn);
-    panel.appendChild(joinRow);
-
-    panel.appendChild(this.forgeCard());
+    joinBtn.classList.add("cr-button--inline");
+    joinBtn.onclick = () => void this.handleJoin();
+    joinRow.append(this.joinCodeInput, joinBtn);
+    play.appendChild(joinRow);
 
     this.errorDiv = this.createError();
-    panel.appendChild(this.errorDiv);
+    play.appendChild(this.errorDiv);
+    body.appendChild(play);
 
-    const bottomRow = document.createElement("div");
-    bottomRow.style.cssText = `
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 24px;
-    `;
+    const preview = document.createElement("div");
+    preview.className = "cr-lobby__preview";
+    this.previewHost = document.createElement("div");
+    this.previewHost.style.cssText = "position:absolute;inset:0;";
+    const meta = document.createElement("div");
+    meta.className = "cr-lobby__preview-meta";
+    this.previewTitle = document.createElement("div");
+    this.previewTitle.className = "cr-lobby__preview-title";
+    meta.appendChild(this.previewTitle);
+    preview.append(this.previewHost, meta);
+    body.appendChild(preview);
+    shell.appendChild(body);
 
-    const settingsBtn = document.createElement("button");
-    settingsBtn.textContent = "Settings";
-    settingsBtn.style.cssText = `
-      padding: 8px 16px;
-      border: 1px solid #444;
-      background: transparent;
-      color: #888;
-      font-size: 14px;
-      cursor: pointer;
-      border-radius: 4px;
-    `;
-    settingsBtn.onmouseenter = () => {
-      settingsBtn.style.borderColor = THEME.accent;
-      settingsBtn.style.color = THEME.accent;
-    };
-    settingsBtn.onmouseleave = () => {
-      settingsBtn.style.borderColor = "#444";
-      settingsBtn.style.color = "#888";
-    };
-    settingsBtn.onclick = () => this.onSettings();
-    bottomRow.appendChild(settingsBtn);
+    const forge = this.createPanel("cr-lobby__forge");
+    const forgeCopy = document.createElement("div");
+    const fk = document.createElement("div");
+    fk.className = "cr-kicker";
+    fk.textContent = "Arena Forge";
+    const ft = document.createElement("div");
+    ft.textContent = "Design a Search & Destroy variant with a bounded agent.";
+    ft.className = "cr-copy cr-copy--left";
+    const steps = document.createElement("div");
+    steps.className = "cr-copy cr-copy--left";
+    steps.textContent = "Edit · Evaluate · Playtest · Revise";
+    forgeCopy.append(fk, ft, steps);
+    const open = this.createButton("Open Forge", false);
+    open.classList.add("cr-button--inline");
+    open.onclick = () => this.onForge();
+    forge.append(forgeCopy, open);
+    shell.appendChild(forge);
 
-    const logoutBtn = document.createElement("button");
-    logoutBtn.textContent = "Sign Out";
-    logoutBtn.style.cssText = `
-      padding: 8px 16px;
-      border: none;
-      background: transparent;
-      color: #666;
-      font-size: 14px;
-      cursor: pointer;
-    `;
-    logoutBtn.onmouseenter = () => {
-      logoutBtn.style.color = THEME.danger;
-    };
-    logoutBtn.onmouseleave = () => {
-      logoutBtn.style.color = "#666";
-    };
-    logoutBtn.onclick = () => this.handleLogout();
-    bottomRow.appendChild(logoutBtn);
-
-    panel.appendChild(bottomRow);
-    this.container.appendChild(panel);
+    this.container.appendChild(shell);
+    this.syncModeButtons();
+    this.renderMapCards();
   }
 
-  private forgeCard(): HTMLDivElement {
-    const card = document.createElement("div");
-    card.style.cssText = `
-      margin-top: 20px;
-      padding: 14px 16px;
-      border: 1px solid ${THEME.panelBorder};
-      border-radius: 4px;
-      background: ${THEME.accentDim};
-    `;
-    const kicker = document.createElement("div");
-    kicker.textContent = "Arena Forge";
-    kicker.style.cssText = `
-      color: ${THEME.accent};
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    `;
-    const sub = document.createElement("div");
-    sub.textContent = "Agentic level design";
-    sub.style.cssText = `color: ${THEME.paper}; font-size: 15px; font-weight: 600; margin: 4px 0 6px 0;`;
-    const steps = document.createElement("div");
-    steps.textContent = "Edit → evaluate → playtest → revise";
-    steps.style.cssText = `color: ${THEME.muted}; font-size: 12px; margin-bottom: 10px;`;
-    const open = this.createButton("Open Forge", false);
-    open.style.margin = "0";
-    open.onclick = () => this.onForge();
-    card.appendChild(kicker);
-    card.appendChild(sub);
-    card.appendChild(steps);
-    card.appendChild(open);
-    return card;
+  private label(text: string): HTMLLabelElement {
+    return this.createLabel(text);
+  }
+
+  private syncModeButtons(): void {
+    for (const btn of this.modeButtons) {
+      btn.classList.toggle("cr-button--primary", btn.dataset.mode === this.selectedMode);
+    }
   }
 
   private renderMapCards(): void {
     const maps = getPublicMaps();
-    const mode = this.gameModeSelect.value as GameModeId;
     this.mapList.replaceChildren();
     for (const map of maps) {
-      this.mapList.appendChild(this.mapCard(map, mode));
+      this.mapList.appendChild(this.mapCard(map));
     }
+    this.syncPreviewCopy();
   }
 
-  private mapCard(map: PublicMapInfo, mode: GameModeId): HTMLButtonElement {
+  private mapCard(map: PublicMapInfo): HTMLButtonElement {
     const selected = map.id === this.selectedMapId;
-    const supports = map.modes.includes(mode);
+    const supports = map.modes.includes(this.selectedMode);
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.style.cssText = `
-      width: 100%;
-      text-align: left;
-      padding: 12px 14px;
-      border: 1px solid ${selected ? THEME.accent : THEME.panelBorder};
-      border-radius: 3px;
-      background: ${selected ? THEME.accentDim : "transparent"};
-      color: ${THEME.paper};
-      cursor: pointer;
-    `;
+    btn.className = `cr-card${selected ? " is-selected" : ""}`;
     const modes = map.modes
       .map((m) => (m === "deathmatch" ? "Deathmatch" : "Search & Destroy"))
-      .join(" · ");
+      .join("  ·  ");
     btn.innerHTML = `
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
-        <div>
-          <div style="font-weight:600;letter-spacing:0.03em;text-transform:uppercase;">${map.title}</div>
-          <div style="color:${THEME.muted};font-size:12px;margin-top:4px;">${map.blurb}</div>
-          <div style="color:${THEME.muted};font-size:11px;margin-top:4px;">${modes}</div>
-        </div>
-        <div style="color:${selected ? THEME.accent : THEME.muted};font-size:11px;letter-spacing:0.06em;text-transform:uppercase;">
-          ${selected ? "Selected" : supports ? "Select" : "Mode mismatch"}
-        </div>
-      </div>
+      <div class="cr-kicker">${map.title}</div>
+      <div>${map.blurb}</div>
+      <div class="cr-copy cr-copy--left" style="margin:8px 0 0">${modes}</div>
+      <div class="cr-copy cr-copy--left">${selected ? "Selected" : supports ? "Select" : "Mode mismatch"}</div>
     `;
     btn.onclick = () => {
       this.selectedMapId = map.id;
       this.errorDiv.textContent = "";
       this.renderMapCards();
+      this.refreshShowcase();
     };
     return btn;
+  }
+
+  private syncPreviewCopy(): void {
+    const map = getPublicMaps().find((m) => m.id === this.selectedMapId);
+    this.previewTitle.textContent = map?.title ?? "Selected map";
+  }
+
+  private refreshShowcase(): void {
+    if (!this.visible) return;
+    try {
+      this.showcase.setGameplayMap(getGameplayMap(this.selectedMapId));
+    } catch {
+      // production maps only
+    }
   }
 
   setUser(user: UserProfile): void {
@@ -297,29 +248,13 @@ export class LobbyScreen extends BaseScreen {
     if (!this.user) return;
     const primary = this.user.primaryWeaponId?.replace("_1", "") || "AR";
     const secondary = this.user.secondaryWeaponId?.replace("_1", "") || "PISTOL";
-    this.playerInfo.innerHTML = `
-      <div style="flex: 1;">
-        <div style="color: ${THEME.accent}; font-weight: 600;">${this.user.displayName || "Player"}</div>
-        <div style="color: ${THEME.muted}; font-size: 12px;">Loadout: ${primary} / ${secondary}</div>
-      </div>
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <button id="edit-profile-btn" style="
-          background: transparent;
-          border: 1px solid ${THEME.panelBorder};
-          color: ${THEME.paper};
-          padding: 6px 12px;
-          border-radius: 3px;
-          font-size: 12px;
-          cursor: pointer;
-        ">Edit</button>
-        <div style="color: ${THEME.teammate}; font-size: 12px;">● Online</div>
-      </div>
-    `;
-
-    const editBtn = this.playerInfo.querySelector("#edit-profile-btn");
-    if (editBtn) {
-      editBtn.addEventListener("click", () => this.onEditProfile());
-    }
+    this.playerInfo.replaceChildren();
+    const name = document.createElement("div");
+    name.innerHTML = `<strong>${this.user.displayName || "Player"}</strong><div>${primary} / ${secondary}</div>`;
+    const edit = this.createButton("Edit", false);
+    edit.classList.add("cr-button--inline");
+    edit.onclick = () => this.onEditProfile();
+    this.playerInfo.append(name, edit);
   }
 
   protected override onShow(): void {
@@ -327,20 +262,26 @@ export class LobbyScreen extends BaseScreen {
     this.joinCodeInput.value = "";
     this.updatePlayerInfo();
     this.renderMapCards();
+    this.showcase.attach(this.previewHost);
+    this.refreshShowcase();
+    this.showcase.start();
+  }
+
+  protected override onHide(): void {
+    this.showcase.dispose();
   }
 
   private selectedCreate(): { gameMode: GameModeId; mapId: string } | undefined {
-    const gameMode = this.gameModeSelect.value as GameModeId;
     const map = getPublicMaps().find((m) => m.id === this.selectedMapId);
     if (!map) {
       this.errorDiv.textContent = "Choose a production map.";
       return undefined;
     }
-    if (!map.modes.includes(gameMode)) {
+    if (!map.modes.includes(this.selectedMode)) {
       this.errorDiv.textContent = `${map.title} does not support that mode.`;
       return undefined;
     }
-    return { gameMode, mapId: map.id };
+    return { gameMode: this.selectedMode, mapId: map.id };
   }
 
   private async handleQuickPlay(): Promise<void> {
@@ -382,12 +323,10 @@ export class LobbyScreen extends BaseScreen {
   private async handleJoin(): Promise<void> {
     const code = this.joinCodeInput.value.trim().toUpperCase();
     if (code.length !== 6) {
-      this.errorDiv.textContent = "Join code must be 6 characters";
+      this.errorDiv.textContent = "Join code must be 6 characters.";
       return;
     }
-
     this.errorDiv.textContent = "";
-
     try {
       const result = await api.joinByCode(code);
       this.onPlay({ type: "join", roomId: result.roomId, joinCode: code });
@@ -404,30 +343,9 @@ export class LobbyScreen extends BaseScreen {
     }
     this.onLogout();
   }
-}
 
-function sectionLabel(text: string): HTMLDivElement {
-  const el = document.createElement("div");
-  el.textContent = text;
-  el.style.cssText = `
-    color: ${THEME.paper};
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin: 8px 0 8px 0;
-  `;
-  return el;
-}
-
-function fieldLabel(text: string): HTMLDivElement {
-  const el = document.createElement("div");
-  el.textContent = text;
-  el.style.cssText = `
-    color: #888;
-    font-size: 12px;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-  `;
-  return el;
+  override destroy(): void {
+    this.showcase.dispose();
+    super.destroy();
+  }
 }

@@ -32,6 +32,7 @@ mainMenu.setOnGameStart(async (options) => {
 
   try {
     await currentGame.start(options.action);
+    mainMenu.hideAll();
   } catch (err) {
     console.error("Failed to start game:", err);
     currentGame.stop();

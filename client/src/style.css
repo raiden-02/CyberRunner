@@ -1,9 +1,15 @@
+@import "./ui/styles/tokens.css";
+@import "./ui/styles/components.css";
+@import "./ui/styles/screens.css";
+@import "./ui/styles/hud.css";
+@import "./ui/styles/forge.css";
+
 :root {
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--cr-font);
   line-height: 1.5;
   font-weight: 400;
-  color: #ede6d9;
-  background-color: #1a1814;
+  color: var(--cr-text);
+  background-color: var(--cr-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -15,34 +21,23 @@ body {
   overflow: hidden;
   min-width: 320px;
   min-height: 100vh;
-  background: #1a1814;
+  background: var(--cr-bg);
 }
 
 a {
   font-weight: 500;
-  color: #d4893a;
+  color: var(--cr-accent);
   text-decoration: inherit;
 }
+
 a:hover {
-  color: #ede6d9;
+  color: var(--cr-text);
 }
 
 button {
-  border-radius: 3px;
-  border: 1px solid #4a433a;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  background-color: #241f1a;
-  color: #ede6d9;
-  cursor: pointer;
 }
-button:hover {
-  border-color: #d4893a;
-}
-button:focus,
-button:focus-visible {
-  outline: 2px solid #d4893a;
-  outline-offset: 2px;
+
+#game-canvas {
+  display: block;
 }

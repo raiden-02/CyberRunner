@@ -1,0 +1,77 @@
+.cr-forge {
+  width: min(1220px, 96vw);
+  margin: 16px auto 32px;
+  padding: 22px 24px 36px;
+  clip-path: none;
+}
+
+.cr-forge__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.cr-forge__showcase {
+  width: 100%;
+  height: min(42vh, 400px);
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--cr-border);
+  background: #05070b;
+}
+
+.cr-forge__split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.cr-forge__timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.cr-forge__turn {
+  text-align: left;
+  padding: 10px;
+  border: 1px solid var(--cr-border);
+  background: var(--cr-bg);
+  color: var(--cr-text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.cr-forge__turn.is-selected {
+  border-color: var(--cr-accent);
+  background: var(--cr-accent-dim);
+}
+
+.cr-forge__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.cr-forge details summary {
+  cursor: pointer;
+  color: var(--cr-text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.cr-forge details summary:focus-visible {
+  outline: 2px solid var(--cr-accent);
+}
+
+@media (max-width: 860px) {
+  .cr-forge__split {
+    grid-template-columns: 1fr;
+  }
+}

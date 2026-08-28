@@ -1,8 +1,8 @@
 import { BaseScreen } from "./BaseScreen.js";
 import { api, type UserProfile } from "../../api/client.js";
-import { THEME } from "../../theme.js";
+import { getGameplayMap } from "@shared/world/map-registry.js";
+import { MapShowcase } from "../../world/MapShowcase.js";
 
-// Google Identity Services types
 declare global {
   interface Window {
     google?: {
@@ -21,6 +21,8 @@ export class AuthScreen extends BaseScreen {
   private onAuthenticated: (user: UserProfile) => void = () => {};
   private googleClientId: string | null = null;
   private errorDiv!: HTMLDivElement;
+  private backdrop = document.createElement("div");
+  private showcase = new MapShowcase();
 
   constructor() {
     super("auth-screen");
@@ -28,75 +30,46 @@ export class AuthScreen extends BaseScreen {
   }
 
   private buildUI(): void {
-    const panel = this.createPanel("380px");
-    
-    const title = this.createTitle("CYBER RUNNER");
+    this.backdrop.className = "cr-backdrop";
+    this.container.appendChild(this.backdrop);
+    const scrim = document.createElement("div");
+    scrim.className = "cr-scrim";
+    this.container.appendChild(scrim);
+
+    const panel = this.createPanel("cr-auth");
+
+    const kicker = document.createElement("div");
+    kicker.className = "cr-kicker";
+    kicker.textContent = "Authoritative multiplayer FPS";
+    panel.appendChild(kicker);
+
+    const title = this.createTitle("CyberRunner");
     panel.appendChild(title);
 
     const subtitle = document.createElement("p");
-    subtitle.textContent = "Browser multiplayer FPS. The server owns physics and hits.";
-    subtitle.style.cssText = `
-      color: ${THEME.paper};
-      text-align: center;
-      margin: 0 0 8px 0;
-      font-size: 14px;
-      line-height: 1.4;
-    `;
+    subtitle.className = "cr-copy";
+    subtitle.textContent = "Server-owned physics and hits. Play as guest or sign in.";
     panel.appendChild(subtitle);
 
-    const demoNote = document.createElement("p");
-    demoNote.textContent = "Play as guest. Open two tabs to fight yourself.";
-    demoNote.style.cssText = `
-      color: ${THEME.muted};
-      text-align: center;
-      margin: 0 0 24px 0;
-      font-size: 13px;
-    `;
-    panel.appendChild(demoNote);
+    const guestBtn = this.createButton("Play as Guest", true);
+    guestBtn.onclick = () => this.handleGuestMode();
+    panel.appendChild(guestBtn);
+
+    const guestNote = document.createElement("p");
+    guestNote.className = "cr-copy";
+    guestNote.textContent = "Guest progress is not saved.";
+    panel.appendChild(guestNote);
 
     const googleBtnContainer = document.createElement("div");
     googleBtnContainer.id = "google-signin-btn";
-    googleBtnContainer.style.cssText = `
-      display: flex;
-      justify-content: center;
-      margin: 16px 0;
-    `;
+    googleBtnContainer.style.cssText = "display:flex;justify-content:center;margin:8px 0;";
     panel.appendChild(googleBtnContainer);
 
     this.errorDiv = this.createError();
     panel.appendChild(this.errorDiv);
 
-    const separator = document.createElement("div");
-    separator.style.cssText = `
-      display: flex;
-      align-items: center;
-      margin: 20px 0;
-      color: ${THEME.muted};
-    `;
-    separator.innerHTML = `
-      <div style="flex: 1; height: 1px; background: ${THEME.panelBorder};"></div>
-      <span style="padding: 0 16px;">OR</span>
-      <div style="flex: 1; height: 1px; background: ${THEME.panelBorder};"></div>
-    `;
-    panel.appendChild(separator);
-
-    const guestBtn = this.createButton("Play as Guest", false);
-    guestBtn.onclick = () => this.handleGuestMode();
-    panel.appendChild(guestBtn);
-
-    const guestNote = document.createElement("p");
-    guestNote.textContent = "Guest progress is not saved";
-    guestNote.style.cssText = `
-      color: ${THEME.muted};
-      text-align: center;
-      margin: 8px 0 0 0;
-      font-size: 12px;
-    `;
-    panel.appendChild(guestNote);
-
     const devBtnContainer = document.createElement("div");
     devBtnContainer.id = "dev-mode-container";
-    devBtnContainer.style.marginTop = "16px";
     panel.appendChild(devBtnContainer);
 
     this.container.appendChild(panel);
@@ -130,14 +103,21 @@ export class AuthScreen extends BaseScreen {
 
   protected override onShow(): void {
     this.errorDiv.textContent = "";
+    this.showcase.attach(this.backdrop);
+    this.showcase.setGameplayMap(getGameplayMap("shoot-house-neon"));
+    this.showcase.start();
     this.initGoogleSignIn();
     this.updateDevModeButton();
+  }
+
+  protected override onHide(): void {
+    this.showcase.dispose();
   }
 
   private updateDevModeButton(): void {
     const container = document.getElementById("dev-mode-container");
     if (!container) return;
-    container.innerHTML = "";
+    container.replaceChildren();
 
     if (import.meta.env.DEV) {
       const devBtn = this.createButton("Dev Mode (Skip Auth)", false);
@@ -147,9 +127,7 @@ export class AuthScreen extends BaseScreen {
   }
 
   private initGoogleSignIn(): void {
-    if (!this.googleClientId) {
-      return;
-    }
+    if (!this.googleClientId) return;
 
     if (!window.google?.accounts?.id) {
       const script = document.createElement("script");
@@ -172,7 +150,7 @@ export class AuthScreen extends BaseScreen {
 
     const container = document.getElementById("google-signin-btn");
     if (container) {
-      container.innerHTML = "";
+      container.replaceChildren();
       window.google.accounts.id.renderButton(container, {
         theme: "filled_black",
         size: "large",
@@ -202,5 +180,10 @@ export class AuthScreen extends BaseScreen {
       profileComplete: false,
     };
     this.onAuthenticated(mockUser);
+  }
+
+  override destroy(): void {
+    this.showcase.dispose();
+    super.destroy();
   }
 }

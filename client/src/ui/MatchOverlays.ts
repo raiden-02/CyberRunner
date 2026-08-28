@@ -1,5 +1,5 @@
-import { THEME } from "../theme.js";
 import type { GameOverMessage } from "../network/NetworkManager.js";
+import { overlayOutcomeTitle } from "@shared/ui/mode-copy.js";
 
 export class MatchOverlays {
   showGameOver(
@@ -8,50 +8,36 @@ export class MatchOverlays {
     hostId: string,
     onRestart: () => void,
     onDisband: () => void,
+    myTeam?: string,
   ): void {
     const overlay = document.createElement("div");
     overlay.id = "game-over-overlay";
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: ${THEME.overlay};
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 2000;
-      color: ${THEME.paper};
-      font-family: ${THEME.font};
-    `;
+    overlay.className = "cr-overlay-center";
 
     let titleHtml: string;
     let subtitleHtml: string;
 
     if (msg.gameMode === "deathmatch") {
-      const isLocalWinner = msg.winnerId === sessionId;
-      if (isLocalWinner) {
-        titleHtml = `<div style="font-size: 48px; font-weight: bold; color: ${THEME.accent}; margin-bottom: 16px;">YOU WIN</div>`;
-        subtitleHtml = `<div style="font-size: 24px; color: ${THEME.muted}; margin-bottom: 32px;">First to ${msg.winnerName ? "the kill limit" : "5 kills"}!</div>`;
-      } else {
-        titleHtml = `<div style="font-size: 48px; font-weight: bold; color: ${THEME.danger}; margin-bottom: 16px;">YOU LOSE</div>`;
-        subtitleHtml = `<div style="font-size: 24px; color: ${THEME.muted}; margin-bottom: 32px;">${msg.winnerName} wins!</div>`;
-      }
+      const localWon = msg.winnerId === sessionId;
+      titleHtml = `<div class="cr-title">${overlayOutcomeTitle({ gameMode: "deathmatch", localWon })}</div>`;
+      subtitleHtml = localWon
+        ? `<div class="cr-copy">${msg.winnerName} · First to 5 kills</div>`
+        : `<div class="cr-copy">${msg.winnerName} wins</div>`;
     } else {
-      const winnerTeamColor = msg.winnerTeam === "ghosts" ? THEME.ghosts : THEME.sentinels;
-      const winnerTeamName = msg.winnerTeam === "ghosts" ? "GHOSTS" : "SENTINELS";
-      titleHtml = `<div style="font-size: 48px; font-weight: bold; color: ${winnerTeamColor}; margin-bottom: 16px;">${winnerTeamName} WIN</div>`;
-      subtitleHtml = `<div style="font-size: 24px; color: ${THEME.muted}; margin-bottom: 32px;">Ghosts ${msg.ghostsRoundsWon} - ${msg.sentinelsRoundsWon} Sentinels</div>`;
+      const localWon = myTeam !== undefined && myTeam === msg.winnerTeam;
+      titleHtml = `<div class="cr-title">${overlayOutcomeTitle({
+        gameMode: "search_destroy",
+        localWon,
+        winnerTeam: msg.winnerTeam,
+        hasLocalTeam: myTeam !== undefined && myTeam.length > 0,
+      })}</div>`;
+      subtitleHtml = `<div class="cr-copy">Ghosts ${msg.ghostsRoundsWon} — ${msg.sentinelsRoundsWon} Sentinels</div>`;
     }
 
     overlay.innerHTML = `
       ${titleHtml}
       ${subtitleHtml}
-      <div id="game-over-status" style="font-size: 16px; color: ${THEME.muted};">
-        Waiting for host...
-      </div>
+      <div id="game-over-status" class="cr-status">Waiting for host...</div>
     `;
 
     document.body.appendChild(overlay);
@@ -60,27 +46,8 @@ export class MatchOverlays {
     if (isHost) {
       const statusEl = overlay.querySelector("#game-over-status")!;
       statusEl.innerHTML = `
-        <button id="restart-btn" style="
-          padding: 12px 32px;
-          margin: 8px;
-          border: 1px solid ${THEME.accent};
-          border-radius: 3px;
-          background: ${THEME.accent};
-          color: ${THEME.ink};
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-        ">PLAY AGAIN</button>
-        <button id="disband-btn" style="
-          padding: 12px 32px;
-          margin: 8px;
-          border: 1px solid ${THEME.panelBorder};
-          border-radius: 3px;
-          background: transparent;
-          color: ${THEME.muted};
-          font-size: 16px;
-          cursor: pointer;
-        ">LEAVE</button>
+        <button id="restart-btn" type="button" class="cr-button cr-button--primary cr-button--inline">Play again</button>
+        <button id="disband-btn" type="button" class="cr-button cr-button--inline">Leave</button>
       `;
 
       overlay.querySelector("#restart-btn")?.addEventListener("click", () => {
@@ -99,67 +66,33 @@ export class MatchOverlays {
     const existing = document.getElementById("round-end-announcement");
     if (existing) existing.remove();
 
-    const teamColor = msg.winnerTeam === "ghosts" ? THEME.ghosts : THEME.sentinels;
-    const teamName = msg.winnerTeam === "ghosts" ? "GHOSTS" : "SENTINELS";
+    const teamName = msg.winnerTeam === "ghosts" ? "Ghosts" : "Sentinels";
+    const teamColor = msg.winnerTeam === "ghosts" ? "var(--cr-ghost)" : "var(--cr-sentinel)";
 
     let reasonText = "";
     switch (msg.reason) {
       case "spike_detonated":
-        reasonText = "Spike uploaded successfully!";
+        reasonText = "Spike uploaded";
         break;
       case "spike_decrypted":
-        reasonText = "Spike decrypted!";
+        reasonText = "Spike decrypted";
         break;
       case "elimination":
-        reasonText = "Enemy team eliminated!";
+        reasonText = "Team eliminated";
         break;
       case "time":
-        reasonText = "Time ran out!";
+        reasonText = "Time expired";
         break;
-      default:
-        reasonText = "";
     }
 
     const announcement = document.createElement("div");
     announcement.id = "round-end-announcement";
-    announcement.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 1500;
-      pointer-events: none;
-      animation: fadeInOut 4s ease-in-out forwards;
-    `;
+    announcement.className = "cr-round-end";
     announcement.innerHTML = `
-      <div style="
-        font-size: 48px;
-        font-weight: bold;
-        color: ${teamColor};
-        text-shadow: 0 0 20px ${teamColor}, 0 4px 8px rgba(0,0,0,0.5);
-        margin-bottom: 12px;
-      ">${teamName} WIN ROUND ${msg.roundNumber}</div>
-      <div style="
-        font-size: 20px;
-        color: #ccc;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-      ">${reasonText}</div>
+      <div class="cr-hud-label">Round won</div>
+      <div class="cr-title" style="color:${teamColor};margin:0">${teamName}</div>
+      <div class="cr-copy">${reasonText}</div>
     `;
-
-    if (!document.getElementById("round-announcement-style")) {
-      const style = document.createElement("style");
-      style.id = "round-announcement-style";
-      style.textContent = `
-        @keyframes fadeInOut {
-          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-          15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-          85% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
 
     document.body.appendChild(announcement);
 

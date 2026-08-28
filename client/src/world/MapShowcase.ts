@@ -4,7 +4,11 @@ import {
   gameplayFromPublicView,
   type PublicArenaMapView,
 } from "@shared/world/arena-map-view.js";
-import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
+import type { GameplayMapDefinition } from "@shared/world/map-types.js";
+import {
+  showcaseSourceForForgePreview,
+  showcaseSourceForGameplayMapId,
+} from "@shared/world/showcase-source.js";
 import { createLevelFromMap, type LevelInstance } from "./LevelFactory.js";
 
 export type ShowcaseHighlight = {
@@ -28,6 +32,9 @@ export class MapShowcase {
   private raf = 0;
   private running = false;
   private startMs = 0;
+  private reduceMotion = false;
+  private currentMapId: string | undefined;
+  private observer: ResizeObserver | null = null;
   private framing = computeShowcaseFraming({
     boundsHalfSize: 12,
     wallHeight: 3,
@@ -54,36 +61,48 @@ export class MapShowcase {
     this.renderer = renderer;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1a1814);
-    this.scene.fog = new THREE.Fog(0x2a2620, 18, 90);
+    this.scene.background = new THREE.Color(0x07090d);
+    this.scene.fog = new THREE.Fog(0x0b1218, 22, 96);
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.2, 120);
-    this.addLights();
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.2, 140);
+    this.addFillLights();
+    this.observer?.disconnect();
+    this.observer = new ResizeObserver(() => this.resize());
+    this.observer.observe(host);
     this.resize();
+    requestAnimationFrame(() => this.resize());
     window.addEventListener("resize", this.onResize);
   }
 
-  setMap(view: PublicArenaMapView, highlight?: ShowcaseHighlight): void {
+  setGameplayMap(map: GameplayMapDefinition, highlight?: ShowcaseHighlight): void {
     if (!this.scene) return;
-    this.clearLevel();
+    const source = showcaseSourceForGameplayMapId(map.id);
+    if (source.mapId !== map.id) {
+      throw new Error(`Showcase production map id mismatch: ${map.id}`);
+    }
+    this.applyMap(map, highlight);
+  }
+
+  setForgeView(view: PublicArenaMapView, highlight?: ShowcaseHighlight): void {
+    if (!this.scene) return;
+    const source = showcaseSourceForForgePreview();
     const map = gameplayFromPublicView(view, {
-      id: ARENA_FORGE_PREVIEW_MAP_ID,
+      id: source.mapId,
       name: "ArenaForge preview",
     });
-    this.level = createLevelFromMap(this.scene, map);
-    this.framing = computeShowcaseFraming(view);
-    if (this.camera) {
-      this.camera.near = this.framing.near;
-      this.camera.far = this.framing.far;
-      this.camera.updateProjectionMatrix();
-    }
-    if (highlight) this.addHighlight(highlight);
+    this.applyMap(map, highlight);
+  }
+
+  /** @deprecated use setForgeView or setGameplayMap */
+  setMap(view: PublicArenaMapView, highlight?: ShowcaseHighlight): void {
+    this.setForgeView(view, highlight);
   }
 
   start(): void {
     if (this.running) return;
     this.running = true;
     this.startMs = performance.now();
+    this.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.tick();
   }
 
@@ -99,6 +118,10 @@ export class MapShowcase {
     return this.running;
   }
 
+  lastMapId(): string | undefined {
+    return this.currentMapId;
+  }
+
   dispose(): void {
     this.stop();
     window.removeEventListener("resize", this.onResize);
@@ -106,12 +129,45 @@ export class MapShowcase {
     this.host = null;
   }
 
+  private applyMap(map: GameplayMapDefinition, highlight?: ShowcaseHighlight): void {
+    if (!this.scene) return;
+    this.clearLevel();
+    this.level = createLevelFromMap(this.scene, map);
+    this.currentMapId = map.id;
+    this.framing = computeShowcaseFraming({
+      boundsHalfSize: map.boundsHalfSize,
+      wallHeight: map.wallHeight,
+      wallThickness: map.wallThickness,
+      groundThickness: map.groundThickness,
+      solids: [...map.obstacles, ...map.occluders].map((s, i) => ({
+        id: `solid-${i}`,
+        kind: "obstacle",
+        x: s.x,
+        y: s.y,
+        z: s.z,
+        hx: s.hx,
+        hy: s.hy,
+        hz: s.hz,
+      })),
+      spawns: [],
+      objectives: [],
+    });
+    if (this.camera) {
+      this.camera.near = this.framing.near;
+      this.camera.far = this.framing.far;
+      this.camera.updateProjectionMatrix();
+    }
+    if (highlight) this.addHighlight(highlight);
+  }
+
   private tick = (): void => {
     if (!this.running || !this.renderer || !this.scene || !this.camera) return;
-    const t = (performance.now() - this.startMs) / 1000;
+    const t = this.reduceMotion ? 0.4 : (performance.now() - this.startMs) / 1000;
     const { centerX, centerY, centerZ, radius, elevation } = this.framing;
-    const yaw = t * 0.18;
-    const lift = elevation + Math.sin(t * 0.35) * Math.min(1.4, elevation * 0.12);
+    const yaw = this.reduceMotion ? 0.85 : t * 0.12;
+    const lift = this.reduceMotion
+      ? elevation
+      : elevation + Math.sin(t * 0.28) * Math.min(1.1, elevation * 0.1);
     this.camera.position.set(
       centerX + Math.cos(yaw) * radius,
       centerY + lift,
@@ -132,13 +188,13 @@ export class MapShowcase {
     this.camera.updateProjectionMatrix();
   }
 
-  private addLights(): void {
+  private addFillLights(): void {
     if (!this.scene) return;
-    const hemi = new THREE.HemisphereLight(0x6a7a88, 0x3a3832, 0.7);
-    const key = new THREE.DirectionalLight(0xffe2b8, 1.35);
-    key.position.set(18, 28, -12);
-    const fill = new THREE.DirectionalLight(0xd4893a, 0.28);
-    fill.position.set(-16, 10, 14);
+    const hemi = new THREE.HemisphereLight(0x7a8a98, 0x1a222c, 0.55);
+    const key = new THREE.DirectionalLight(0xc8d8e4, 0.85);
+    key.position.set(16, 26, -10);
+    const fill = new THREE.DirectionalLight(0x5ec8d8, 0.18);
+    fill.position.set(-14, 10, 12);
     this.scene.add(hemi, key, fill);
     this.lights = [hemi, key, fill];
   }
@@ -147,7 +203,7 @@ export class MapShowcase {
     if (!this.scene) return;
     const geom = new THREE.BoxGeometry(box.hx * 2 + 0.1, box.hy * 2 + 0.1, box.hz * 2 + 0.1);
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xd4893a,
+      color: 0x5ec8d8,
       wireframe: true,
       transparent: true,
       opacity: 0.9,
@@ -176,6 +232,8 @@ export class MapShowcase {
   }
 
   private disposeRenderer(): void {
+    this.observer?.disconnect();
+    this.observer = null;
     this.clearLevel();
     if (this.scene) {
       for (const light of this.lights) this.scene.remove(light);

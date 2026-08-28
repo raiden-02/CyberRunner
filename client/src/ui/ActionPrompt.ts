@@ -3,20 +3,18 @@
  * Shows context-sensitive keybind prompts (e.g., "Press E to Upload")
  */
 
-import { THEME } from "../theme.js";
-
-export type ActionType = 
-  | "upload"      // Carrier near terminal
-  | "decrypt"     // Non-carrier near uploaded terminal
-  | "pickup"      // Near dropped spike
-  | "uploading"   // Currently uploading (show progress)
-  | "decrypting"  // Currently decrypting (show progress)
-  | null;         // No action available
+export type ActionType =
+  | "upload"
+  | "decrypt"
+  | "pickup"
+  | "uploading"
+  | "decrypting"
+  | null;
 
 export interface ActionPromptState {
   action: ActionType;
   terminalId?: "A" | "B";
-  progress?: number; // 0-100
+  progress?: number;
 }
 
 export class ActionPrompt {
@@ -24,24 +22,7 @@ export class ActionPrompt {
 
   constructor() {
     this.container = document.createElement("div");
-    this.container.style.cssText = `
-      position: fixed;
-      bottom: 25%;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 24px;
-      background: ${THEME.hudBg};
-      border: 1px solid ${THEME.panelBorder};
-      border-radius: 3px;
-      font-family: ${THEME.font};
-      font-size: 16px;
-      color: ${THEME.paper};
-      text-align: center;
-      pointer-events: none;
-      z-index: 200;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-      display: none;
-    `;
+    this.container.className = "cr-action-prompt";
     document.body.appendChild(this.container);
   }
 
@@ -52,112 +33,42 @@ export class ActionPrompt {
     }
 
     this.container.style.display = "block";
-
-    let html = "";
-    const keyStyle = `
-      display: inline-block;
-      background: ${THEME.ink};
-      border: 1px solid ${THEME.accent};
-      border-radius: 3px;
-      padding: 4px 12px;
-      margin: 0 4px;
-      font-weight: bold;
-      color: ${THEME.accent};
-    `;
+    const key = `<span class="cr-action-prompt__key">E</span>`;
+    const site = state.terminalId ?? "";
 
     switch (state.action) {
       case "upload":
-        this.container.style.borderColor = THEME.danger;
-        html = `
-          <div style="color: ${THEME.danger}; font-weight: bold; margin-bottom: 6px;">
-            TERMINAL ${state.terminalId || ""}
-          </div>
-          <div>
-            Hold <span style="${keyStyle}">E</span> to <span style="color: ${THEME.danger};">UPLOAD DATA SPIKE</span>
-          </div>
-        `;
+        this.container.innerHTML = `
+          <div class="cr-hud-label">Spike pickup · Terminal ${site}</div>
+          <div>Hold ${key} to upload</div>`;
         break;
-
       case "decrypt":
-        this.container.style.borderColor = THEME.teammate;
-        html = `
-          <div style="color: ${THEME.danger}; font-weight: bold; margin-bottom: 6px;">
-            SPIKE ACTIVE - TERMINAL ${state.terminalId || ""}
-          </div>
-          <div>
-            Hold <span style="${keyStyle}">E</span> to <span style="color: ${THEME.teammate};">DECRYPT SPIKE</span>
-          </div>
-        `;
+        this.container.innerHTML = `
+          <div class="cr-hud-label">Spike live · Terminal ${site}</div>
+          <div>Hold ${key} to decrypt</div>`;
         break;
-
       case "pickup":
-        this.container.style.borderColor = THEME.accent;
-        html = `
-          <div style="color: ${THEME.accent}; font-weight: bold; margin-bottom: 6px;">
-            SPIKE DROPPED
-          </div>
-          <div>
-            Press <span style="${keyStyle}">E</span> to <span style="color: ${THEME.accent};">ACQUIRE SPIKE</span>
-          </div>
-        `;
+        this.container.innerHTML = `
+          <div class="cr-hud-label">Spike dropped</div>
+          <div>Press ${key} to pick up</div>`;
         break;
-
-      case "uploading":
-        this.container.style.borderColor = THEME.danger;
+      case "uploading": {
         const uploadProgress = state.progress || 0;
-        html = `
-          <div style="color: ${THEME.danger}; font-weight: bold; margin-bottom: 8px;">
-            UPLOADING... ${Math.floor(uploadProgress)}%
-          </div>
-          <div style="
-            background: ${THEME.ink};
-            height: 8px;
-            width: 200px;
-            border-radius: 3px;
-            overflow: hidden;
-          ">
-            <div style="
-              background: ${THEME.danger};
-              height: 100%;
-              width: ${uploadProgress}%;
-              transition: width 0.1s;
-            "></div>
-          </div>
-          <div style="margin-top: 8px; font-size: 12px; color: ${THEME.muted};">
-            Release E to cancel
-          </div>
-        `;
+        this.container.innerHTML = `
+          <div class="cr-hud-label">Upload ${Math.floor(uploadProgress)}%</div>
+          <div class="cr-action-prompt__bar"><div class="cr-action-prompt__fill" style="width:${uploadProgress}%"></div></div>
+          <div class="cr-hud-label" style="margin-top:8px">Release E to cancel</div>`;
         break;
-
-      case "decrypting":
-        this.container.style.borderColor = THEME.teammate;
+      }
+      case "decrypting": {
         const decryptProgress = state.progress || 0;
-        html = `
-          <div style="color: ${THEME.teammate}; font-weight: bold; margin-bottom: 8px;">
-            DECRYPTING... ${Math.floor(decryptProgress)}%
-          </div>
-          <div style="
-            background: ${THEME.ink};
-            height: 8px;
-            width: 200px;
-            border-radius: 3px;
-            overflow: hidden;
-          ">
-            <div style="
-              background: ${THEME.teammate};
-              height: 100%;
-              width: ${decryptProgress}%;
-              transition: width 0.1s;
-            "></div>
-          </div>
-          <div style="margin-top: 8px; font-size: 12px; color: ${THEME.muted};">
-            Release E to cancel
-          </div>
-        `;
+        this.container.innerHTML = `
+          <div class="cr-hud-label">Decrypt ${Math.floor(decryptProgress)}%</div>
+          <div class="cr-action-prompt__bar"><div class="cr-action-prompt__fill" style="width:${decryptProgress}%;background:var(--cr-sentinel)"></div></div>
+          <div class="cr-hud-label" style="margin-top:8px">Release E to cancel</div>`;
         break;
+      }
     }
-
-    this.container.innerHTML = html;
   }
 
   hide(): void {

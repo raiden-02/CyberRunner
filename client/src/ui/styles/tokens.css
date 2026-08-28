@@ -1,0 +1,36 @@
+:root {
+  --cr-bg: #07090d;
+  --cr-surface: #0e141c;
+  --cr-surface-raised: #151c26;
+  --cr-border: #2a3848;
+  --cr-text: #e8eef4;
+  --cr-text-muted: #8a9aab;
+  --cr-accent: #5ec8d8;
+  --cr-accent-strong: #3eb4c8;
+  --cr-accent-dim: rgba(94, 200, 216, 0.14);
+  --cr-warning: #e0a04a;
+  --cr-danger: #d4544a;
+  --cr-ghost: #e08a5a;
+  --cr-sentinel: #4ec4c8;
+  --cr-overlay: rgba(7, 9, 13, 0.82);
+  --cr-hud-bg: rgba(8, 12, 18, 0.55);
+  --cr-space-1: 4px;
+  --cr-space-2: 8px;
+  --cr-space-3: 12px;
+  --cr-space-4: 16px;
+  --cr-space-5: 24px;
+  --cr-space-6: 32px;
+  --cr-radius: 2px;
+  --cr-notch: 12px;
+  --cr-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --cr-glow: 0 0 16px rgba(94, 200, 216, 0.18);
+  --cr-motion: 180ms;
+  --cr-font: "Segoe UI", system-ui, sans-serif;
+  --cr-font-display: "Segoe UI", system-ui, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --cr-motion: 1ms;
+  }
+}

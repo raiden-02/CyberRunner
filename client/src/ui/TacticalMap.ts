@@ -15,10 +15,10 @@ export type TacticalMapState = {
 };
 
 const SOLID_COLOR: Record<string, string> = {
-  unchanged: "#6a6458",
-  added: "#d4893a",
-  removed: "#c45c3a",
-  changed: "#e8b86a",
+  unchanged: "#3a4654",
+  added: "#5ec8d8",
+  removed: "#d4544a",
+  changed: "#e0a04a",
 };
 
 export class TacticalMap {
@@ -85,7 +85,7 @@ export class TacticalMap {
     }
 
     for (const obj of state.map.objectives) {
-      ctx.strokeStyle = obj.id === "A" ? "#d4893a" : "#4a8b8a";
+      ctx.strokeStyle = obj.id === "A" ? THEME.warning : THEME.sentinels;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(toX(obj.x), toY(obj.z), Math.max(6, toW(obj.radius)), 0, Math.PI * 2);
@@ -103,8 +103,8 @@ export class TacticalMap {
     }
 
     if (state.hotspot) {
-      ctx.strokeStyle = "#ede6d9";
-      ctx.fillStyle = "rgba(237, 230, 217, 0.18)";
+      ctx.strokeStyle = THEME.paper;
+      ctx.fillStyle = "rgba(232, 238, 244, 0.14)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(toX(state.hotspot.x), toY(state.hotspot.z), 9, 0, Math.PI * 2);

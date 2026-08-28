@@ -1,23 +1,26 @@
 /**
- * Afterhours district: sodium streetlight, wet concrete, copper hardware.
- * One warm accent. Cool grey floors. Dark gunmetal weapons so they read against the ground.
+ * CyberRunner UI: graphite tactical sci-fi.
+ * Cool panels. Cyan information. Amber action. Coral Ghosts / teal Sentinels.
+ * Keep WORLD values for in-level materials. Menu/HUD uses THEME.
  */
 export const THEME = {
   font: `'Segoe UI', system-ui, sans-serif`,
-  overlay: "rgba(22, 20, 17, 0.88)",
-  panel: "#241f1a",
-  panelBorder: "#4a433a",
-  paper: "#ede6d9",
-  muted: "#9a9286",
-  accent: "#d4893a",
-  accentDim: "rgba(212, 137, 58, 0.18)",
-  accentHover: "rgba(212, 137, 58, 0.32)",
-  ink: "#1a1814",
-  teammate: "#4a8b8a",
-  danger: "#c45c3a",
-  ghosts: "#c45c3a",
-  sentinels: "#4a8b8a",
-  hudBg: "rgba(26, 24, 20, 0.88)",
+  overlay: "rgba(7, 9, 13, 0.82)",
+  panel: "#0e141c",
+  panelRaised: "#151c26",
+  panelBorder: "#2a3848",
+  paper: "#e8eef4",
+  muted: "#8a9aab",
+  accent: "#5ec8d8",
+  accentDim: "rgba(94, 200, 216, 0.14)",
+  accentHover: "rgba(94, 200, 216, 0.28)",
+  ink: "#07090d",
+  teammate: "#4ec4c8",
+  danger: "#d4544a",
+  warning: "#e0a04a",
+  ghosts: "#e08a5a",
+  sentinels: "#4ec4c8",
+  hudBg: "rgba(8, 12, 18, 0.55)",
 } as const;
 
 export const WORLD = {

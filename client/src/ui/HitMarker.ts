@@ -11,7 +11,7 @@ interface HitMarkerConfig {
 const DEFAULT_CONFIG: HitMarkerConfig = {
   normalColor: "#ffffff",
   headshotColor: "#c45c3a",
-  killColor: "#d4893a",
+  killColor: "#e0a04a",
   size: 24,
   duration: 150,
 };

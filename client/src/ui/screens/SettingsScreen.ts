@@ -38,11 +38,7 @@ export class SettingsScreen extends BaseScreen {
     this.pendingKeybindsAlt = settings.getKeybindsAlt();
     this.pendingGraphics = settings.getGraphics();
     
-    this.panel = this.createPanel("700px");
-    this.panel.style.maxHeight = "80vh";
-    this.panel.style.overflow = "hidden";
-    this.panel.style.display = "flex";
-    this.panel.style.flexDirection = "column";
+    this.panel = this.createPanel("cr-settings");
     
     const title = this.createTitle("Settings");
     this.panel.appendChild(title);
@@ -77,11 +73,8 @@ export class SettingsScreen extends BaseScreen {
 
   private createTabBar(): HTMLDivElement {
     const tabBar = document.createElement("div");
-    tabBar.style.cssText = `
-      display: flex;
-      border-bottom: 2px solid #4a433a;
-      margin-bottom: 16px;
-    `;
+    tabBar.className = "cr-tabs";
+    tabBar.style.marginBottom = "16px";
     
     const controlsTab = this.createTab("Controls", "controls");
     const graphicsTab = this.createTab("Graphics", "graphics");
@@ -117,8 +110,8 @@ export class SettingsScreen extends BaseScreen {
     const tabs = this.tabBar.querySelectorAll("button");
     tabs.forEach((tab) => {
       const isActive = tab.dataset.tabId === tabId;
-      tab.style.color = isActive ? "#d4893a" : "#aaa";
-      tab.style.borderBottomColor = isActive ? "#d4893a" : "transparent";
+      tab.style.color = isActive ? "#5ec8d8" : "#aaa";
+      tab.style.borderBottomColor = isActive ? "#5ec8d8" : "transparent";
     });
     
     this.controlsContent.style.display = tabId === "controls" ? "block" : "none";
@@ -130,7 +123,7 @@ export class SettingsScreen extends BaseScreen {
     
     const keybindsHeader = document.createElement("h3");
     keybindsHeader.textContent = "Keybinds";
-    keybindsHeader.style.cssText = "color: #d4893a; margin: 0 0 12px 0; font-size: 16px;";
+    keybindsHeader.style.cssText = "color: #5ec8d8; margin: 0 0 12px 0; font-size: 16px;";
     content.appendChild(keybindsHeader);
     
     const headerRow = document.createElement("div");
@@ -185,7 +178,7 @@ export class SettingsScreen extends BaseScreen {
     
     const sensitivityHeader = document.createElement("h3");
     sensitivityHeader.textContent = "Sensitivity";
-    sensitivityHeader.style.cssText = "color: #d4893a; margin: 0 0 12px 0; font-size: 16px;";
+    sensitivityHeader.style.cssText = "color: #5ec8d8; margin: 0 0 12px 0; font-size: 16px;";
     content.appendChild(sensitivityHeader);
     
     content.appendChild(this.createSliderRow("Mouse Sensitivity", "mouseSensitivity", 0.1, 2.0, 0.1));
@@ -221,9 +214,9 @@ export class SettingsScreen extends BaseScreen {
         width: 90px;
         padding: 8px 12px;
         background: rgba(0, 255, 255, 0.1);
-        border: 1px solid #d4893a;
+        border: 1px solid #5ec8d8;
         border-radius: 4px;
-        color: #d4893a;
+        color: #5ec8d8;
         text-align: center;
         cursor: pointer;
         transition: all 0.2s;
@@ -313,8 +306,8 @@ export class SettingsScreen extends BaseScreen {
     
     keyDisplay.textContent = settings.getKeyDisplayName(code);
     keyDisplay.style.background = "rgba(0, 255, 255, 0.1)";
-    keyDisplay.style.borderColor = "#d4893a";
-    keyDisplay.style.color = "#d4893a";
+    keyDisplay.style.borderColor = "#5ec8d8";
+    keyDisplay.style.color = "#5ec8d8";
     row.style.borderColor = "transparent";
     
     this.rebindingAction = null;
@@ -337,8 +330,8 @@ export class SettingsScreen extends BaseScreen {
     const keyValue = slot === "primary" ? this.pendingKeybinds[action] : this.pendingKeybindsAlt[action];
     keyDisplay.textContent = settings.getKeyDisplayName(keyValue);
     keyDisplay.style.background = "rgba(0, 255, 255, 0.1)";
-    keyDisplay.style.borderColor = "#d4893a";
-    keyDisplay.style.color = "#d4893a";
+    keyDisplay.style.borderColor = "#5ec8d8";
+    keyDisplay.style.color = "#5ec8d8";
     row.style.borderColor = "transparent";
     
     this.rebindingAction = null;
@@ -359,15 +352,15 @@ export class SettingsScreen extends BaseScreen {
       if (primaryDisplay && action) {
         const key = this.pendingKeybinds[action];
         primaryDisplay.textContent = settings.getKeyDisplayName(key);
-        primaryDisplay.style.borderColor = "#d4893a";
-        primaryDisplay.style.color = "#d4893a";
+        primaryDisplay.style.borderColor = "#5ec8d8";
+        primaryDisplay.style.color = "#5ec8d8";
       }
       
       if (secondaryDisplay && action) {
         const key = this.pendingKeybindsAlt[action];
         secondaryDisplay.textContent = settings.getKeyDisplayName(key);
-        secondaryDisplay.style.borderColor = "#d4893a";
-        secondaryDisplay.style.color = "#d4893a";
+        secondaryDisplay.style.borderColor = "#5ec8d8";
+        secondaryDisplay.style.color = "#5ec8d8";
       }
     }
   }
@@ -441,10 +434,10 @@ export class SettingsScreen extends BaseScreen {
     toggle.textContent = isOn ? "ON" : "OFF";
     toggle.style.cssText = `
       padding: 8px 20px;
-      border: 2px solid ${isOn ? "#d4893a" : "#666"};
+      border: 2px solid ${isOn ? "#5ec8d8" : "#666"};
       border-radius: 4px;
       background: ${isOn ? "rgba(0, 255, 255, 0.2)" : "transparent"};
-      color: ${isOn ? "#d4893a" : "#aaa"};
+      color: ${isOn ? "#5ec8d8" : "#aaa"};
       cursor: pointer;
       min-width: 60px;
     `;
@@ -479,7 +472,7 @@ export class SettingsScreen extends BaseScreen {
     
     const valueEl = document.createElement("span");
     valueEl.className = `value-${key}`;
-    valueEl.style.color = "#d4893a";
+    valueEl.style.color = "#5ec8d8";
     valueEl.textContent = String(this.pendingGraphics[key]);
     
     labelRow.appendChild(labelEl);
@@ -495,7 +488,7 @@ export class SettingsScreen extends BaseScreen {
     slider.className = `slider-${key}`;
     slider.style.cssText = `
       width: 100%;
-      accent-color: #d4893a;
+      accent-color: #5ec8d8;
     `;
     
     slider.addEventListener("input", () => {
@@ -592,9 +585,9 @@ export class SettingsScreen extends BaseScreen {
       if (toggle) {
         const isOn = this.pendingGraphics[key] as boolean;
         toggle.textContent = isOn ? "ON" : "OFF";
-        toggle.style.borderColor = isOn ? "#d4893a" : "#666";
+        toggle.style.borderColor = isOn ? "#5ec8d8" : "#666";
         toggle.style.background = isOn ? "rgba(0, 255, 255, 0.2)" : "transparent";
-        toggle.style.color = isOn ? "#d4893a" : "#aaa";
+        toggle.style.color = isOn ? "#5ec8d8" : "#aaa";
       }
     }
     

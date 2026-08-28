@@ -441,6 +441,7 @@ export class NetworkManager {
   }
 
   public sendSpikeAction(action: SpikeAction): void {
+    if (!this.gameplaySendable()) return;
     this.room?.send("spike_action", { action });
   }
 
