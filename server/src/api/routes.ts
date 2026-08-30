@@ -4,6 +4,7 @@ import { getDesignJobView } from "../arena-forge/design-jobs.js";
 import { getForgeQuotaStore } from "../arena-forge/forge-quota.js";
 import { admitLiveDesign, publicLiveCapability } from "../arena-forge/live-design-admission.js";
 import { resolveLiveForgePolicy } from "../arena-forge/live-forge-policy.js";
+import { resolveArenaForgeProviderConfig } from "../arena-forge/provider.js";
 import { recordedDemoView } from "../arena-forge/recorded-demo.js";
 import { listForgeCatalog, loadForgeMap } from "../arena-forge/preview.js";
 import { AuthService } from "../services/auth-service.js";
@@ -63,11 +64,13 @@ router.get("/arena-forge/capability", async (req: Request, res: Response) => {
       }
     }
   }
+  const provider = resolveArenaForgeProviderConfig();
   res.json(publicLiveCapability({
     liveAvailable: policy.runnable,
     accessMode: policy.mode,
     requiresSignIn: policy.requiresAuth,
     remainingRunsToday,
+    ...(provider.valid ? { provider: provider.provider, model: provider.model } : {}),
   }));
 });
 

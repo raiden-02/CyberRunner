@@ -73,9 +73,13 @@ While it is on: teal predicted capsule, orange server capsule, aim ray, last ser
 
 ArenaForge is a bounded AI level-design agent inside CyberRunner. It edits the game's real map structures, checks geometry/navigation/spawn/LOS deterministically, runs a seeded scripted playtest to observe route behavior, and can revise the map before launching the result into the real multiplayer runtime.
 
-**Demo flow:** Lobby → Arena Forge → recorded run → Play Result.
+**Recorded demo:** Lobby → Arena Forge → recorded run → Play Result. Works immediately. No model key.
 
-The recorded P5 run loads with no API key. Live design stays secondary and stays off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and `OPENAI_API_KEY` are both set.
+**Live local:** self-host with an OpenAI or Anthropic server credential. See [`docs/arena-forge-live.md`](docs/arena-forge-live.md).
+
+**Hosted live:** optional, authenticated and quota-backed, disabled unless configured.
+
+The recorded P5 run is existing OpenAI evaluation evidence. Live OpenAI and Anthropic adapters share the same tool loop. That is runtime compatibility, not a claim that the providers match.
 
 The cinematic camera is presentation only. The scripted playtest is an offline navigation proxy, not live GameRoom bots and not a balance score.
 
@@ -114,8 +118,12 @@ npm run dev:client
 | `NODE_ENV` | unset locally | `production` ignores god mode, unlimited ammo, and `apply_damage` |
 | `VITE_WS_URL` | unset | Force the client WebSocket URL |
 | `VITE_GOOGLE_CLIENT_ID` | unset | Google sign-in. Guest play works if this is unset |
-| `OPENAI_API_KEY` | unset | Server-only. ArenaForge live design |
-| `ARENA_FORGE_LIVE_AGENT_ENABLED` | unset | Must be `true` plus a key before Forge can start a live job |
+| `OPENAI_API_KEY` | unset | Server-only OpenAI key for live Forge. Never put this in client env |
+| `ANTHROPIC_API_KEY` | unset | Server-only Anthropic key for live Forge. Never put this in client env |
+| `ARENA_FORGE_PROVIDER` | `openai` | `openai` or `anthropic`. Server-only |
+| `ARENA_FORGE_LIVE_AGENT_ENABLED` | unset | Must be `true` plus the selected provider key before Forge can start a live job |
+
+Live local setup: [`docs/arena-forge-live.md`](docs/arena-forge-live.md). `npm run forge:doctor` checks configuration without calling a model.
 
 Copy `server/.env.example` to `server/.env` for the server. Copy `client/.env.example` to `client/.env.local` if you want local Vite overrides.
 

@@ -74,6 +74,8 @@ export type PublicDesignView = {
   playResultId?: string;
   revisionMaps: PublicArenaMapView[];
   revisionReplays?: PlaytestReplay[];
+  provider?: "openai" | "anthropic";
+  model?: string;
 };
 
 export function isDesignStartingMap(id: string): id is DesignStartingMapId {
@@ -158,6 +160,8 @@ export function viewFromAgentResult(args: {
   initialMap?: ArenaMap;
   revisionMaps?: PublicArenaMapView[];
   revisionReplays?: PlaytestReplay[];
+  provider?: "openai" | "anthropic";
+  model?: string;
 }): PublicDesignView {
   const records = args.result?.turns ?? args.turns ?? [];
   const turns = publicTurnsFromRecords(records);
@@ -202,6 +206,8 @@ export function viewFromAgentResult(args: {
     ...(args.playResultId ? { playResultId: args.playResultId } : {}),
     revisionMaps,
     ...(revisionReplays ? { revisionReplays } : {}),
+    ...(args.provider ? { provider: args.provider } : {}),
+    ...(args.model ? { model: args.model } : {}),
   };
 }
 
@@ -230,7 +236,7 @@ export function parseDemoCatalogId(catalogId: string): "initial" | "final" | und
 export function publicError(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) return "Design failed.";
-  if (/sk-[a-zA-Z0-9]|OPENAI_API_KEY|api[_-]?key/i.test(trimmed)) {
+  if (/sk-ant-|sk-[a-zA-Z0-9]|OPENAI_API_KEY|ANTHROPIC_API_KEY|api[_-]?key/i.test(trimmed)) {
     return "The model call failed.";
   }
   if (trimmed.length > 240) return `${trimmed.slice(0, 237)}...`;
@@ -239,7 +245,7 @@ export function publicError(message: string): string {
 
 export function assertNoSecrets(payload: unknown): void {
   const text = JSON.stringify(payload);
-  if (/sk-[a-zA-Z0-9]|OPENAI_API_KEY/i.test(text)) {
+  if (/sk-ant-|sk-[a-zA-Z0-9]|OPENAI_API_KEY|ANTHROPIC_API_KEY/i.test(text)) {
     throw new Error("payload contains a secret");
   }
 }

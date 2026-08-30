@@ -135,7 +135,7 @@ This is not a claim that P5 beats P2 or P3. It shows the agent can query the sim
 
 The lobby Forge screen runs this same P5 agent behind `POST /api/arena-forge/design`. Jobs are in-memory only. They disappear on server restart. At most one live job at a time.
 
-Live design is off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and a server-side `OPENAI_API_KEY` exist. The API never tells the client whether a key is present, only `liveAgentAvailable`.
+Live design is off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and the selected provider's server key exist. Capability may include provider and model names. It never includes keys. Local setup: [`docs/arena-forge-live.md`](../docs/arena-forge-live.md).
 
 A sanitized copy of the development run lives at `server/fixtures/arena-forge/p5-demo.json`. Load it from Forge as **Recorded P5 demo**. No API key required.
 

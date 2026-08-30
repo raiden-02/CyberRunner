@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { getGameplayMap } from "@shared/world/map-registry.js";
 import { evaluateArena } from "./evaluator.js";
 import { importGameplayMap } from "./import-map.js";
-import { readOpenAIApiKey } from "./one-shot.js";
 import {
   compactP0,
   DESIGN_BRIEF_MAX,
@@ -14,6 +13,7 @@ import {
   type PublicDesignView,
 } from "./design-view.js";
 import { runPlaytestAgentDesign, type PlaytestAgentTurnRecord } from "./playtest-agent.js";
+import { resolveArenaForgeProviderConfig, type ArenaForgeProvider } from "./provider.js";
 import type { ArenaEvaluation, ArenaMap } from "./types.js";
 import type { PlaytestAgentRunResult } from "./playtest-agent.js";
 
@@ -36,6 +36,8 @@ export type DesignJobRecord = {
   result?: PlaytestAgentRunResult;
   error?: string;
   createdAt: number;
+  provider?: ArenaForgeProvider;
+  providerModel?: string;
 };
 
 export type DesignJobDeps = {
@@ -53,7 +55,8 @@ export function resetDesignJobs(): void {
 }
 
 export function isLiveAgentAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.ARENA_FORGE_LIVE_AGENT_ENABLED === "true" && Boolean(readOpenAIApiKey(env));
+  const provider = resolveArenaForgeProviderConfig(env);
+  return env.ARENA_FORGE_LIVE_AGENT_ENABLED === "true" && provider.valid && provider.keyConfigured;
 }
 
 export function liveAgentGate(
@@ -66,7 +69,8 @@ export function liveAgentGate(
       error: "Live design is off on this server. Load the recorded P5 demo instead.",
     };
   }
-  if (!readOpenAIApiKey(env)) {
+  const provider = resolveArenaForgeProviderConfig(env);
+  if (!provider.valid || !provider.keyConfigured) {
     return {
       ok: false,
       status: 403,
@@ -81,8 +85,8 @@ export async function defaultLiveRunner(args: {
   brief: string;
   onTurn: (turn: PlaytestAgentTurnRecord) => void;
 }): Promise<PlaytestAgentRunResult> {
-  const { OpenAIPlaytestAgentSession } = await import("./openai-playtest-agent.js");
-  const session = new OpenAIPlaytestAgentSession();
+  const { createPlaytestAgentSession } = await import("./playtest-session-factory.js");
+  const session = createPlaytestAgentSession();
   return runPlaytestAgentDesign({
     map: args.map,
     brief: args.brief,
@@ -135,6 +139,8 @@ function jobView(job: DesignJobRecord): PublicDesignView {
         ? jobCatalogId(job.id, "final")
         : undefined,
     initialMap: job.initialMap,
+    provider: job.provider,
+    model: job.providerModel,
   });
 }
 
@@ -202,6 +208,7 @@ export function startDesignJob(
   const mapId = typeof input.mapId === "string" ? input.mapId : "";
   const initialMap = importGameplayMap(getGameplayMap(mapId));
   const id = (deps.createId ?? randomUUID)();
+  const provider = resolveArenaForgeProviderConfig();
   const job: DesignJobRecord = {
     id,
     status: "queued",
@@ -211,6 +218,7 @@ export function startDesignJob(
     initialEvaluation: evaluateArena(initialMap),
     turns: [],
     createdAt: Date.now(),
+    ...(provider.valid ? { provider: provider.provider, providerModel: provider.model } : {}),
   };
   jobs.set(id, job);
   activeJobId = id;

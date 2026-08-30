@@ -10,6 +10,29 @@ import {
   type PlaytestAgentStartInput,
   type PlaytestAgentToolFeedback,
 } from "./playtest-agent.js";
+import { publicProviderError } from "./provider.js";
+
+export type OpenAIResponsesCreateParams = {
+  model: string;
+  instructions: string;
+  tools: unknown;
+  tool_choice: "required";
+  parallel_tool_calls: false;
+  store: true;
+  input: string | Array<{ type: "function_call_output"; call_id?: string; output: string }>;
+  previous_response_id?: string;
+};
+
+export type OpenAIResponsesClient = {
+  responses: {
+    create(params: OpenAIResponsesCreateParams): Promise<{
+      id: string;
+      model?: string;
+      usage?: { input_tokens: number; output_tokens: number; total_tokens: number };
+      output?: Array<{ type: string }>;
+    }>;
+  };
+};
 
 function usageOf(response: { usage?: { input_tokens: number; output_tokens: number; total_tokens: number } }): TokenUsage | undefined {
   if (!response.usage) return undefined;
@@ -41,13 +64,17 @@ function callsFrom(output: Array<{ type: string }> | undefined): AgentToolCall[]
 /** P5 Responses session. Does not use the frozen P3 prompt. */
 export class OpenAIPlaytestAgentSession implements PlaytestAgentSession {
   readonly requestedModel: string;
-  private readonly client: OpenAI;
+  private readonly client: OpenAIResponsesClient;
   private previousResponseId: string | undefined;
 
-  constructor(opts?: { apiKey?: string; model?: string }) {
-    const key = opts?.apiKey ?? readOpenAIApiKey();
-    if (!key) throw new MissingOpenAIKeyError();
-    this.client = new OpenAI({ apiKey: key });
+  constructor(opts?: { apiKey?: string; model?: string; client?: OpenAIResponsesClient }) {
+    if (opts?.client) {
+      this.client = opts.client;
+    } else {
+      const key = opts?.apiKey ?? readOpenAIApiKey();
+      if (!key) throw new MissingOpenAIKeyError();
+      this.client = new OpenAI({ apiKey: key }) as unknown as OpenAIResponsesClient;
+    }
     this.requestedModel = opts?.model ?? resolveArenaForgeModel();
   }
 
@@ -76,15 +103,20 @@ export class OpenAIPlaytestAgentSession implements PlaytestAgentSession {
     previous_response_id?: string;
   }): Promise<AgentTurnDecision> {
     const started = Date.now();
-    const response = await this.client.responses.create({
-      model: this.requestedModel,
-      instructions: PLAYTEST_SYSTEM_PROMPT,
-      tools: PLAYTEST_FUNCTION_TOOLS,
-      tool_choice: "required",
-      parallel_tool_calls: false,
-      store: true,
-      ...body,
-    });
+    let response: Awaited<ReturnType<OpenAIResponsesClient["responses"]["create"]>>;
+    try {
+      response = await this.client.responses.create({
+        model: this.requestedModel,
+        instructions: PLAYTEST_SYSTEM_PROMPT,
+        tools: PLAYTEST_FUNCTION_TOOLS,
+        tool_choice: "required",
+        parallel_tool_calls: false,
+        store: true,
+        ...body,
+      });
+    } catch (err) {
+      throw new Error(publicProviderError(err));
+    }
     this.previousResponseId = response.id;
     return {
       responseId: response.id,

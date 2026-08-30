@@ -1,5 +1,17 @@
 import { diffArenaMapViews } from "@shared/world/arena-map-view.js";
 import {
+  DEFAULT_LIVE_BRIEF,
+  LIVE_DOCS_HREF,
+  LIVE_STARTING_MAP_ID,
+  LIVE_STARTING_MAP_LABEL,
+  LIVE_STARTING_MAP_NOTE,
+  liveCostCopy,
+  liveDisabledCopy,
+  liveLocalLinkLabel,
+  liveProviderLine,
+  liveRunBadge,
+} from "@shared/ui/forge-live-copy.js";
+import {
   api,
   type ForgeCatalogEntry,
   type ForgeDesignTurn,
@@ -53,10 +65,15 @@ export class ForgeScreen extends BaseScreen {
   private evidence!: HTMLDivElement;
   private playRow!: HTMLDivElement;
   private liveBox!: HTMLDivElement;
+  private liveForm!: HTMLDivElement;
+  private liveDisabled!: HTMLDivElement;
+  private liveProviderEl!: HTMLDivElement;
   private mapSelect!: HTMLSelectElement;
   private briefInput!: HTMLTextAreaElement;
   private runBtn!: HTMLButtonElement;
   private liveHint!: HTMLDivElement;
+  private liveProvider?: string;
+  private liveModel?: string;
   private inspectList!: HTMLDivElement;
   private errorDiv!: HTMLDivElement;
 
@@ -220,27 +237,60 @@ export class ForgeScreen extends BaseScreen {
     sum.style.cssText = summaryCss();
     details.appendChild(sum);
 
-    this.mapSelect = this.createSelect([{ value: "map-contract-smoke", label: "map-contract-smoke" }]);
-    details.appendChild(this.createLabel("Starting map"));
-    details.appendChild(this.mapSelect);
+    this.liveDisabled = document.createElement("div");
+    const disabledCopy = document.createElement("p");
+    disabledCopy.textContent = liveDisabledCopy();
+    disabledCopy.style.cssText = mutedBlock();
+    const localLink = document.createElement("a");
+    localLink.href = LIVE_DOCS_HREF;
+    localLink.target = "_blank";
+    localLink.rel = "noreferrer";
+    localLink.textContent = liveLocalLinkLabel();
+    localLink.style.cssText = `color: ${THEME.accent}; font-size: 13px;`;
+    this.liveDisabled.append(disabledCopy, localLink);
+    details.appendChild(this.liveDisabled);
 
-    details.appendChild(this.createLabel("Design brief"));
+    this.liveForm = document.createElement("div");
+    this.liveForm.appendChild(this.createLabel("Provider"));
+    this.liveProviderEl = document.createElement("div");
+    this.liveProviderEl.style.cssText = `color: ${THEME.paper}; font-size: 14px; margin: 0 0 12px 0;`;
+    this.liveForm.appendChild(this.liveProviderEl);
+
+    this.liveForm.appendChild(this.createLabel("Starting map"));
+    this.mapSelect = this.createSelect([{ value: LIVE_STARTING_MAP_ID, label: LIVE_STARTING_MAP_LABEL }]);
+    this.liveForm.appendChild(this.mapSelect);
+    const mapNote = document.createElement("div");
+    mapNote.textContent = LIVE_STARTING_MAP_NOTE;
+    mapNote.style.cssText = `color: ${THEME.muted}; font-size: 12px; margin: 4px 0 12px 0;`;
+    this.liveForm.appendChild(mapNote);
+
+    this.liveForm.appendChild(this.createLabel("Design brief"));
     this.briefInput = document.createElement("textarea");
     this.briefInput.maxLength = BRIEF_MAX;
     this.briefInput.rows = 3;
-    this.briefInput.placeholder =
-      "Use playtest evidence to make attacker routing less one-sided while keeping both sites reachable.";
+    this.briefInput.value = DEFAULT_LIVE_BRIEF;
     this.briefInput.className = "cr-field";
     this.briefInput.style.resize = "vertical";
-    details.appendChild(this.briefInput);
+    this.liveForm.appendChild(this.briefInput);
 
-    this.runBtn = this.createButton("Run ArenaForge", true);
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.textContent = "Reset sample";
+    reset.className = "cr-button cr-button--ghost";
+    reset.style.margin = "8px 0 12px 0";
+    reset.onclick = () => {
+      this.briefInput.value = DEFAULT_LIVE_BRIEF;
+    };
+    this.liveForm.appendChild(reset);
+
+    this.runBtn = this.createButton("Run live design", true);
     this.runBtn.onclick = () => void this.startLive();
-    details.appendChild(this.runBtn);
+    this.liveForm.appendChild(this.runBtn);
 
     this.liveHint = document.createElement("div");
     this.liveHint.style.cssText = mutedBlock();
-    details.appendChild(this.liveHint);
+    this.liveForm.appendChild(this.liveHint);
+    details.appendChild(this.liveForm);
     return details;
   }
 
@@ -264,6 +314,8 @@ export class ForgeScreen extends BaseScreen {
       this.liveAccessMode = cap.accessMode === "self_host" ? "self_host" : "hosted";
       this.liveRequiresSignIn = cap.requiresSignIn !== false;
       this.remainingRunsToday = cap.remainingRunsToday;
+      this.liveProvider = cap.provider;
+      this.liveModel = cap.model;
     } catch {
       this.liveAvailable = false;
     }
@@ -296,14 +348,14 @@ export class ForgeScreen extends BaseScreen {
     const quotaGone = this.remainingRunsToday === 0;
     const needsSignIn =
       this.liveRequiresSignIn && this.remainingRunsToday === undefined && this.liveAvailable;
+    this.liveDisabled.style.display = this.liveAvailable ? "none" : "block";
+    this.liveForm.style.display = this.liveAvailable ? "block" : "none";
+    this.liveProviderEl.textContent = liveProviderLine(this.liveProvider, this.liveModel);
     this.runBtn.disabled = !this.liveAvailable || this.busy || quotaGone || needsSignIn;
     this.runBtn.style.opacity = this.runBtn.disabled ? "0.55" : "1";
     this.runBtn.style.cursor = this.runBtn.disabled ? "default" : "pointer";
     if (!this.liveAvailable) {
-      this.liveHint.textContent =
-        this.liveAccessMode === "hosted"
-          ? "Live design is unavailable. The recorded demo stays available."
-          : "Live design is unavailable on this server. The recorded run remains playable.";
+      this.liveHint.textContent = "";
       return;
     }
     if (needsSignIn) {
@@ -315,8 +367,8 @@ export class ForgeScreen extends BaseScreen {
       return;
     }
     this.liveHint.textContent = this.liveRequiresSignIn
-      ? "Live design uses the server's configured model key. Sign in required."
-      : "Live design uses the server's configured model key.";
+      ? `${liveCostCopy()} Sign in required.`
+      : liveCostCopy();
   }
 
   private async startLive(): Promise<void> {
@@ -438,7 +490,10 @@ export class ForgeScreen extends BaseScreen {
       return;
     }
 
-    this.sourceBadge.textContent = view.source === "recorded" ? "Recorded agent run" : "Live agent run";
+    this.sourceBadge.textContent =
+      view.source === "recorded"
+        ? "Recorded agent run"
+        : liveRunBadge(view.provider, view.model ?? view.modelRequested);
     this.sourceBadge.style.color = view.source === "live" ? THEME.accent : THEME.muted;
     this.briefEl.textContent = `Brief: ${view.brief}`;
     this.activity.textContent = forgeActivityText(view);

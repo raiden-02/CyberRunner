@@ -1,4 +1,4 @@
-import { readOpenAIApiKey } from "./one-shot.js";
+import { resolveArenaForgeProviderConfig } from "./provider.js";
 
 export type LiveAccessMode = "hosted" | "self_host";
 
@@ -19,7 +19,9 @@ export function resolveLiveForgePolicy(
   opts: { databaseAvailable: boolean } = { databaseAvailable: false },
 ): LiveForgePolicy {
   const mode = resolveLiveAccessMode(env);
-  const liveEnabled = env.ARENA_FORGE_LIVE_AGENT_ENABLED === "true" && Boolean(readOpenAIApiKey(env));
+  const provider = resolveArenaForgeProviderConfig(env);
+  const liveEnabled =
+    env.ARENA_FORGE_LIVE_AGENT_ENABLED === "true" && provider.valid && provider.keyConfigured;
 
   if (mode === "self_host") {
     return {

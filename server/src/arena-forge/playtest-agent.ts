@@ -83,6 +83,7 @@ export type PlaytestAgentToolFeedback = {
 };
 
 export interface PlaytestAgentSession {
+  readonly requestedModel?: string;
   start(input: PlaytestAgentStartInput): Promise<AgentTurnDecision>;
   continueWithTool(feedback: PlaytestAgentToolFeedback): Promise<AgentTurnDecision>;
 }

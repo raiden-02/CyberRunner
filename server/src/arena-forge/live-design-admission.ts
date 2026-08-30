@@ -11,6 +11,7 @@ import {
   type LiveAccessMode,
   type LiveForgePolicy,
 } from "./live-forge-policy.js";
+import type { ArenaForgeProvider } from "./provider.js";
 
 export type AdmitDesignResult =
   | { ok: true; status: 202; jobId: string }
@@ -98,6 +99,8 @@ export type PublicLiveCapability = {
   accessMode: LiveAccessMode;
   requiresSignIn: boolean;
   remainingRunsToday?: number;
+  provider?: ArenaForgeProvider;
+  model?: string;
 };
 
 export function publicLiveCapability(args?: {
@@ -105,6 +108,8 @@ export function publicLiveCapability(args?: {
   accessMode?: LiveAccessMode;
   requiresSignIn?: boolean;
   remainingRunsToday?: number;
+  provider?: ArenaForgeProvider;
+  model?: string;
 }): PublicLiveCapability {
   const accessMode = args?.accessMode ?? "hosted";
   const body: PublicLiveCapability = {
@@ -115,5 +120,7 @@ export function publicLiveCapability(args?: {
   if (typeof args?.remainingRunsToday === "number") {
     body.remainingRunsToday = args.remainingRunsToday;
   }
+  if (args?.provider) body.provider = args.provider;
+  if (args?.model) body.model = args.model;
   return body;
 }

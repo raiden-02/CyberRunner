@@ -28,6 +28,8 @@ export interface ForgeCapability {
   accessMode?: "hosted" | "self_host";
   requiresSignIn?: boolean;
   remainingRunsToday?: number;
+  provider?: "openai" | "anthropic";
+  model?: string;
 }
 
 export interface JoinResult {
@@ -166,6 +168,8 @@ export interface ForgeDesignView {
   playResultId?: string;
   revisionMaps?: ForgePublicMapView[];
   revisionReplays?: ForgePlaytestReplay[];
+  provider?: "openai" | "anthropic";
+  model?: string;
 }
 
 class ApiClient {

@@ -201,7 +201,7 @@ describe("live Forge admission", () => {
       requiresSignIn: true,
       remainingRunsToday: 1,
     });
-    expect(JSON.stringify(cap)).not.toMatch(/sk-|OPENAI|api[_-]?key/i);
+    expect(JSON.stringify(cap)).not.toMatch(/OPENAI_API_KEY|ANTHROPIC_API_KEY|sk-ant-|sk-[a-zA-Z0-9]/);
     expect(publicLiveCapability({ liveAvailable: false })).toEqual({
       liveAgentAvailable: false,
       accessMode: "hosted",
@@ -306,6 +306,27 @@ describe("live Forge admission", () => {
     if (next.ok) await waitForJob(next.jobId);
   });
 
+  it("admits self-host Anthropic live design without a user or quota store", async () => {
+    const policy = resolveLiveForgePolicy(
+      {
+        ARENA_FORGE_LIVE_AGENT_ENABLED: "true",
+        ANTHROPIC_API_KEY: "test-placeholder",
+        ARENA_FORGE_PROVIDER: "anthropic",
+        ARENA_FORGE_ACCESS_MODE: "self_host",
+      },
+      { databaseAvailable: false },
+    );
+    expect(policy.requiresAuth).toBe(false);
+    expect(policy.requiresQuota).toBe(false);
+
+    const result = await admitLiveDesign(
+      { brief: "Self-host Anthropic run.", mapId: "map-contract-smoke" },
+      { policy, deps: liveDeps() },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) await waitForJob(result.jobId);
+  });
+
   it("admits self-host live design without a user or quota store", async () => {
     const policy = resolveLiveForgePolicy(
       {
@@ -357,6 +378,25 @@ describe("live Forge admission", () => {
     release();
     const winner = first.ok ? first : second;
     if (winner.ok) await waitForJob(winner.jobId);
+  });
+
+  it("keeps hosted Anthropic behind sign-in and quota", async () => {
+    const policy = resolveLiveForgePolicy(
+      {
+        ARENA_FORGE_LIVE_AGENT_ENABLED: "true",
+        ARENA_FORGE_PROVIDER: "anthropic",
+        ANTHROPIC_API_KEY: "test-placeholder",
+      },
+      { databaseAvailable: true },
+    );
+    expect(policy.requiresAuth).toBe(true);
+    expect(policy.requiresQuota).toBe(true);
+    const result = await admitLiveDesign(
+      { brief: "Hosted Anthropic.", mapId: "map-contract-smoke" },
+      { policy, deps: liveDeps() },
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(401);
   });
 
   it("does not treat a missing database as self-host", async () => {

@@ -35,16 +35,22 @@ systemd reads `/opt/CyberRunner/server.env`. Local `npm run dev:server` reads `s
 
 ### ArenaForge (optional)
 
-Leave live design off on the public site unless you intend to pay for server-owned inference. The recorded demo works with no key.
+Leave live design off on the public site unless you intend to pay for server-owned inference. The recorded demo works with no key. Recommended public production config is recorded demo only (`ARENA_FORGE_LIVE_AGENT_ENABLED` unset or `false`).
+
+If you enable hosted live, the selected provider's server key plus existing auth and quota policy apply. Visitors never paste a provider key.
 
 | Variable | Production | Notes |
 |----------|------------|--------|
-| `OPENAI_API_KEY` | unset | Server-owned key only. Never put this in browser JavaScript or a public UI |
-| `ARENA_FORGE_MODEL` | unset | Default if unset: `gpt-5.6` |
-| `ARENA_FORGE_LIVE_AGENT_ENABLED` | unset / `false` | Must be exactly `true` and a key must exist |
-| `ARENA_FORGE_ACCESS_MODE` | `hosted` or omit | `hosted` is the safe public default. `self_host` is an explicit private-server opt-in |
+| `OPENAI_API_KEY` | unset | Server-owned OpenAI key. Never put this in browser JavaScript or a public UI |
+| `ANTHROPIC_API_KEY` | unset | Server-owned Anthropic key. Never put this in browser JavaScript or a public UI |
+| `ARENA_FORGE_PROVIDER` | `openai` or omit | `openai` or `anthropic`. One process, one provider |
+| `ARENA_FORGE_MODEL` | unset | OpenAI default `gpt-5.6`. Anthropic default `claude-sonnet-5` |
+| `ARENA_FORGE_LIVE_AGENT_ENABLED` | unset / `false` | Must be exactly `true` and the selected provider key must exist |
+| `ARENA_FORGE_ACCESS_MODE` | `hosted` or omit | `hosted` is the safe public default. Do not use `self_host` on the public internet |
 | `ARENA_FORGE_USER_DAILY_LIMIT` | `1` | Hosted mode only. Successful live starts per signed-in user per UTC day |
 | `ARENA_FORGE_GLOBAL_DAILY_LIMIT` | `10` | Hosted mode only. Successful live starts on this server per UTC day |
+
+Local live setup for both providers: [`docs/arena-forge-live.md`](../docs/arena-forge-live.md).
 
 ## Public hosted
 
@@ -53,16 +59,18 @@ Caddy
   -> Node
   -> Postgres
   -> Google sign-in
-  -> server-owned OpenAI key
+  -> server-owned OpenAI or Anthropic key
   -> quota
 ```
 
-Recommended public mode: `hosted` (or omit `ARENA_FORGE_ACCESS_MODE`).
+Recommended public mode: `hosted` (or omit `ARENA_FORGE_ACCESS_MODE`) with live disabled.
+
+Do not recommend public `self_host`. Anyone who can reach that live-design endpoint can consume the configured model account.
 
 Hosted live design needs all of:
 
 * `ARENA_FORGE_LIVE_AGENT_ENABLED=true`
-* server-owned `OPENAI_API_KEY`
+* the selected provider's server key (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`)
 * `DATABASE_URL` (quota rows in `arena_forge_usage`)
 * Google sign-in (persistent user id)
 * per-user and global daily caps
@@ -74,23 +82,23 @@ If the database is down, `liveAgentAvailable` is false and live design fails clo
 
 ```text
 Node
-  -> server-side OpenAI key
+  -> server-side OpenAI or Anthropic key
   -> ARENA_FORGE_ACCESS_MODE=self_host
 ```
 
-Require all three:
+Require all of:
 
 * `ARENA_FORGE_LIVE_AGENT_ENABLED=true`
-* `OPENAI_API_KEY=...`
 * `ARENA_FORGE_ACCESS_MODE=self_host`
+* `ARENA_FORGE_PROVIDER=openai` plus `OPENAI_API_KEY=...`, or `ARENA_FORGE_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY=...`
 
 Then live design does not need Google sign-in or Postgres. One active job, brief/map validation, and the P5 edit/model/playtest budgets still apply. The key stays on the server.
 
-Use this only on a server you control. Anyone who can reach the live-design endpoint can consume the configured server key. For a publicly exposed deployment, use `hosted`.
+Use this only on a server you control. Anyone who can reach the live-design endpoint can consume the configured model account. For a publicly exposed deployment, use `hosted` and keep live off unless you want paid inference behind auth and quota.
 
 Google and Postgres can still be configured if you want user accounts for other features. They are not required solely for live Forge in self-host mode.
 
-Never put an OpenAI key in browser JavaScript, a form, or localStorage. There is no browser BYOK.
+Never put a provider key in browser JavaScript, a form, or localStorage. There is no browser BYOK.
 
 Client build-time vars (set when you run `npm run build`):
 
