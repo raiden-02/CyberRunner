@@ -33,3 +33,10 @@ notes/
 scratch/
 .scratch/
 server/.arena-forge-results/
+.arena-forge-results/
+coverage/
+playwright-report/
+test-results/
+*.png.tmp
+*.webm
+*.har

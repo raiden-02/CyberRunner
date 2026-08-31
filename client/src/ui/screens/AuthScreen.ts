@@ -120,7 +120,7 @@ export class AuthScreen extends BaseScreen {
     container.replaceChildren();
 
     if (import.meta.env.DEV) {
-      const devBtn = this.createButton("Dev Mode (Skip Auth)", false);
+      const devBtn = this.createButton("Skip sign-in (local)", false);
       devBtn.onclick = () => this.handleDevMode();
       container.appendChild(devBtn);
     }

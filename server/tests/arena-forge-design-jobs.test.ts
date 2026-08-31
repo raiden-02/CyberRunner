@@ -68,7 +68,7 @@ describe("P6 A feature disabled", () => {
     expect(started.ok).toBe(false);
     if (started.ok) return;
     expect(started.status).toBe(403);
-    expect(started.error).toMatch(/recorded P5 demo/i);
+    expect(started.error).toMatch(/recorded run is still available/i);
     expect(liveAgentCapability({ isLiveAvailable: () => false })).toEqual({ liveAgentAvailable: false });
   });
 });

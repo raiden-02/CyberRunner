@@ -14,13 +14,13 @@ describe("forge doctor", () => {
     );
     expect(report.ok).toBe(true);
     const text = report.lines.join("\n");
-    expect(text).toMatch(/Access mode: self_host/);
+    expect(text).toMatch(/Mode: self_host/);
     expect(text).toMatch(/Provider: OpenAI/);
     expect(text).toMatch(/Model: gpt-5\.6/);
-    expect(text).toMatch(/Provider key: configured/);
+    expect(text).toMatch(/Key: configured/);
     expect(text).toMatch(/Database: not required/);
-    expect(text).toMatch(/Live flag: enabled/);
-    expect(text).toMatch(/Live design configuration is ready/);
+    expect(text).toMatch(/Live: enabled/);
+    expect(text).toMatch(/Live design: ready/);
     expect(text).not.toMatch(/sk-secret-should-never-print/);
     expect(text).not.toMatch(/sk-secret/);
   });
@@ -65,7 +65,7 @@ describe("forge doctor", () => {
     );
     expect(report.ok).toBe(false);
     const text = report.lines.join("\n");
-    expect(text).toMatch(/Access mode: hosted/);
+    expect(text).toMatch(/Mode: hosted/);
     expect(text).toMatch(/Database: missing/);
     expect(text).toMatch(/Quota: required/);
     expect(text).toMatch(/Hosted mode requires database-backed quota storage/);

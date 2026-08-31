@@ -250,7 +250,11 @@ export class LobbyScreen extends BaseScreen {
     const secondary = this.user.secondaryWeaponId?.replace("_1", "") || "PISTOL";
     this.playerInfo.replaceChildren();
     const name = document.createElement("div");
-    name.innerHTML = `<strong>${this.user.displayName || "Player"}</strong><div>${primary} / ${secondary}</div>`;
+    const strong = document.createElement("strong");
+    strong.textContent = this.user.displayName || "Player";
+    const loadout = document.createElement("div");
+    loadout.textContent = `${primary} / ${secondary}`;
+    name.append(strong, loadout);
     const edit = this.createButton("Edit", false);
     edit.classList.add("cr-button--inline");
     edit.onclick = () => this.onEditProfile();

@@ -74,7 +74,13 @@ export class HUD {
       return;
     }
     this.roomInfoElement.style.display = "block";
-    this.roomInfoElement.innerHTML = `<div class="cr-hud-label">Room</div><div>${this.joinCode} · ${this.playerCount}/${this.maxPlayers}</div>`;
+    this.roomInfoElement.replaceChildren();
+    const label = document.createElement("div");
+    label.className = "cr-hud-label";
+    label.textContent = "Room";
+    const value = document.createElement("div");
+    value.textContent = `${this.joinCode} · ${this.playerCount}/${this.maxPlayers}`;
+    this.roomInfoElement.append(label, value);
   }
 
   public setWeapon(weaponId: string): void {

@@ -10,15 +10,8 @@ import {
 } from "./playtest-agent.js";
 import { DEFAULT_ANTHROPIC_MODEL, publicProviderError, readAnthropicApiKey } from "./provider.js";
 
-export type AnthropicContentBlock = {
-  type: string;
-  id?: string;
-  name?: string;
-  input?: unknown;
-  text?: string;
-  tool_use_id?: string;
-  content?: string;
-};
+/** Opaque provider block. Extra fields (signature, redacted payload) stay intact. */
+export type AnthropicContentBlock = { type: string; [key: string]: unknown };
 
 export type AnthropicMessageParam = {
   role: "user" | "assistant";
@@ -70,19 +63,15 @@ function callsFrom(content: AnthropicContentBlock[]): AgentToolCall[] {
   for (const block of content) {
     if (block.type !== "tool_use") continue;
     calls.push({
-      name: block.name ?? "",
+      name: typeof block.name === "string" ? block.name : "",
       arguments: block.input,
-      callId: block.id,
+      callId: typeof block.id === "string" ? block.id : undefined,
     });
   }
   return calls;
 }
 
-function publicAssistantContent(content: AnthropicContentBlock[]): AnthropicContentBlock[] {
-  return content.filter((block) => block.type !== "thinking" && block.type !== "redacted_thinking");
-}
-
-/** Messages session. Same ArenaForge tools and prompt as the OpenAI adapter. */
+/** Anthropic Messages adapter for the playtest-driven design agent. */
 export class AnthropicPlaytestAgentSession implements PlaytestAgentSession {
   readonly requestedModel: string;
   private readonly client: AnthropicMessagesClient;
@@ -139,9 +128,11 @@ export class AnthropicPlaytestAgentSession implements PlaytestAgentSession {
       throw new Error(publicProviderError(err));
     }
 
+    // Round-trip the provider content unchanged. Thinking blocks are protocol
+    // state for Anthropic and must not be filtered or rebuilt.
     this.messages.push({
       role: "assistant",
-      content: publicAssistantContent(response.content),
+      content: response.content,
     });
 
     return {

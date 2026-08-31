@@ -50,39 +50,44 @@ export class Scoreboard {
       return a.id.localeCompare(b.id);
     });
 
-    const body = rows
-      .map((r) => {
-        const isLocal = r.id === localId;
-        const kd = r.deaths > 0 ? (r.kills / r.deaths).toFixed(2) : `${r.kills}.00`;
-        const name = isLocal ? `${r.displayName} (you)` : r.displayName;
-        const hp = r.isDead ? "Down" : String(r.health);
-        return `
-        <div class="cr-scoreboard__grid${isLocal ? " cr-scoreboard__you" : ""}">
-          <div>${name}</div>
-          <div>${r.score}</div>
-          <div>${r.kills}</div>
-          <div>${r.deaths}</div>
-          <div>${kd}</div>
-          <div>${hp}</div>
-        </div>`;
-      })
-      .join("");
+    this.element.replaceChildren();
+    const head = document.createElement("div");
+    head.className = "cr-scoreboard__head";
+    const title = document.createElement("div");
+    title.textContent = "Scoreboard";
+    const count = document.createElement("div");
+    count.textContent = `${rows.length} players`;
+    head.append(title, count);
 
-    this.element.innerHTML = `
-      <div class="cr-scoreboard__head">
-        <div>Scoreboard</div>
-        <div>${rows.length} players</div>
-      </div>
-      <div class="cr-scoreboard__grid cr-scoreboard__cols">
-        <div>Player</div>
-        <div>Score</div>
-        <div>K</div>
-        <div>D</div>
-        <div>K/D</div>
-        <div>HP</div>
-      </div>
-      ${body}
-    `;
+    const cols = document.createElement("div");
+    cols.className = "cr-scoreboard__grid cr-scoreboard__cols";
+    for (const label of ["Player", "Score", "K", "D", "K/D", "HP"]) {
+      const cell = document.createElement("div");
+      cell.textContent = label;
+      cols.appendChild(cell);
+    }
+
+    this.element.append(head, cols);
+    for (const r of rows) {
+      const isLocal = r.id === localId;
+      const row = document.createElement("div");
+      row.className = isLocal ? "cr-scoreboard__grid cr-scoreboard__you" : "cr-scoreboard__grid";
+      const kd = r.deaths > 0 ? (r.kills / r.deaths).toFixed(2) : `${r.kills}.00`;
+      const values = [
+        isLocal ? `${r.displayName} (you)` : r.displayName,
+        String(r.score),
+        String(r.kills),
+        String(r.deaths),
+        kd,
+        r.isDead ? "Down" : String(r.health),
+      ];
+      for (const value of values) {
+        const cell = document.createElement("div");
+        cell.textContent = value;
+        row.appendChild(cell);
+      }
+      this.element.appendChild(row);
+    }
   }
 
   destroy(): void {

@@ -35,7 +35,7 @@ systemd reads `/opt/CyberRunner/server.env`. Local `npm run dev:server` reads `s
 
 ### ArenaForge (optional)
 
-Leave live design off on the public site unless you intend to pay for server-owned inference. The recorded demo works with no key. Recommended public production config is recorded demo only (`ARENA_FORGE_LIVE_AGENT_ENABLED` unset or `false`).
+Keep live design off on the public site unless you intend to pay for server-owned inference. Set `ARENA_FORGE_LIVE_AGENT_ENABLED=false` or leave it unset. The recorded agent run works with no key.
 
 If you enable hosted live, the selected provider's server key plus existing auth and quota policy apply. Visitors never paste a provider key.
 

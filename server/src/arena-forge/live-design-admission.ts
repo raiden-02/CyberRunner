@@ -7,6 +7,7 @@ import {
 } from "./design-jobs.js";
 import type { ForgeQuotaStore } from "./forge-quota.js";
 import {
+  LIVE_DISABLED_MESSAGE,
   resolveLiveForgePolicy,
   type LiveAccessMode,
   type LiveForgePolicy,
@@ -57,7 +58,7 @@ export async function admitLiveDesign(
       return {
         ok: false,
         status: 403,
-        error: "Live design is off on this server. Load the recorded P5 demo instead.",
+        error: LIVE_DISABLED_MESSAGE,
       };
     }
   } else {

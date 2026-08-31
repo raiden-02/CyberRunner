@@ -1,12 +1,12 @@
-# ArenaForge P4-B evaluation
+# Interaction evaluation
 
-Interaction / revision stress suite. Separate from P4-A basic repair.
+Revision stress suite. Separate from the basic-repair evaluation.
 
-## Why P4-B exists
+Reproducibility: manifest `arena-forge-p4b-v1`.
 
-P4-A was a valid basic-recovery check. Both frozen modes scored 34/34 (100%). P3 feedback-responsive revision was 0/10 because almost every run was one edit then finish. That ceiling did not test evaluator-grounded revision.
+The basic-repair suite scored 34/34 (100%) on both arms. Almost every iterative run was one edit then finish, so it did not test evaluator-grounded revision.
 
-P4-B asks: when an edit that helps a target can change a guardrail, does the iterative agent recover or refine better than one-shot?
+This suite asks: when an edit that helps a target can change a guardrail, does the iterative agent recover or refine better than one-shot?
 
 ## P4-A (do not mix into P4-B percents)
 

@@ -16,6 +16,7 @@ import {
   runPlaytestAgentDesign,
   type PlaytestAgentStartInput,
 } from "../src/arena-forge/playtest-agent.js";
+import { compactP0, viewFromAgentResult } from "../src/arena-forge/design-view.js";
 import { createPlaytestAgentSession } from "../src/arena-forge/playtest-session-factory.js";
 import { ArenaWorkspace } from "../src/arena-forge/workspace.js";
 
@@ -141,33 +142,112 @@ describe("Anthropic playtest session adapter", () => {
     });
   });
 
-  it("does not store thinking blocks", async () => {
+  it("preserves Anthropic assistant blocks across tool turns", async () => {
+    const thinkingContent = [
+      {
+        type: "thinking",
+        thinking: "opaque-reasoning-fixture",
+        signature: "sig-fixture-aaa111",
+      },
+      {
+        type: "tool_use",
+        id: "toolu_1",
+        name: "finish_design",
+        input: { summary: "Done." },
+      },
+    ];
+    const redactedContent = [
+      {
+        type: "redacted_thinking",
+        data: "encrypted-redacted-fixture",
+        signature: "sig-fixture-bbb222",
+      },
+      {
+        type: "tool_use",
+        id: "toolu_2",
+        name: "finish_design",
+        input: { summary: "Still done." },
+      },
+    ];
+    const first = toolUseResult({ content: thinkingContent });
     const fake = fakeClient([
+      first,
+      toolUseResult({ id: "msg_2", content: redactedContent }),
       toolUseResult({
-        content: [
-          { type: "thinking", text: "hidden chain of thought" },
-          {
-            type: "tool_use",
-            id: "toolu_1",
-            name: "finish_design",
-            input: { summary: "Done." },
-          },
-        ],
-      }),
-      toolUseResult({
-        id: "msg_2",
-        content: [{ type: "tool_use", id: "toolu_2", name: "finish_design", input: { summary: "x" } }],
+        id: "msg_3",
+        content: [{ type: "tool_use", id: "toolu_3", name: "finish_design", input: { summary: "x" } }],
       }),
     ]);
     const session = new AnthropicPlaytestAgentSession({ client: fake.client });
-    await session.start(startInput());
+    const firstDecision = await session.start(startInput());
+    expect(firstDecision.calls).toEqual([
+      { name: "finish_design", arguments: { summary: "Done." }, callId: "toolu_1" },
+    ]);
+    expect(JSON.stringify(firstDecision)).not.toMatch(
+      /thinking|redacted_thinking|opaque-reasoning-fixture|sig-fixture|encrypted-redacted-fixture/,
+    );
+
     await session.continueWithTool({
       callId: "toolu_1",
       name: "finish_design",
       output: { ok: true } as never,
     });
-    const stored = fake.calls[1]!.messages[1];
-    expect(JSON.stringify(stored)).not.toMatch(/hidden chain of thought|thinking/);
+    expect(fake.calls[1]!.messages[1]).toEqual({
+      role: "assistant",
+      content: thinkingContent,
+    });
+    expect(fake.calls[1]!.messages[1]?.content).toEqual(first.content);
+
+    await session.continueWithTool({
+      callId: "toolu_2",
+      name: "finish_design",
+      output: { ok: true } as never,
+    });
+    expect(fake.calls[2]!.messages[3]).toEqual({
+      role: "assistant",
+      content: redactedContent,
+    });
+  });
+
+  it("keeps thinking blocks out of the public design view", async () => {
+    const fake = fakeClient([
+      toolUseResult({
+        content: [
+          {
+            type: "thinking",
+            thinking: "opaque-reasoning-fixture",
+            signature: "sig-fixture-aaa111",
+          },
+          {
+            type: "tool_use",
+            id: "toolu_1",
+            name: "finish_design",
+            input: { summary: "Finish after observing routes." },
+          },
+        ],
+      }),
+    ]);
+    const map = importGameplayMap(getGameplayMap("map-contract-smoke"));
+    const result = await runPlaytestAgentDesign({
+      map,
+      brief: "Finish.",
+      session: new AnthropicPlaytestAgentSession({ client: fake.client }),
+    });
+    const view = viewFromAgentResult({
+      jobId: "job-public",
+      source: "live",
+      startingMapId: "map-contract-smoke",
+      brief: "Finish.",
+      status: "completed",
+      result,
+      initialP0: compactP0(result.initialEvaluation),
+      playOriginalId: "job:job-public:initial",
+      playResultId: "job:job-public:final",
+      initialMap: map,
+    });
+    const publicText = JSON.stringify({ turns: result.turns, view });
+    expect(publicText).not.toMatch(/"type":"thinking"|redacted_thinking|opaque-reasoning-fixture|sig-fixture-aaa111/);
+    expect(view.turns[0]?.tool).toBe("finish_design");
   });
 
   it("does not silently repair multiple tool calls", async () => {

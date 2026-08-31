@@ -13,6 +13,7 @@ import {
   type PublicDesignView,
 } from "./design-view.js";
 import { runPlaytestAgentDesign, type PlaytestAgentTurnRecord } from "./playtest-agent.js";
+import { LIVE_DISABLED_MESSAGE } from "./live-forge-policy.js";
 import { resolveArenaForgeProviderConfig, type ArenaForgeProvider } from "./provider.js";
 import type { ArenaEvaluation, ArenaMap } from "./types.js";
 import type { PlaytestAgentRunResult } from "./playtest-agent.js";
@@ -66,7 +67,7 @@ export function liveAgentGate(
     return {
       ok: false,
       status: 403,
-      error: "Live design is off on this server. Load the recorded P5 demo instead.",
+      error: LIVE_DISABLED_MESSAGE,
     };
   }
   const provider = resolveArenaForgeProviderConfig(env);
@@ -173,7 +174,7 @@ export function validateDesignJobStart(
     return {
       ok: false,
       status: 403,
-      error: "Live design is off on this server. Load the recorded P5 demo instead.",
+      error: LIVE_DISABLED_MESSAGE,
     };
   }
 

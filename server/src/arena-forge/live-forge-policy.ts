@@ -1,5 +1,8 @@
 import { resolveArenaForgeProviderConfig } from "./provider.js";
 
+export const LIVE_DISABLED_MESSAGE =
+  "Live design is disabled on this server. The recorded run is still available.";
+
 export type LiveAccessMode = "hosted" | "self_host";
 
 export type LiveForgePolicy = {

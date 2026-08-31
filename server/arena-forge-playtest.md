@@ -1,6 +1,8 @@
-# ArenaForge P5 playtest
+# Scripted playtest and recorded agent run
 
 Seeded scripted-playtest proxy for ArenaForge. Offline design analysis. Not a GameRoom bot, not human play, not combat AI, not a balance score.
+
+The recorded agent run fixture is `server/fixtures/arena-forge/p5-demo.json`. The UI calls it the recorded agent run.
 
 ## What it measures
 
@@ -133,10 +135,10 @@ This is not a claim that P5 beats P2 or P3. It shows the agent can query the sim
 
 ## Forge workbench (P6)
 
-The lobby Forge screen runs this same P5 agent behind `POST /api/arena-forge/design`. Jobs are in-memory only. They disappear on server restart. At most one live job at a time.
+The lobby Forge screen runs this same playtest-driven agent behind `POST /api/arena-forge/design`. Jobs are in-memory only. They disappear on server restart. At most one live job at a time.
 
-Live design is off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and the selected provider's server key exist. Capability may include provider and model names. It never includes keys. Local setup: [`docs/arena-forge-live.md`](../docs/arena-forge-live.md).
+Live design stays off unless `ARENA_FORGE_LIVE_AGENT_ENABLED=true` and the selected provider's server key exist. Capability may include provider and model names. It never includes keys. Local setup: [`docs/arena-forge-live.md`](../docs/arena-forge-live.md).
 
-A sanitized copy of the development run lives at `server/fixtures/arena-forge/p5-demo.json`. Load it from Forge as **Recorded P5 demo**. No API key required.
+The recorded agent run loads with no API key.
 
 Same-seed playtest reports are deterministic. Pairing is strongest while the valid spawn and route sets stay the same. The simulator was not changed to address that.

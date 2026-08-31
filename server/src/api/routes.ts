@@ -3,7 +3,7 @@ import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js
 import { getDesignJobView } from "../arena-forge/design-jobs.js";
 import { getForgeQuotaStore } from "../arena-forge/forge-quota.js";
 import { admitLiveDesign, publicLiveCapability } from "../arena-forge/live-design-admission.js";
-import { resolveLiveForgePolicy } from "../arena-forge/live-forge-policy.js";
+import { LIVE_DISABLED_MESSAGE, resolveLiveForgePolicy } from "../arena-forge/live-forge-policy.js";
 import { resolveArenaForgeProviderConfig } from "../arena-forge/provider.js";
 import { recordedDemoView } from "../arena-forge/recorded-demo.js";
 import { listForgeCatalog, loadForgeMap } from "../arena-forge/preview.js";
@@ -87,7 +87,7 @@ router.post("/arena-forge/design", async (req: Request, res: Response) => {
   const policy = resolveLiveForgePolicy(process.env, { databaseAvailable: isDatabaseEnabled() });
   if (!policy.liveEnabled) {
     res.status(403).json({
-      error: "Live design is off on this server. Load the recorded P5 demo instead.",
+      error: LIVE_DISABLED_MESSAGE,
     });
     return;
   }

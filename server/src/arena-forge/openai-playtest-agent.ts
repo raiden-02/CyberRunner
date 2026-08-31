@@ -61,7 +61,7 @@ function callsFrom(output: Array<{ type: string }> | undefined): AgentToolCall[]
   return calls;
 }
 
-/** P5 Responses session. Does not use the frozen P3 prompt. */
+/** OpenAI Responses adapter for the playtest-driven design agent. */
 export class OpenAIPlaytestAgentSession implements PlaytestAgentSession {
   readonly requestedModel: string;
   private readonly client: OpenAIResponsesClient;

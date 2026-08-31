@@ -13,7 +13,7 @@ export function isShootHouseNeonMap(mapId: string): boolean {
 
 export type MapVisuals = {
   displayName: string;
-  skyboxPath?: string;
+  generatedSkybox?: boolean;
 };
 
 /** Shoot House has a custom theme. Every other registered map is unstyled. */
@@ -22,7 +22,7 @@ export function getMapVisuals(mapId: string): MapVisuals {
   if (isShootHouseNeonMap(map.id)) {
     return {
       displayName: "Shoot House Neon",
-      skyboxPath: "/skybox/cyberpunk",
+      generatedSkybox: true,
     };
   }
   return { displayName: map.name };

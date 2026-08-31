@@ -1,6 +1,8 @@
-# ArenaForge P4 evaluation
+# One-shot vs iterative evaluation
 
-Held-out comparison of the frozen one-shot designer (P2) and the frozen evaluator-grounded agent loop (P3).
+Held-out comparison of the frozen one-shot designer and the frozen evaluator-grounded iterative agent.
+
+Reproducibility: manifest `arena-forge-p4-v1`.
 
 ## Experiment contract
 
@@ -105,7 +107,7 @@ No held-out P3 run had a clear action → evaluator fact → later compensating 
 - P3 better: none
 - P2 better: none
 
-## Kill-gate verdict
+## Verdict
 
 **FAIL**
 

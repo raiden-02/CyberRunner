@@ -12,7 +12,7 @@ import { Minimap } from "../ui/Minimap.js";
 import { ActionPrompt } from "../ui/ActionPrompt.js";
 import { Skybox } from "../world/Skybox.js";
 import { WEAPON_RENDER_LAYER } from "../world/lighting/CyberpunkLighting.js";
-import { getGameplayMap, getMapVisuals, isShootHouseNeonMap } from "../world/maps/map-registry.js";
+import { getGameplayMap, getMapVisuals } from "../world/maps/map-registry.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { SHOOT_HOUSE_NEON_LIGHTING_CONFIG } from "../world/lighting/ShootHouseNeonLighting.js";
 import { TeamLobbyScreen } from "../ui/screens/TeamLobbyScreen.js";
@@ -539,8 +539,8 @@ export class Game {
     this.level = createLevelFromMap(this.renderer.scene, map);
     console.log(`[Game] Authoritative map: ${visuals.displayName} (${map.id})`);
 
-    if (isShootHouseNeonMap(map.id) && visuals.skyboxPath) {
-      this.skybox.loadFromFolder(visuals.skyboxPath).catch(() => undefined);
+    if (visuals.generatedSkybox) {
+      this.skybox.applyGenerated();
     }
 
     if (this.network.state?.gameMode === "search_destroy") {

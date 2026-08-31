@@ -101,11 +101,11 @@ describe("canonical map contract", () => {
   it("uses Shoot House visuals and a generic description for other maps", () => {
     const shootHouse = getMapVisuals("shoot-house-neon");
     expect(shootHouse.displayName).toBe("Shoot House Neon");
-    expect(shootHouse.skyboxPath).toBe("/skybox/cyberpunk");
+    expect(shootHouse.generatedSkybox).toBe(true);
 
     const smoke = getMapVisuals("map-contract-smoke");
     expect(smoke.displayName).toBe(getGameplayMap("map-contract-smoke").name);
-    expect(smoke.skyboxPath).toBeUndefined();
+    expect(smoke.generatedSkybox).toBeUndefined();
     expect(() => getMapVisuals("not-a-map")).toThrow(/Unknown map id/);
   });
 

@@ -137,7 +137,14 @@ export class TeamLobbyScreen extends BaseScreen {
     el.style.display = "flex";
     el.style.justifyContent = "space-between";
     el.style.padding = "8px 0";
-    el.innerHTML = `<span>${name}${isLocal ? " (You)" : ""}</span>${isHost ? "<span>HOST</span>" : ""}`;
+    const label = document.createElement("span");
+    label.textContent = isLocal ? `${name} (You)` : name;
+    el.appendChild(label);
+    if (isHost) {
+      const host = document.createElement("span");
+      host.textContent = "HOST";
+      el.appendChild(host);
+    }
     return el;
   }
 

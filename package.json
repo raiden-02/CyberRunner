@@ -2,7 +2,7 @@
   "name": "cyberrunner",
   "version": "1.0.0",
   "private": true,
-  "description": "Browser multiplayer FPS with server-authoritative netcode, client-side prediction, and lag compensation.",
+  "description": "Browser multiplayer FPS with server-authoritative netcode and an agentic level-design workbench.",
   "workspaces": [
     "client",
     "server"
@@ -29,7 +29,9 @@
     "threejs",
     "rapier",
     "typescript",
-    "webgl"
+    "webgl",
+    "arenaforge",
+    "level-design"
   ],
   "author": "Mayur",
   "license": "ISC",

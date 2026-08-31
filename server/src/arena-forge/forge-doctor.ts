@@ -22,13 +22,13 @@ export function buildForgeDoctorReport(
   const lines = [
     "ArenaForge live configuration",
     "",
-    `Access mode: ${policy.mode}`,
+    `Mode: ${policy.mode}`,
     `Provider: ${provider.valid ? providerDisplayName(provider.provider) : "invalid"}`,
     `Model: ${provider.model}`,
-    `Provider key: ${provider.keyConfigured ? "configured" : "missing"}`,
+    `Key: ${provider.keyConfigured ? "configured" : "missing"}`,
     `Database: ${databaseLine(policy, opts.databaseAvailable)}`,
     `Quota: ${policy.requiresQuota ? "required" : "not required"}`,
-    `Live flag: ${env.ARENA_FORGE_LIVE_AGENT_ENABLED === "true" ? "enabled" : "disabled"}`,
+    `Live: ${env.ARENA_FORGE_LIVE_AGENT_ENABLED === "true" ? "enabled" : "disabled"}`,
     "",
     readinessLine(env, policy, provider, opts.databaseAvailable),
   ];
@@ -46,7 +46,7 @@ function readinessLine(
   provider: ArenaForgeProviderConfig,
   databaseAvailable: boolean,
 ): string {
-  if (policy.runnable) return "Live design configuration is ready.";
+  if (policy.runnable) return "Live design: ready";
   if (env.ARENA_FORGE_LIVE_AGENT_ENABLED !== "true") return "Live flag is disabled.";
   if (!provider.valid || !provider.keyConfigured) {
     return provider.error ?? "Live design is not configured on this server.";
@@ -54,5 +54,5 @@ function readinessLine(
   if (policy.mode === "hosted" && !databaseAvailable) {
     return "Hosted mode requires database-backed quota storage.";
   }
-  return "Live design configuration is not ready.";
+  return "Live design is not ready.";
 }

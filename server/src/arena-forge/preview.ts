@@ -84,7 +84,7 @@ export function listForgeCatalog(): ForgeCatalogEntry[] {
       id: `fixture:${evalCase.id}`,
       suite: "p4b",
       title: evalCase.title,
-      subtitle: `P4-B start - ${evalCase.id}`,
+      subtitle: `Interaction evaluation start - ${evalCase.id}`,
       which: "initial",
     });
   }
@@ -94,7 +94,7 @@ export function listForgeCatalog(): ForgeCatalogEntry[] {
     const caseId = parts[0] ?? base;
     const arm = parts[1] ?? "run";
     const rep = parts[2] ?? "";
-    const armLabel = arm === "one_shot" ? "P2 one-shot" : arm === "agent" ? "P3 agent" : arm;
+    const armLabel = arm === "one_shot" ? "one-shot" : arm === "agent" ? "iterative" : arm;
     for (const which of ["initial", "final"] as const) {
       entries.push({
         id: `run:${rel}:${which}`,
@@ -135,7 +135,7 @@ export function loadForgeMap(catalogId?: string): GameplayMapDefinition {
   const demoWhich = parseDemoCatalogId(catalogId);
   if (demoWhich) {
     const map = recordedDemoMap(demoWhich);
-    const name = `Recorded P5 demo ${demoWhich}`;
+    const name = `Recorded agent run ${demoWhich}`;
     return asPreview(exportGameplayMap(map, { id: ARENA_FORGE_PREVIEW_MAP_ID, name }), name);
   }
   if (catalogId.startsWith("fixture:")) {

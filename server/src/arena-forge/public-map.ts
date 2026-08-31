@@ -42,7 +42,7 @@ export function toPublicArenaMapView(map: ArenaMap): PublicArenaMapView {
 }
 
 /**
- * Recorded P5 edits, in order. Taken from the committed development run
+ * Recorded agent-run edits, in order. Taken from the committed development run
  * (`server/arena-forge-playtest.md`). Used only to rebuild sanitized revision
  * snapshots. Not sent to any model.
  */
