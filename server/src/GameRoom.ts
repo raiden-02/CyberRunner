@@ -563,7 +563,11 @@ export class GameRoom extends Room<GameState> {
     const roundState = this.gameMode.getRoundState();
     this.state.currentRound = roundState.roundNumber;
     this.state.roundTimeRemaining = Math.max(0, Math.floor(roundState.roundTimeRemaining));
-    this.state.isRoundActive = roundState.isRoundActive;
+    if (this.gameMode.getConfig().roundBased) {
+      this.state.isRoundActive = roundState.isRoundActive;
+    } else {
+      this.state.isRoundActive = this.state.lobbyState === "playing" && !this.state.isGameOver;
+    }
 
     if (this.gameMode.isGameEnded()) {
       this.match.handleGameOver(this.gameMode.getWinner());

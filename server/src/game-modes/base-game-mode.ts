@@ -74,6 +74,9 @@ export abstract class BaseGameMode {
 
     if (this.config.roundBased) {
       this.startRound();
+    } else {
+      // Deathmatch has no inter-round. The room copies this flag every tick.
+      this.roundState.isRoundActive = true;
     }
   }
 

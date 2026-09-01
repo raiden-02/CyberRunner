@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { shouldSendGameplayInput } from "../../shared/net/gameplay-input.js";
 import { HealthSystem } from "../src/systems/health-system.js";
 import { GAME_MODES } from "../src/game-modes/game-mode-config.js";
 import { makeDeathmatchRoom, makeSearchDestroyRoom } from "./match-test-harness.js";
@@ -11,6 +12,17 @@ describe("Deathmatch acceptance", () => {
     expect(room.state.scoreLimit).toBe(GAME_MODES.deathmatch.scoreLimit);
     expect(room.state.timeRemaining).toBe(GAME_MODES.deathmatch.timeLimit);
     expect(room.state.lobbyState).toBe("playing");
+  });
+
+  it("stays input-active after the room copies the mode round flag", () => {
+    const { mode, room } = makeDeathmatchRoom();
+    room.state.isRoundActive = mode.getRoundState().isRoundActive;
+    expect(mode.getRoundState().isRoundActive).toBe(true);
+    expect(shouldSendGameplayInput({
+      lobbyState: room.state.lobbyState,
+      isRoundActive: room.state.isRoundActive,
+      isGameOver: room.state.isGameOver,
+    })).toBe(true);
   });
 
   it("awards a kill, ends at the score limit, and records the winner", () => {
