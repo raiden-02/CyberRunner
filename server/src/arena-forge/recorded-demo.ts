@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { SERVER_DIR } from "../project-paths.js";
 import type { ArenaMap } from "./types.js";
 import {
   compactP0,
@@ -43,10 +43,7 @@ export type RecordedP5Demo = {
   turns: PublicDesignTurn[];
 };
 
-const fixturePath = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../fixtures/arena-forge/p5-demo.json",
-);
+const fixturePath = path.join(SERVER_DIR, "fixtures", "arena-forge", "p5-demo.json");
 
 let cached: RecordedP5Demo | undefined;
 

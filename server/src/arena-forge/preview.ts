@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { SERVER_DIR } from "../project-paths.js";
 import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { assertSearchDestroyMap } from "@shared/world/map-registry.js";
@@ -12,8 +12,7 @@ import { parseDemoCatalogId, parseJobCatalogId } from "./design-view.js";
 import { recordedDemoMap } from "./recorded-demo.js";
 import type { ArenaMap } from "./types.js";
 
-const serverDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const RESULTS_ROOT = path.join(serverDir, ".arena-forge-results");
+const RESULTS_ROOT = path.join(SERVER_DIR, ".arena-forge-results");
 
 export type ForgeCatalogEntry = {
   id: string;
