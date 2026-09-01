@@ -1,8 +1,8 @@
 # ArenaForge live runs
 
-The public site shows a recorded agent run with no model account. Live design is separate. It calls a server-side OpenAI or Anthropic API and can consume a lot of tokens.
+The public site shows a recorded agent run with no model account. Live design is separate. It calls OpenAI or Anthropic from the server and can spend a lot of tokens.
 
-Recorded evaluation evidence was produced with the OpenAI path. Live design has direct OpenAI and Anthropic session adapters. Those adapters share the same tools and prompt. They were not benchmarked against each other.
+The recorded evaluation used OpenAI. Live design talks to OpenAI or Anthropic with the same tools and prompt. Those two paths were not compared as a benchmark.
 
 ## Keys stay on the server
 

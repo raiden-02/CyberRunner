@@ -1,8 +1,10 @@
 # One-shot vs iterative evaluation
 
-Held-out comparison of the frozen one-shot designer and the frozen evaluator-grounded iterative agent.
+Can a one-edit designer and an iterative designer both repair simple Search & Destroy faults? Yes. This suite is that comparison. It is not a claim that iteration is better.
 
 Reproducibility: manifest `arena-forge-p4-v1`.
+
+In the tables below, one-shot is the single structured proposal. Iterative is the tool-using loop. Older lab labels P2 and P3 in the rows mean those two arms.
 
 ## Experiment contract
 
@@ -118,9 +120,9 @@ No held-out P3 run had a clear action → evaluator fact → later compensating 
 - P3 aggregate constraint satisfaction is equal or worse than P2
 - no held-out P3 run had clear feedback-responsive revision
 
-## Portfolio claim supported by this evidence
+## What this supports
 
-ArenaForge is a bounded tool-using level-design experiment with deterministic evaluation and traceable revisions.
+ArenaForge is a tool-using level-design loop with a deterministic checker and a recorded revision trail. This suite does not show iteration beating one-shot on simple repairs.
 
 ## Arms and budget
 

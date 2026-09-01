@@ -4,7 +4,7 @@ Live site: `https://game.cyberrunnergame.dev`
 
 Caddy terminates HTTPS and proxies to Node on `127.0.0.1:2567`. systemd runs the built server. Postgres is local. Secrets live in `/opt/CyberRunner/server.env` (not in git).
 
-Repo path on the droplet: `/opt/CyberRunner`
+Repo path on the production host: `/opt/CyberRunner`
 
 ## Architecture
 
@@ -92,13 +92,13 @@ Require all of:
 * `ARENA_FORGE_ACCESS_MODE=self_host`
 * `ARENA_FORGE_PROVIDER=openai` plus `OPENAI_API_KEY=...`, or `ARENA_FORGE_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY=...`
 
-Then live design does not need Google sign-in or Postgres. One active job, brief/map validation, and the P5 edit/model/playtest budgets still apply. The key stays on the server.
+Then live design does not need Google sign-in or Postgres. One active job, plus the usual brief, map, edit, model, and playtest limits. The key stays on the server.
 
 Use this only on a server you control. Anyone who can reach the live-design endpoint can consume the configured model account. For a publicly exposed deployment, use `hosted` and keep live off unless you want paid inference behind auth and quota.
 
 Google and Postgres can still be configured if you want user accounts for other features. They are not required solely for live Forge in self-host mode.
 
-Never put a provider key in browser JavaScript, a form, or localStorage. There is no browser BYOK.
+Never put a provider key in browser JavaScript, a form, or localStorage. There is no place in the UI to paste a model key.
 
 Client build-time vars (set when you run `npm run build`):
 
@@ -178,6 +178,8 @@ systemctl restart cyberrunner
 ```
 
 `server.env` is untracked. `git pull` does not replace it.
+
+If `git pull --ff-only` refuses because histories diverged, fetch and reset the checkout to `origin/main`. That is the exception, not the usual path.
 
 New SQL files under `server/src/db/migrations/` must be applied once:
 

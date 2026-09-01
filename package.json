@@ -2,7 +2,7 @@
   "name": "cyberrunner",
   "version": "1.0.0",
   "private": true,
-  "description": "Browser multiplayer FPS with server-authoritative netcode and an agentic level-design workbench.",
+  "description": "Browser multiplayer FPS with server-authoritative netcode. ArenaForge is a level-design agent whose maps launch into the same game.",
   "workspaces": [
     "client",
     "server"
@@ -31,7 +31,8 @@
     "typescript",
     "webgl",
     "arenaforge",
-    "level-design"
+    "level-design",
+    "browser-game"
   ],
   "author": "Mayur",
   "license": "ISC",

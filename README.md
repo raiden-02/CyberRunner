@@ -1,18 +1,18 @@
 # CyberRunner
 
-CyberRunner is a browser multiplayer FPS with server-authoritative netcode and ArenaForge, a bounded agentic level-design workbench whose generated maps run in the same multiplayer runtime.
+A browser multiplayer FPS. The server owns movement and hits. ArenaForge is a level-design agent that edits a map you can then play in the same runtime.
 
-**Play live:** [game.cyberrunnergame.dev](https://game.cyberrunnergame.dev)
+**Play:** [game.cyberrunnergame.dev](https://game.cyberrunnergame.dev)
 
 Guest play works. Two tabs can share a Deathmatch with the 6-letter HUD code.
 
 ![Netcode architecture](.github/architecture.svg)
 
-## What it demonstrates
+## What this is
 
-**Multiplayer / netcode.** The server owns movement and hits at a fixed 60 Hz RAPIER tick. The client predicts locally, reconciles on each ack, and fires through a bounded rewind window.
+The server runs movement and hits at a fixed 60 Hz RAPIER tick. The client predicts locally, reconciles on each ack, and fires through a bounded rewind window.
 
-**ArenaForge.** A small set of game-domain tools edits real map structures. Geometry, navigation, spawns, and line-of-sight are checked deterministically. A seeded scripted playtest can expose route and timing consequences before the agent decides whether to revise. The result launches into Search & Destroy.
+ArenaForge edits real map geometry with a small tool set. A deterministic checker covers navigation, spawns, and line of sight. A seeded scripted playtest can show route and timing effects before the agent revises. The result launches into Search & Destroy.
 
 ## Gameplay
 
@@ -27,21 +27,17 @@ Guest play works. Two tabs can share a Deathmatch with the 6-letter HUD code.
 
 ## ArenaForge
 
-The generated map launches into Search & Destroy.
+Open Arena Forge in the lobby. The recorded run is already there. Watch the timeline, then Play Result. No model key.
 
-**Recorded demo:** Lobby → Arena Forge → recorded agent run → Play Result. No model key.
+To run live design on your machine, put an OpenAI or Anthropic key on the server. See [`docs/arena-forge-live.md`](docs/arena-forge-live.md). The public site keeps live design off unless you turn it on with sign-in and daily caps.
 
-**Live local:** self-host with an OpenAI or Anthropic server credential. See [`docs/arena-forge-live.md`](docs/arena-forge-live.md).
+The recorded numbers used OpenAI. Both providers can run live. That is not a claim they produce the same maps.
 
-**Hosted live:** optional, authenticated and quota-backed. Off unless you configure it.
+Both designers solved the simple repair cases (blocked spawn, broken routes) in one edit. A harder suite, where a useful edit can break something else, did not show the iterative designer winning overall. The recorded live session queried the playtest, overcorrected, then revised.
 
-The recorded run and evaluation numbers came from the OpenAI path. Live design has direct OpenAI and Anthropic session adapters. That is runtime compatibility, not a claim that the providers match.
+Numbers: [`server/arena-forge-evaluation.md`](server/arena-forge-evaluation.md), [`server/arena-forge-evaluation-p4b.md`](server/arena-forge-evaluation-p4b.md), [`server/arena-forge-playtest.md`](server/arena-forge-playtest.md).
 
-Simple repair cases were solved by both one-shot and iterative approaches. The interaction evaluation did not show iterative superiority overall. There was a real held-out evaluator-driven revision case. The recorded playtest-grounded run shows an edit, an observed overcorrection, a revision, and a finish.
-
-Method and numbers: [`server/arena-forge-evaluation.md`](server/arena-forge-evaluation.md), [`server/arena-forge-evaluation-p4b.md`](server/arena-forge-evaluation-p4b.md), [`server/arena-forge-playtest.md`](server/arena-forge-playtest.md).
-
-The cinematic camera is presentation only. The scripted playtest is an offline navigation proxy, not live GameRoom bots.
+The camera flythrough is presentation only. The scripted playtest is an offline navigation proxy, not bots in a live room.
 
 ## Networking
 

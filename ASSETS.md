@@ -16,4 +16,4 @@ UI click, reload, and hit-marker helpers exist on `AudioManager` but have no cli
 
 ## Not shipped
 
-Earlier unverifiable glTF weapons, cubemap PNGs, and `.wav` / requested `.ogg` files were removed. They were not needed for gameplay. Weapon IDs, damage, fire rate, ammo, and network behavior did not change.
+No third-party weapon models, skybox images, or audio files live in `client/public`. Weapon IDs, damage, fire rate, ammo, and network behavior come from code, not those assets.

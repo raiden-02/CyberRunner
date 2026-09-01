@@ -1,18 +1,17 @@
 # Interaction evaluation
 
-Revision stress suite. Separate from the basic-repair evaluation.
+Harder than the basic-repair suite. Here a useful edit can break a guardrail. The question is whether the iterative designer recovers better than one-shot. It did not, overall.
+
+Do not mix these percents with the basic-repair suite.
 
 Reproducibility: manifest `arena-forge-p4b-v1`.
 
-The basic-repair suite scored 34/34 (100%) on both arms. Almost every iterative run was one edit then finish, so it did not test evaluator-grounded revision.
+The basic-repair suite scored 34/34 on both arms. Almost every iterative run was one edit then finish, so it did not test recovery after a later edit.
 
-This suite asks: when an edit that helps a target can change a guardrail, does the iterative agent recover or refine better than one-shot?
+## Basic-repair suite (do not mix into these percents)
 
-## P4-A (do not mix into P4-B percents)
-
-- basic recovery
-- P2 100%
-- P3 100%
+- one-shot 100%
+- iterative 100%
 
 ## Contract
 
@@ -21,7 +20,7 @@ This suite asks: when an edit that helps a target can change a guardrail, does t
 - Arms: frozen `runOneShotDesign` vs frozen `runAgentDesign`
 - Model alias: `gpt-5.6`
 - 5 cases × 2 arms × 2 replicates = 20 runs
-- P2 is one structured proposal. P3 is sequential function calls. This is not a pure causal test of feedback.
+- One-shot is one structured proposal. Iterative is sequential function calls. This is not a pure causal test of feedback.
 
 ## Cases
 
@@ -123,6 +122,6 @@ No held-out P3 run restored a guardrail or hard-failure regression after a later
 - hard-failure runs P3 0, P2 0
 - feedback-responsive revision appeared, but the quantitative STRONG PASS gate was not met
 
-## Portfolio claim
+## What this supports
 
-ArenaForge is a bounded tool-using level-design agent that uses deterministic gameplay evaluation to inspect and revise map edits.
+The iterative designer can inspect a checker result and revise. This suite does not show it beating one-shot on the harder cases.
