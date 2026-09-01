@@ -107,4 +107,4 @@ Production (Caddy, systemd, Postgres): [`server/DEPLOY.md`](server/DEPLOY.md).
 - ArenaForge V1 generates Search & Destroy variants only.
 - Live design is one active job per process.
 
-Code is ISC. See `LICENSE`. Shipped media: [`ASSETS.md`](ASSETS.md).
+The source is public to read. It is not open source. See `LICENSE`. Shipped media: [`ASSETS.md`](ASSETS.md).
