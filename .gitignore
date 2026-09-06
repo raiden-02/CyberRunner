@@ -29,7 +29,7 @@ server.env
 .claude/
 .codex/
 .ai/
-notes/
+/notes/
 scratch/
 .scratch/
 server/.arena-forge-results/
