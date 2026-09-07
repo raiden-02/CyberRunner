@@ -450,7 +450,7 @@ export function applyProductEdit(
   return { ...output, inspection: productInspection(workspace) };
 }
 
-/** Mode/evaluator blockers only. Used by the current recorded fixture until it is replaced. */
+/** Mode/evaluator checks without product-specific design constraints. */
 export function productModeCompletionIssues(
   map: ArenaMap,
   evaluation: ArenaEvaluation,

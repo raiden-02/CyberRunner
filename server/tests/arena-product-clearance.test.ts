@@ -14,7 +14,6 @@ import {
   applyProductLayoutEdit,
   productCompletionIssues,
   productInspection,
-  productModeCompletionIssues,
   productSystemPrompt,
 } from "../src/arena-forge/product-tools.js";
 import { evaluateArena } from "../src/arena-forge/evaluator.js";
@@ -60,10 +59,10 @@ function solid(
 }
 
 /** Two boxes that overlap on X. `gap` is the positive Z edge-to-edge opening. */
-function facingOnZ(idA: string, idB: string, gap: number, hx = 2, hz = 0.5): ArenaSolid[] {
+function facingOnZ(idA: string, idB: string, gap: number, hx = 2, hz = 0.5, x = 0): ArenaSolid[] {
   return [
-    solid(idA, 0, -(hz + gap / 2), hx, hz),
-    solid(idB, 0, +(hz + gap / 2), hx, hz),
+    solid(idA, x, -(hz + gap / 2), hx, hz),
+    solid(idB, x, +(hz + gap / 2), hx, hz),
   ];
 }
 
@@ -126,24 +125,40 @@ describe("product clearance constants", () => {
   });
 });
 
-describe("native recorded fixture regression", () => {
-  it("detects the 0.50 m occluder-1 ↔ occluder-8 slit and the 0.90 m occluder-6 ↔ occluder-9 gap", () => {
+describe("synthetic observed-gap regression", () => {
+  it("flags a 0.50 m slit and a 0.90 m too-tight opening on one map", () => {
+    const report = inspectProductClearance(mapWith([
+      ...facingOnZ("slit-a", "slit-b", 0.5),
+      ...facingOnZ("tight-a", "tight-b", 0.9, 2, 0.5, 8),
+    ]));
+    expect(report.issues).toEqual(expect.arrayContaining([
+      {
+        code: "narrow-solid-gap",
+        a: "slit-a",
+        b: "slit-b",
+        axis: "z",
+        gapMeters: 0.5,
+        requiredMeters: 1.2,
+      },
+      {
+        code: "narrow-solid-gap",
+        a: "tight-a",
+        b: "tight-b",
+        axis: "z",
+        gapMeters: 0.9,
+        requiredMeters: 1.2,
+      },
+    ]));
+    expect(report.issues).toHaveLength(2);
+  });
+});
+
+describe("native recorded fixture clearance", () => {
+  it("keeps the current recorded final map clearance-clean", () => {
     const demo = loadNativeRecordedDemo();
     const report = inspectProductClearance(demo.finalMap);
-    const pair18 = report.issues.find(
-      (issue) => issue.code === "narrow-solid-gap" && issue.a === "occluder-1" && issue.b === "occluder-8",
-    );
-    const pair69 = report.issues.find(
-      (issue) => issue.code === "narrow-solid-gap" && issue.a === "occluder-6" && issue.b === "occluder-9",
-    );
-    expect(pair18).toMatchObject({ axis: "z", gapMeters: 0.5, requiredMeters: 1.2 });
-    expect(pair69).toMatchObject({ axis: "z", gapMeters: 0.9, requiredMeters: 1.2 });
-    expect(productCompletionIssues(demo.finalMap, demo.result.finalEvaluation, "search_destroy")).toContain(
-      "narrow-passage",
-    );
-    expect(productModeCompletionIssues(demo.finalMap, demo.result.finalEvaluation, "search_destroy")).not.toContain(
-      "narrow-passage",
-    );
+    expect(report.issues).toEqual([]);
+    expect(productCompletionIssues(demo.finalMap, demo.result.finalEvaluation, "search_destroy")).toEqual([]);
   });
 });
 

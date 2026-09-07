@@ -10,6 +10,7 @@ import {
   nativeDemoCatalogId,
   nativeRecordedDemoView,
   resetNativeRecordedDemoCache,
+  validateNativeRecordedDemo,
 } from "../src/arena-forge/native-recorded-demo.js";
 import { assertPublicRecordedPayload } from "../src/arena-forge/native-demo-sanitize.js";
 import { recordNativeDemo, writeNativeDemoCandidate } from "../src/arena-forge/record-native-demo.js";
@@ -19,6 +20,7 @@ import { toPublicArenaMapView } from "../src/arena-forge/public-map.js";
 import { issueExploreFromJob, issueSavedMapLaunch, resetSavedMapLaunches } from "../src/arena-forge/saved-map-launches.js";
 import { MemorySavedMapStore, saveCompletedDesign, resetGuestSavedMaps } from "../src/arena-forge/saved-maps.js";
 import { resetSavedRuntimeMaps } from "../src/arena-forge/saved-runtime-maps.js";
+import { productCompletionIssues } from "../src/arena-forge/product-tools.js";
 import { syntheticNativeDemoSession } from "../src/arena-forge/synthetic-native-demo.js";
 import { assertCreatedRoomMode, resolveCreatedRoomMap } from "../src/room-map.js";
 import { loadForgeMap } from "../src/arena-forge/preview.js";
@@ -62,12 +64,12 @@ describe("native recorded demo fixture", () => {
     expect(firstPlaytest).toBeGreaterThan(0);
     expect(demo.result.turns.slice(firstPlaytest + 1).some(isSuccessfulMapMutation)).toBe(true);
 
-    const resize = view.turns.find((t) => t.tool === "resize_solid" && t.target === "occluder-8");
-    expect(resize).toBeDefined();
-    const before = view.revisionMaps[resize!.mapRevision - 1];
-    const after = view.revisionMaps[resize!.mapRevision];
-    const prev = before?.solids.find((s) => s.id === "occluder-8");
-    const next = after?.solids.find((s) => s.id === "occluder-8");
+    const moved = view.turns.find((t) => t.tool === "move_objective" && t.target === "A");
+    expect(moved).toBeDefined();
+    const before = view.revisionMaps[moved!.mapRevision - 1];
+    const after = view.revisionMaps[moved!.mapRevision];
+    const prev = before?.objectives.find((o) => o.id === "A");
+    const next = after?.objectives.find((o) => o.id === "A");
     expect(prev).toBeDefined();
     expect(next).toBeDefined();
     expect(prev).not.toEqual(next);
@@ -79,6 +81,39 @@ describe("native recorded demo fixture", () => {
     expect(() => assertSearchDestroyMap(original)).toThrow(/upload terminals/);
     assertNoSecrets(view);
     assertPublicRecordedPayload(demo);
+  });
+
+  it("validates the current fixture under the full product completion contract", () => {
+    const demo = structuredClone(loadNativeRecordedDemo());
+    expect(() => validateNativeRecordedDemo(demo)).not.toThrow();
+    expect(productCompletionIssues(demo.finalMap, demo.result.finalEvaluation, "search_destroy")).toEqual([]);
+  });
+
+  it("rejects a cloned fixture whose final map has a narrow passage", () => {
+    const broken = structuredClone(loadNativeRecordedDemo());
+    broken.finalMap.solids.push(
+      {
+        id: "slit-a",
+        kind: "occluder",
+        x: 0,
+        y: 1.5,
+        z: -0.75,
+        hx: 2,
+        hy: 1.5,
+        hz: 0.5,
+      },
+      {
+        id: "slit-b",
+        kind: "occluder",
+        x: 0,
+        y: 1.5,
+        z: 0.75,
+        hx: 2,
+        hy: 1.5,
+        hz: 0.5,
+      },
+    );
+    expect(() => validateNativeRecordedDemo(broken)).toThrow(/narrow-passage/);
   });
 
   it("keeps P5 evaluation evidence without making it the public recorded view", () => {
@@ -140,6 +175,8 @@ describe("native recorded explore and save", () => {
     });
     expect(first.ok).toBe(true);
     if (!first.ok) return;
+    const demo = loadNativeRecordedDemo();
+    expect(productCompletionIssues(demo.finalMap, demo.result.finalEvaluation, "search_destroy")).toEqual([]);
     const again = await saveCompletedDesign({
       userId: "user-a",
       jobId: NATIVE_DEMO_ID,
