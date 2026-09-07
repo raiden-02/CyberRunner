@@ -488,7 +488,8 @@ export class Game {
         action?.type === "create" ||
         action?.type === "quickplay" ||
         Boolean(action?.forgeMapId) ||
-        Boolean(action?.savedMapLaunchId),
+        Boolean(action?.savedMapLaunchId) ||
+        Boolean(action?.mapLaunchId),
       displayName,
       primaryWeaponId,
       secondaryWeaponId,
@@ -496,6 +497,7 @@ export class Game {
       mapId: action?.mapId,
       forgeMapId: action?.forgeMapId,
       savedMapLaunchId: action?.savedMapLaunchId,
+      mapLaunchId: action?.mapLaunchId,
     });
 
     await this.applyAuthoritativeMap();
@@ -512,7 +514,7 @@ export class Game {
       throw new Error(msg);
     }
 
-    const map = mapId.startsWith("user-map:")
+    const map = mapId.startsWith("user-map:") || mapId.startsWith("runtime-map:")
       ? await fetchArenaForgePreviewMap(mapId)
       : mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID)
         ? await fetchArenaForgePreviewMap(
@@ -522,7 +524,7 @@ export class Game {
           )
         : getGameplayMap(mapId);
     const visuals =
-      mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID) || mapId.startsWith("user-map:")
+      mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID) || mapId.startsWith("user-map:") || mapId.startsWith("runtime-map:")
         ? { displayName: map.name }
         : getMapVisuals(map.id);
     this.currentMap = map;

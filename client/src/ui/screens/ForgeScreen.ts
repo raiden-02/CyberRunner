@@ -32,6 +32,7 @@ import {
   revisionCaption,
 } from "../forge-workbench.js";
 import { TacticalMap } from "../TacticalMap.js";
+import { fillDesignPlan, setUntrustedText } from "@shared/ui/untrusted-text.js";
 import { BaseScreen } from "./BaseScreen.js";
 import type { PlayAction } from "./LobbyScreen.js";
 
@@ -80,7 +81,15 @@ export class ForgeScreen extends BaseScreen {
   private fixturesEl!: HTMLDetailsElement;
   private playNote!: HTMLDivElement;
   private errorDiv!: HTMLDivElement;
-  private tab = "recorded" as "recorded" | "design";
+  private tab = "design" as "recorded" | "design";
+  private introEl!: HTMLParagraphElement;
+  private timelineHead!: HTMLDivElement;
+  private tacNote!: HTMLDivElement;
+  private replayHint!: HTMLDivElement;
+  private replayBtn!: HTMLButtonElement;
+  private saveModal!: HTMLDivElement;
+  private saveNameInput!: HTMLInputElement;
+  private saveStatus!: HTMLDivElement;
   private setup = new ArenaSetupEditor();
   private setupHost!: HTMLDivElement;
   private setupIssues!: HTMLDivElement;
@@ -89,6 +98,7 @@ export class ForgeScreen extends BaseScreen {
   private signedIn = false;
   private briefEdited = false;
   private savedMapByJob = new Map<string, string>();
+  private productView: ForgeDesignView | null = null;
 
   private showcase = new MapShowcase();
   private tactical = new TacticalMap();
@@ -130,8 +140,8 @@ export class ForgeScreen extends BaseScreen {
     const tabs = document.createElement("div");
     tabs.className = "cr-row";
     tabs.style.margin = "12px 0";
-    const designTab = this.createButton("New Design", false);
-    const recordedTab = this.createButton("Recorded Run", true);
+    const designTab = this.createButton("New Design", true);
+    const recordedTab = this.createButton("Recorded Run", false);
     designTab.onclick = () => this.setTab("design");
     recordedTab.onclick = () => this.setTab("recorded");
     tabs.append(designTab, recordedTab);
@@ -142,11 +152,11 @@ export class ForgeScreen extends BaseScreen {
     this.setupHost.appendChild(this.buildSetupPanel());
     this.workbench.appendChild(this.setupHost);
 
-    const intro = document.createElement("p");
-    intro.textContent =
-      "Draw an arena boundary, place the starting positions, and give ArenaForge a brief. The recorded run stays available without a key.";
-    intro.style.cssText = mutedBlock();
-    this.workbench.appendChild(intro);
+    this.introEl = document.createElement("p");
+    this.introEl.textContent =
+      "Draw an arena, place starts, and generate. Playing walks the map. Save Map is the only way into Your Maps.";
+    this.introEl.style.cssText = mutedBlock();
+    this.workbench.appendChild(this.introEl);
 
     this.briefEl = document.createElement("div");
     this.briefEl.style.cssText = `
@@ -182,8 +192,8 @@ export class ForgeScreen extends BaseScreen {
     this.revisionLabel.style.cssText = `color:${THEME.muted};font-size:12px;letter-spacing:0.06em;text-transform:uppercase;`;
     this.workbench.appendChild(this.revisionLabel);
 
-    const timeHead = sectionLabel("Recorded agent run");
-    this.workbench.appendChild(timeHead);
+    this.timelineHead = sectionLabel("Design edits");
+    this.workbench.appendChild(this.timelineHead);
     this.timeline = document.createElement("div");
     this.timeline.className = "cr-forge__timeline";
     this.workbench.appendChild(this.timeline);
@@ -194,26 +204,26 @@ export class ForgeScreen extends BaseScreen {
     const tacLabel = sectionLabel("Tactical map");
     tacLabel.style.marginTop = "0";
     left.appendChild(tacLabel);
-    const tacNote = document.createElement("div");
-    tacNote.textContent = "Scripted playtest";
-    tacNote.style.cssText = `color:${THEME.muted};font-size:12px;margin-bottom:8px;`;
-    left.appendChild(tacNote);
+    this.tacNote = document.createElement("div");
+    this.tacNote.textContent = "Scripted playtest";
+    this.tacNote.style.cssText = `color:${THEME.muted};font-size:12px;margin-bottom:8px;`;
+    left.appendChild(this.tacNote);
     this.tacticalHost = document.createElement("div");
     this.tacticalHost.style.cssText = "height:280px;overflow:hidden;border:1px solid var(--cr-border);";
     this.tacticalHost.appendChild(this.tactical.canvas);
     left.appendChild(this.tacticalHost);
-    const replayHint = document.createElement("div");
-    replayHint.textContent = "Offline navigation proxy. Not live players.";
-    replayHint.style.cssText = `color:${THEME.muted};font-size:12px;margin-top:8px;`;
-    left.appendChild(replayHint);
-    const replayBtn = document.createElement("button");
-    replayBtn.textContent = "Pause rollout";
-    replayBtn.className = "cr-button cr-button--ghost";
-    replayBtn.onclick = () => {
+    this.replayHint = document.createElement("div");
+    this.replayHint.textContent = "Offline navigation proxy. Not live players.";
+    this.replayHint.style.cssText = `color:${THEME.muted};font-size:12px;margin-top:8px;`;
+    left.appendChild(this.replayHint);
+    this.replayBtn = document.createElement("button");
+    this.replayBtn.textContent = "Pause rollout";
+    this.replayBtn.className = "cr-button cr-button--ghost";
+    this.replayBtn.onclick = () => {
       this.replayPlaying = !this.replayPlaying;
-      replayBtn.textContent = this.replayPlaying ? "Pause rollout" : "Play rollout";
+      this.replayBtn.textContent = this.replayPlaying ? "Pause rollout" : "Play rollout";
     };
-    left.appendChild(replayBtn);
+    left.appendChild(this.replayBtn);
 
     const right = document.createElement("div");
     const evLabel = sectionLabel("Evidence");
@@ -226,7 +236,7 @@ export class ForgeScreen extends BaseScreen {
     this.workbench.appendChild(split);
 
     this.playNote = document.createElement("div");
-    this.playNote.textContent = "Launch this map in CyberRunner.";
+    this.playNote.textContent = "Walk the map without starting a match. Save Map is the only persist action.";
     this.playNote.style.cssText = `color:${THEME.muted};font-size:13px;margin-bottom:8px;`;
     this.workbench.appendChild(this.playNote);
     this.playRow = document.createElement("div");
@@ -263,8 +273,46 @@ export class ForgeScreen extends BaseScreen {
 
     this.errorDiv = this.createError();
     this.workbench.appendChild(this.errorDiv);
+    this.saveModal = this.buildSaveModal();
+    this.workbench.appendChild(this.saveModal);
 
     this.container.appendChild(this.workbench);
+  }
+
+  private buildSaveModal(): HTMLDivElement {
+    const overlay = document.createElement("div");
+    overlay.style.cssText =
+      "display:none;position:fixed;inset:0;z-index:20;background:rgba(7,9,13,0.72);align-items:center;justify-content:center;";
+    const panel = document.createElement("div");
+    panel.className = "cr-panel";
+    panel.style.cssText = "width:min(420px,92vw);";
+    const title = document.createElement("div");
+    title.className = "cr-title cr-title--left";
+    title.textContent = "SAVE MAP";
+    const nameLabel = this.createLabel("Name");
+    this.saveNameInput = this.createInput("Neon Crossfire");
+    this.saveNameInput.maxLength = 40;
+    const modeHint = document.createElement("div");
+    modeHint.className = "cr-copy cr-copy--left";
+    modeHint.textContent = "Search & Destroy or Deathmatch is taken from the design.";
+    const row = document.createElement("div");
+    row.className = "cr-row";
+    row.style.marginTop = "12px";
+    const cancel = this.createButton("Cancel", false);
+    const save = this.createButton("Save", true);
+    cancel.onclick = () => {
+      overlay.style.display = "none";
+    };
+    save.onclick = () => void this.commitSave();
+    row.append(cancel, save);
+    this.saveStatus = document.createElement("div");
+    this.saveStatus.style.cssText = `color:${THEME.muted};font-size:13px;margin-top:8px;`;
+    panel.append(title, nameLabel, this.saveNameInput, modeHint, row, this.saveStatus);
+    overlay.appendChild(panel);
+    overlay.addEventListener("click", (ev) => {
+      if (ev.target === overlay) overlay.style.display = "none";
+    });
+    return overlay;
   }
 
   private buildSetupPanel(): HTMLDivElement {
@@ -377,15 +425,62 @@ export class ForgeScreen extends BaseScreen {
       : "Setup is ready. Generate starts the agent.";
   }
 
-  private setTab(tab: "recorded" | "design"): void {
-    this.tab = tab;
-    this.setupHost.style.display = tab === "design" ? "block" : "none";
-    this.fixturesEl.style.display = tab === "recorded" ? "block" : "none";
-    if (tab === "design") {
+  private designPhase(): "setup" | "designing" | "result" | "recorded" {
+    if (this.tab === "recorded") return "recorded";
+    const view = this.view;
+    if (!view || view.path !== "product") return "setup";
+    if (view.status === "queued" || view.status === "running") return "designing";
+    return "result";
+  }
+
+  private applyChrome(): void {
+    const phase = this.designPhase();
+    const recorded = phase === "recorded";
+    const setup = phase === "setup";
+    const designing = phase === "designing";
+    const result = phase === "result";
+    const view = this.view;
+    const showPlaytest = recorded || (view?.mode === "search_destroy" && Boolean(view.lastPlaytest || this.currentTurn()?.playtest));
+
+    this.setupHost.style.display = setup ? "block" : "none";
+    this.fixturesEl.style.display = recorded ? "block" : "none";
+    this.storyEl.style.display = recorded ? "block" : "none";
+    this.introEl.style.display = setup || recorded ? "block" : "none";
+    this.introEl.textContent = recorded
+      ? "Recorded agent run. Frozen evaluation fixtures stay here."
+      : "Draw an arena, place starts, and generate. Playing walks the map. Save Map is the only way into Your Maps.";
+    this.timelineHead.textContent = recorded ? "Recorded agent run" : "Design edits";
+    this.timelineHead.style.display = recorded || designing || result ? "block" : "none";
+    this.timeline.style.display = recorded || designing || result ? "block" : "none";
+    this.revisionRow.style.display = recorded || designing || result ? "flex" : "none";
+    this.briefEl.style.display = recorded || designing || result ? "block" : "none";
+    this.activity.style.display = recorded || designing || result ? "block" : "none";
+    this.showcaseHost.style.display = recorded || designing || result ? "block" : "none";
+    this.playNote.style.display = result || recorded ? "block" : "none";
+    this.playRow.style.display = result || recorded ? "flex" : "none";
+    this.saveRow.style.display = result && view?.path === "product" ? "flex" : "none";
+    this.tacNote.style.display = showPlaytest ? "block" : "none";
+    this.replayHint.style.display = showPlaytest ? "block" : "none";
+    this.replayBtn.style.display = showPlaytest ? "inline-flex" : "none";
+    if (setup) {
       this.setup.resize();
       this.refreshSetupIssues();
     }
-    if (tab === "recorded" && !this.view) void this.loadRecorded();
+  }
+
+  private setTab(tab: "recorded" | "design"): void {
+    this.tab = tab;
+    if (tab === "recorded") {
+      if (this.view?.path === "product") this.productView = this.view;
+      void this.loadRecorded();
+    } else if (this.productView) {
+      this.view = this.productView;
+    } else if (this.view?.source === "recorded") {
+      this.view = null;
+    }
+    this.applyChrome();
+    this.renderView();
+    this.syncShowcase();
   }
 
   private liveDesignBlock(): HTMLDivElement {
@@ -428,13 +523,13 @@ export class ForgeScreen extends BaseScreen {
       this.signedIn = false;
     }
     this.renderCapability();
-    if (!this.loadedOnce || !this.view) {
+    if (this.tab === "recorded" && (!this.view || this.view.path === "product")) {
       await this.loadRecorded();
-      this.loadedOnce = true;
-    } else {
-      this.renderView();
-      this.syncShowcase();
     }
+    this.loadedOnce = true;
+    this.applyChrome();
+    this.renderView();
+    this.syncShowcase();
     this.showcase.start();
     this.startReplayClock();
     try {
@@ -514,6 +609,8 @@ export class ForgeScreen extends BaseScreen {
         revisionMaps: [],
       };
       this.selectedTurn = 0;
+      this.productView = this.view;
+      this.applyChrome();
       this.renderView();
       this.startPoll(jobId);
     } catch (err) {
@@ -529,6 +626,7 @@ export class ForgeScreen extends BaseScreen {
       try {
         const next = await api.getForgeDesign(jobId);
         this.view = next;
+        if (next.path === "product") this.productView = next;
         if (next.turns.length) this.selectedTurn = next.turns.length - 1;
         this.renderView();
         this.syncShowcase();
@@ -536,9 +634,7 @@ export class ForgeScreen extends BaseScreen {
           this.stopPoll();
           this.busy = false;
           this.renderCapability();
-          if (next.status === "completed" && next.path === "product") {
-            void this.ensureSaved(next).catch(() => undefined);
-          }
+          this.applyChrome();
         }
       } catch (err) {
         this.stopPoll();
@@ -604,13 +700,13 @@ export class ForgeScreen extends BaseScreen {
     }
 
     this.sourceBadge.textContent =
-      view.source === "recorded"
+      this.tab === "recorded" || view.source === "recorded"
         ? "Recorded agent run"
         : liveRunBadge(view.provider, view.model ?? view.modelRequested);
     this.sourceBadge.style.color = view.source === "live" ? THEME.accent : THEME.muted;
     this.briefEl.textContent = `Brief: ${view.brief}`;
     this.activity.textContent = forgeActivityText(view);
-    this.storyEl.textContent = recordedStoryLine(view) ?? "";
+    this.storyEl.textContent = this.tab === "recorded" ? recordedStoryLine(view) ?? "" : "";
     if (view.status === "failed" && view.error) this.errorDiv.textContent = view.error;
 
     this.revisionRow.replaceChildren();
@@ -655,42 +751,58 @@ export class ForgeScreen extends BaseScreen {
     this.evidence.appendChild(this.p0Cards(view));
 
     this.playRow.replaceChildren();
-    const playOriginal = this.createButton("Play Original", false);
-    playOriginal.style.flex = "1";
-    playOriginal.onclick = () => void this.playCatalog(view.playOriginalId, view.mode);
-    this.playRow.appendChild(playOriginal);
-    if (view.playResultId && (view.status === "completed" || view.source === "recorded")) {
-      const playResult = this.createButton("Play Result", true);
-      playResult.style.flex = "1";
-      playResult.onclick = () => void this.playFinished(view);
-      this.playRow.appendChild(playResult);
+    const product = view.path === "product";
+    if (product) {
+      const playOriginal = this.createButton("Play Original", false);
+      playOriginal.style.flex = "1";
+      playOriginal.onclick = () => void this.playExplore("original");
+      this.playRow.appendChild(playOriginal);
+      if (view.status === "completed") {
+        const playGenerated = this.createButton("Play Generated", true);
+        playGenerated.style.flex = "1";
+        playGenerated.onclick = () => void this.playExplore("generated");
+        this.playRow.appendChild(playGenerated);
+      }
+    } else {
+      const playOriginal = this.createButton("Play Original", false);
+      playOriginal.style.flex = "1";
+      playOriginal.onclick = () => void this.playCatalog(view.playOriginalId, view.mode);
+      this.playRow.appendChild(playOriginal);
+      if (view.playResultId && (view.status === "completed" || view.source === "recorded")) {
+        const playResult = this.createButton("Play Result", true);
+        playResult.style.flex = "1";
+        playResult.onclick = () => void this.playCatalog(view.playResultId, view.mode);
+        this.playRow.appendChild(playResult);
+      }
     }
 
     this.saveRow.replaceChildren();
-    if (view.path === "product" && view.status === "completed") {
-      const save = this.createButton("Save Map", true);
-      save.onclick = () => void this.saveCurrent(view.jobId);
+    if (product && view.status === "completed") {
+      const already = this.savedMapByJob.has(view.jobId);
+      const save = this.createButton(already ? "Saved" : "Save Map", !already);
+      save.disabled = already;
+      save.onclick = () => this.openSaveModal(view);
       this.saveRow.appendChild(save);
-      if (!this.signedIn) {
-        const note = document.createElement("div");
-        note.textContent = "Guests keep the map for this session. Sign in to keep it after restart.";
-        note.style.cssText = `color:${THEME.muted};font-size:13px;`;
-        this.saveRow.appendChild(note);
-      }
+      const note = document.createElement("div");
+      note.textContent = already
+        ? this.signedIn
+          ? "Saved to Your Maps"
+          : "Saved to Your Maps for this session"
+        : this.signedIn
+          ? "Only Save Map writes Your Maps."
+          : "Guests keep a saved map for this session.";
+      note.style.cssText = `color:${THEME.muted};font-size:13px;`;
+      this.saveRow.appendChild(note);
     }
 
     if (view.designPlan) {
       this.planEl.style.display = "block";
-      this.planEl.innerHTML = `
-        <div style="letter-spacing:0.08em;text-transform:uppercase;font-size:12px;color:${THEME.muted};margin-bottom:6px;">Design Plan</div>
-        <div style="font-weight:600;margin-bottom:8px;">${view.designPlan.summary}</div>
-        <div>${view.designPlan.layout.map((l) => `· ${l}`).join("<br/>")}</div>
-        <div style="margin-top:8px;">${view.designPlan.priorities.map((p) => `· ${p}`).join("<br/>")}</div>
-      `;
+      fillDesignPlan(this.planEl, view.designPlan, (tag) => document.createElement(tag) as HTMLDivElement);
     } else {
       this.planEl.style.display = "none";
       this.planEl.replaceChildren();
     }
+    this.applyChrome();
 
     this.drawTactical();
   }
@@ -786,14 +898,6 @@ export class ForgeScreen extends BaseScreen {
     return "Forge Arena";
   }
 
-  private async ensureSaved(view: ForgeDesignView): Promise<{ id: string; sessionOnly?: boolean }> {
-    const existing = this.savedMapByJob.get(view.jobId);
-    if (existing) return { id: existing };
-    const saved = await api.saveMyMap(view.jobId, this.defaultSaveName(view));
-    this.savedMapByJob.set(view.jobId, saved.id);
-    return saved;
-  }
-
   private async playCatalog(catalogId: string | undefined, mode?: ArenaGameMode): Promise<void> {
     if (!catalogId) return;
     this.errorDiv.textContent = "";
@@ -804,38 +908,56 @@ export class ForgeScreen extends BaseScreen {
     });
   }
 
-  private async playFinished(view: ForgeDesignView): Promise<void> {
+  private async playExplore(which: "original" | "generated"): Promise<void> {
+    const view = this.view;
+    if (!view?.jobId) return;
     this.errorDiv.textContent = "";
-    if (view.path === "product" && view.status === "completed" && view.jobId) {
-      try {
-        const saved = await this.ensureSaved(view);
-        const launched = await api.launchMyMap(saved.id);
-        this.onPlay({
-          type: "create",
-          gameMode: view.mode ?? "search_destroy",
-          savedMapLaunchId: launched.launchId,
-        });
-        return;
-      } catch (err) {
-        this.errorDiv.textContent =
-          err instanceof Error ? err.message : "Could not launch this map. Try Save Map first.";
-        return;
-      }
+    try {
+      const launched = await api.exploreForgeDesign(view.jobId, which);
+      this.onPlay({
+        type: "create",
+        gameMode: "explore",
+        mapLaunchId: launched.launchId,
+        returnTo: "forge",
+      });
+    } catch (err) {
+      this.errorDiv.textContent = err instanceof Error ? err.message : "Could not explore this map.";
     }
-    await this.playCatalog(view.playResultId, view.mode);
   }
 
-  private async saveCurrent(jobId: string): Promise<void> {
-    const name = window.prompt("SAVE MAP\n\nName", "Neon Crossfire");
-    if (name == null) return;
+  private openSaveModal(view: ForgeDesignView): void {
+    if (this.savedMapByJob.has(view.jobId)) {
+      this.saveStatus.textContent = this.signedIn
+        ? "Saved to Your Maps"
+        : "Saved to Your Maps for this session";
+      this.renderView();
+      return;
+    }
+    this.saveNameInput.value = this.defaultSaveName(view);
+    this.saveStatus.textContent = "";
+    this.saveModal.style.display = "flex";
+    this.saveNameInput.focus();
+    this.saveNameInput.select();
+  }
+
+  private async commitSave(): Promise<void> {
+    const view = this.view;
+    if (!view?.jobId) return;
+    if (this.savedMapByJob.has(view.jobId)) {
+      this.saveModal.style.display = "none";
+      this.renderView();
+      return;
+    }
     try {
-      const saved = await api.saveMyMap(jobId, name);
-      this.savedMapByJob.set(jobId, saved.id);
+      const saved = await api.saveMyMap(view.jobId, this.saveNameInput.value);
+      this.savedMapByJob.set(view.jobId, saved.id);
+      this.saveModal.style.display = "none";
       this.errorDiv.textContent = saved.sessionOnly
-        ? "Saved to Your Maps for this session."
-        : "Saved to Your Maps.";
+        ? "Saved to Your Maps for this session"
+        : "Saved to Your Maps";
+      this.renderView();
     } catch (err) {
-      this.errorDiv.textContent = err instanceof Error ? err.message : "Save failed.";
+      this.saveStatus.textContent = err instanceof Error ? err.message : "Save failed.";
     }
   }
 
@@ -876,10 +998,13 @@ export class ForgeScreen extends BaseScreen {
         color: ${THEME.paper};
         cursor: pointer;
       `;
-      row.innerHTML = `
-        <div style="font-weight: 600;">${entry.title}</div>
-        <div style="color: ${THEME.muted}; font-size: 12px; margin-top: 4px;">${publicCatalogSubtitle(entry)}</div>
-      `;
+      const title = document.createElement("div");
+      title.style.fontWeight = "600";
+      setUntrustedText(title, entry.title);
+      const sub = document.createElement("div");
+      sub.style.cssText = `color: ${THEME.muted}; font-size: 12px; margin-top: 4px;`;
+      setUntrustedText(sub, publicCatalogSubtitle(entry));
+      row.append(title, sub);
       row.onmouseenter = () => {
         row.style.borderColor = THEME.accent;
       };

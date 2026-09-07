@@ -19,17 +19,23 @@ import {
   PROPOSE_DESIGN_PLAN_TOOL,
   RUN_PLAYTEST_TOOL,
   applyProductEdit,
+  applyProductLayoutEdit,
   formatProductStartMessage,
   isProductGeometryTool,
+  isProductLayoutTool,
+  isProductObservationalTool,
   parseDesignPlan,
   parseEditToolArgs,
   parseFinishSummary,
   productCompletionIssues,
+  productInspection,
   productSystemPrompt,
   productToolNames,
   readIntent,
+  TRACE_ROUTE_TOOL,
   type PublicDesignPlan,
 } from "./product-tools.js";
+import { MAX_PRODUCT_ROUTE_QUERIES, parseTraceRouteArgs, traceRoute } from "./product-route.js";
 import type { ArenaEvaluation, ArenaMap } from "./types.js";
 import { ArenaWorkspace } from "./workspace.js";
 
@@ -104,6 +110,7 @@ export async function runArenaDesigner(args: {
   let editAttempts = 0;
   let successfulEdits = 0;
   let playtestCalls = 0;
+  let routeQueries = 0;
   let modelCalls = 0;
   let lastPlaytest: ArenaPlaytestReport | undefined;
   let designPlan: PublicDesignPlan | undefined;
@@ -149,7 +156,7 @@ export async function runArenaDesigner(args: {
   try {
     decision = await args.session.start({
       brief: args.spec.brief,
-      inspection: workspace.inspect(),
+      inspection: productInspection(workspace),
       maxEditAttempts: MAX_PRODUCT_EDIT_ATTEMPTS,
       toolNames: productToolNames(mode),
       maxPlaytestCalls: maxPlaytests,
@@ -215,7 +222,7 @@ export async function runArenaDesigner(args: {
         const ok = await continueWith({
           ok: false,
           error: { code: "plan-already-published" },
-          inspection: workspace.inspect(),
+          inspection: productInspection(workspace),
         });
         if (!ok) return fail("model_error", continueError ?? "provider failed after plan rejection");
         continue;
@@ -232,7 +239,7 @@ export async function runArenaDesigner(args: {
       const ok = await continueWith({
         ok: true,
         changedIds: [],
-        inspection: workspace.inspect(),
+        inspection: productInspection(workspace),
       });
       if (!ok) return fail("model_error", continueError ?? "provider failed after design plan");
       continue;
@@ -248,7 +255,7 @@ export async function runArenaDesigner(args: {
       const ok = await continueWith({
         ok: false,
         error: { code: "plan-required", target: call.name },
-        inspection: workspace.inspect(),
+        inspection: productInspection(workspace),
       });
       if (!ok) return fail("model_error", continueError ?? "provider failed after plan-first rejection");
       continue;
@@ -268,7 +275,7 @@ export async function runArenaDesigner(args: {
         const ok = await continueWith({
           ok: false,
           error: { code: "finish-blocked", target: blockers.join(",") },
-          inspection: workspace.inspect(),
+          inspection: productInspection(workspace),
         });
         if (!ok) return fail("model_error", continueError ?? "provider failed after finish rejection");
         continue;
@@ -327,9 +334,54 @@ export async function runArenaDesigner(args: {
       const ok = await continueWith({
         ok: true,
         playtest,
-        inspection: workspace.inspect(),
+        inspection: productInspection(workspace),
       });
       if (!ok) return fail("model_error", continueError ?? "provider failed after playtest");
+      continue;
+    }
+
+    if (call.name === TRACE_ROUTE_TOOL || isProductObservationalTool(call.name)) {
+      if (routeQueries >= MAX_PRODUCT_ROUTE_QUERIES) {
+        record.evaluationAfter = structuredClone(workspace.evaluation);
+        commitTurn(record);
+        return fail(
+          "budget_exhausted",
+          `route queries reached MAX_PRODUCT_ROUTE_QUERIES (${MAX_PRODUCT_ROUTE_QUERIES})`,
+        );
+      }
+      const parsed = parseTraceRouteArgs(call.arguments);
+      if (typeof parsed === "string") {
+        commitTurn(record);
+        return fail("invalid_model_output", parsed);
+      }
+      const before = workspace.currentMap();
+      const routed = traceRoute(before, parsed.fromId, parsed.toId);
+      routeQueries += 1;
+      if ("error" in routed) {
+        record.outcome = { ok: false, error: routed.error };
+        record.evaluationAfter = structuredClone(workspace.evaluation);
+        commitTurn(record);
+        const ok = await continueWith({
+          ok: false,
+          error: routed.error,
+          inspection: productInspection(workspace),
+        });
+        if (!ok) return fail("model_error", continueError ?? "provider failed after route rejection");
+        continue;
+      }
+      record.outcome = { ok: true };
+      record.evaluationAfter = structuredClone(workspace.evaluation);
+      commitTurn(record);
+      const after = workspace.currentMap();
+      if (JSON.stringify(before.solids) !== JSON.stringify(after.solids)) {
+        return fail("invalid_model_output", "trace_route mutated the map");
+      }
+      const ok = await continueWith({
+        ok: true,
+        route: routed,
+        inspection: productInspection(workspace),
+      });
+      if (!ok) return fail("model_error", continueError ?? "provider failed after route");
       continue;
     }
 
@@ -345,6 +397,20 @@ export async function runArenaDesigner(args: {
         "budget_exhausted",
         `edit attempts reached MAX_PRODUCT_EDIT_ATTEMPTS (${MAX_PRODUCT_EDIT_ATTEMPTS})`,
       );
+    }
+
+    if (isProductLayoutTool(call.name)) {
+      const output = applyProductLayoutEdit(workspace, call.name, call.arguments, envelope);
+      editAttempts += 1;
+      if (output.ok) successfulEdits += 1;
+      record.outcome = output.ok
+        ? { ok: true, changedIds: output.changedIds }
+        : { ok: false, error: output.error };
+      record.evaluationAfter = structuredClone(workspace.evaluation);
+      commitTurn(record);
+      const ok = await continueWith(output);
+      if (!ok) return fail("model_error", continueError ?? "provider failed after edit");
+      continue;
     }
 
     const parsed = parseEditToolArgs(call.name, call.arguments);

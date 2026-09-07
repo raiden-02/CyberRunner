@@ -304,6 +304,30 @@ class ApiClient {
     return { jobId: body.jobId };
   }
 
+  async exploreForgeDesign(
+    jobId: string,
+    which: "original" | "generated",
+  ): Promise<{ launchId: string; purpose: string; designedMode: string }> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/design/${encodeURIComponent(jobId)}/explore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ which }),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      launchId?: string;
+      purpose?: string;
+      designedMode?: string;
+      error?: string;
+    };
+    if (!res.ok || !body.launchId) throw new Error(body.error || "Could not launch map explore");
+    return {
+      launchId: body.launchId,
+      purpose: body.purpose ?? "explore",
+      designedMode: body.designedMode ?? "search_destroy",
+    };
+  }
+
   async getForgeDesign(jobId: string): Promise<ForgeDesignView> {
     const res = await fetch(`${this.baseUrl}/arena-forge/design/${encodeURIComponent(jobId)}`);
     const body = (await res.json().catch(() => ({}))) as ForgeDesignView & { error?: string };

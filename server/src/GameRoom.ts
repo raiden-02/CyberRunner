@@ -31,7 +31,9 @@ import {
 import { LagCompensation } from "./systems/lag-compensation.js";
 import { ProjectileManager } from "./systems/projectile-system.js";
 import { createPlayerRuntime, type PlayerRuntime } from "./player-runtime.js";
+import { pickExploreSpawn } from "@shared/world/explore-map.js";
 import { pickSpawnPoint, isInSpawnProtectionZone } from "./spawn/spawn-select.js";
+import { ExploreMode } from "./game-modes/explore-mode.js";
 import {
   processFiringPlayers,
   updateProjectiles,
@@ -118,7 +120,7 @@ export class GameRoom extends Room<GameState> {
     return true;
   }
 
-  async onCreate(options: { gameMode?: string; mapId?: string; forgeMapId?: string; savedMapLaunchId?: string } = {}) {
+  async onCreate(options: { gameMode?: string; mapId?: string; forgeMapId?: string; savedMapLaunchId?: string; mapLaunchId?: string } = {}) {
     this.setState(new GameState());
 
     this.maxPlayers = Number(process.env.MAX_PLAYERS || DEFAULT_MAX_PLAYERS);
@@ -701,6 +703,9 @@ export class GameRoom extends Room<GameState> {
   }
 
   private pickSpawnPoint(sessionId?: string): { x: number; y: number; z: number } {
+    if (this.gameMode instanceof ExploreMode) {
+      return pickExploreSpawn(this.map);
+    }
     const sdMode = this.getSDMode();
     return pickSpawnPoint(
       this.map,

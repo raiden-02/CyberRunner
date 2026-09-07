@@ -13,6 +13,7 @@ import {
 import { guestMapOwnerId } from "../src/arena-forge/guest-map-session.js";
 import {
   consumeSavedMapLaunch,
+  issueExploreFromJob,
   issueSavedMapLaunch,
   LAUNCH_GRANT_TTL_MS,
   resetSavedMapLaunches,
@@ -58,7 +59,7 @@ async function completeOwnedJob(owner: string): Promise<string> {
             layout: ["ring"],
             priorities: ["cover"],
           }),
-          call("add_solid", { kind: "occluder", x: 0, y: 1.5, z: 0, hx: 2, hy: 1.5, hz: 0.4, hp: null }),
+          call("add_block", { kind: "occluder", x: 0, z: 0, width: 4, depth: 0.8, height: 3, hp: null }),
           call("finish_design", { summary: "good enough" }),
         ]),
       });
@@ -91,7 +92,7 @@ async function completeGuestJob(sessionId: string): Promise<string> {
             layout: ["ring"],
             priorities: ["cover"],
           }),
-          call("add_solid", { kind: "occluder", x: 0, y: 1.5, z: 0, hx: 2, hy: 1.5, hz: 0.4, hp: null }),
+          call("add_block", { kind: "occluder", x: 0, z: 0, width: 4, depth: 0.8, height: 3, hp: null }),
           call("finish_design", { summary: "good enough" }),
         ]),
       });
@@ -207,6 +208,40 @@ describe("saved maps", () => {
     });
     expect(again.ok).toBe(true);
     if (again.ok) expect(again.record.id).toBe("guest-map-1");
+    expect(forgeMapTitle(saved.record.name)).toBe("FORGE · Session Arena");
+  });
+
+  it("does not create library entries when exploring original or generated", async () => {
+    const store = new MemorySavedMapStore();
+    const jobId = await completeOwnedJob("user-a");
+    expect((await store.list("user-a")).length).toBe(0);
+    const original = issueExploreFromJob({ jobId, which: "original", actorId: "user-a" });
+    expect(original.ok).toBe(true);
+    if (original.ok) consumeSavedMapLaunch(original.grant.id);
+    expect((await store.list("user-a")).length).toBe(0);
+    const generated = issueExploreFromJob({ jobId, which: "generated", actorId: "user-a" });
+    expect(generated.ok).toBe(true);
+    if (generated.ok) consumeSavedMapLaunch(generated.grant.id);
+    expect((await store.list("user-a")).length).toBe(0);
+    const saved = await saveCompletedDesign({
+      userId: "user-a",
+      jobId,
+      name: "Neon Crossfire",
+      store,
+      createId: () => "map-play",
+    });
+    expect(saved.ok).toBe(true);
+    expect((await store.list("user-a")).length).toBe(1);
+    const again = await saveCompletedDesign({
+      userId: "user-a",
+      jobId,
+      name: "Neon Crossfire Two",
+      store,
+      createId: () => "map-play-2",
+    });
+    expect(again.ok).toBe(true);
+    if (again.ok) expect(again.record.id).toBe("map-play");
+    expect((await store.list("user-a")).length).toBe(1);
   });
 
   it("enforces rename/delete ownership and the map limit", async () => {
@@ -383,6 +418,7 @@ describe("lobby helpers", () => {
     ];
     expect(personalMapsForMode(maps, "deathmatch").map((m) => m.id)).toEqual(["b"]);
     expect(createGameUsesLaunchGrant({ kind: "personal", gameMode: "deathmatch", savedMapId: "b" })).toBe(true);
+    expect(forgeMapTitle("<script>x</script>")).toBe("FORGE · <script>x</script>");
     expect(createGameUsesLaunchGrant({ kind: "official", gameMode: "deathmatch", mapId: "shoot-house-neon" })).toBe(
       false,
     );

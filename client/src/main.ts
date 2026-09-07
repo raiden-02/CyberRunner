@@ -27,7 +27,8 @@ mainMenu.setOnGameStart(async (options) => {
   currentGame.setUserProfile(options.user);
   currentGame.setOnReturnToMenu(() => {
     currentGame = null;
-    mainMenu.showLobby();
+    if (options.action.returnTo === "forge") mainMenu.showForge();
+    else mainMenu.showLobby();
   });
 
   try {
@@ -37,7 +38,8 @@ mainMenu.setOnGameStart(async (options) => {
     console.error("Failed to start game:", err);
     currentGame.stop();
     currentGame = null;
-    mainMenu.showLobby();
+    if (options.action.returnTo === "forge") mainMenu.showForge();
+    else mainMenu.showLobby();
   }
 });
 

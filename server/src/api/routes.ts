@@ -12,7 +12,7 @@ import {
   saveCompletedDesign,
 } from "../arena-forge/saved-maps.js";
 import { ensureGuestMapSession, guestMapOwnerId } from "../arena-forge/guest-map-session.js";
-import { issueSavedMapLaunch } from "../arena-forge/saved-map-launches.js";
+import { issueExploreFromJob, issueSavedMapLaunch } from "../arena-forge/saved-map-launches.js";
 import { getSavedRuntimeMap } from "../arena-forge/saved-runtime-maps.js";
 import { LIVE_DISABLED_MESSAGE, resolveLiveForgePolicy } from "../arena-forge/live-forge-policy.js";
 import { resolveArenaForgeProviderConfig } from "../arena-forge/provider.js";
@@ -72,8 +72,10 @@ router.get("/arena-forge/maps", (_req: Request, res: Response) => {
 router.get("/arena-forge/preview-map", async (req: Request, res: Response) => {
   try {
     const id = typeof req.query.id === "string" ? req.query.id : undefined;
-    if (id && (id.startsWith("user-map:") || parseSavedRuntimeMapId(id))) {
-      const runtime = getSavedRuntimeMap(id.startsWith("user-map:") ? id : `user-map:${id}`);
+    if (id && (id.startsWith("user-map:") || id.startsWith("runtime-map:") || parseSavedRuntimeMapId(id))) {
+      const runtime = getSavedRuntimeMap(
+        id.startsWith("user-map:") || id.startsWith("runtime-map:") ? id : `user-map:${id}`,
+      );
       if (runtime) {
         res.json(runtime);
         return;
@@ -176,6 +178,31 @@ router.post("/arena-forge/design", async (req: Request, res: Response) => {
     return;
   }
   res.status(started.status).json({ jobId: started.jobId });
+});
+
+router.post("/arena-forge/design/:jobId/explore", (req: Request, res: Response) => {
+  const actor = mapActor(req, res);
+  if (!actor.ok) {
+    res.status(actor.status).json({ error: actor.error });
+    return;
+  }
+  const jobId = Array.isArray(req.params.jobId) ? req.params.jobId[0] : req.params.jobId;
+  const which = req.body?.which === "generated" ? "generated" : req.body?.which === "original" ? "original" : undefined;
+  if (!jobId || !which) {
+    res.status(400).json({ error: "Explore requires which: original or generated." });
+    return;
+  }
+  const issued = issueExploreFromJob({ jobId, which, actorId: actor.userId });
+  if (!issued.ok) {
+    res.status(issued.status).json({ error: issued.error });
+    return;
+  }
+  res.status(201).json({
+    launchId: issued.grant.id,
+    purpose: issued.grant.purpose,
+    designedMode: issued.grant.designedMode,
+    expiresAt: issued.grant.expiresAt,
+  });
 });
 
 router.get("/arena-forge/design/:jobId", (req: Request, res: Response) => {

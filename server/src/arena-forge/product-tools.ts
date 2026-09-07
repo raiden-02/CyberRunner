@@ -15,6 +15,13 @@ import {
   type AgentToolOutput,
 } from "./agent-tools.js";
 import { circleInsideBounds, isFiniteNumber } from "./geometry.js";
+import { deathmatchAllPairs } from "./product-dm-diagnostics.js";
+import {
+  isProductLayoutTool,
+  layoutSolidActions,
+  parseProductLayoutAction,
+  PRODUCT_LAYOUT_TOOLS,
+} from "./product-layout.js";
 import { PLAYER_RADIUS, type ArenaEvaluation, type ArenaMap } from "./types.js";
 import type { ArenaWorkspace } from "./workspace.js";
 
@@ -28,8 +35,10 @@ export const MAX_PRODUCT_SND_PLAYTESTS = 3;
 export const MAX_PRODUCT_DEATHMATCH_PLAYTESTS = 0;
 export const MAX_PRODUCT_MODEL_CALLS = 24;
 
+export const TRACE_ROUTE_TOOL = "trace_route";
+
 export const PRODUCT_GEOMETRY_TOOLS = [
-  "add_solid",
+  ...PRODUCT_LAYOUT_TOOLS,
   "move_solid",
   "resize_solid",
   "remove_solid",
@@ -72,19 +81,55 @@ export const PRODUCT_PLAN_TOOL = {
 const GEOMETRY_FUNCTION_TOOLS = [
   {
     type: "function" as const,
-    name: "add_solid",
-    description: "Add an axis-aligned obstacle, occluder, or breakable inside the human envelope.",
+    name: "add_block",
+    description: "Add a grounded axis-aligned block. Server sets y from height. No floating geometry.",
     strict: true,
     allowed_callers: ["direct" as const],
-    parameters: obj(["kind", "x", "y", "z", "hx", "hy", "hz", "hp"], {
+    parameters: obj(["kind", "x", "z", "width", "depth", "height", "hp"], {
       kind: { type: "string", enum: ["obstacle", "occluder", "breakable"] },
       x: { type: "number" },
-      y: { type: "number" },
       z: { type: "number" },
-      hx: { type: "number" },
-      hy: { type: "number" },
-      hz: { type: "number" },
+      width: { type: "number" },
+      depth: { type: "number" },
+      height: { type: "number" },
       hp: { type: ["number", "null"] },
+    }),
+  },
+  {
+    type: "function" as const,
+    name: "add_wall",
+    description: "Add one orthogonal grounded wall from (x1,z1) to (x2,z2). Diagonal walls are rejected.",
+    strict: true,
+    allowed_callers: ["direct" as const],
+    parameters: obj(["x1", "z1", "x2", "z2", "height", "thickness", "kind"], {
+      x1: { type: "number" },
+      z1: { type: "number" },
+      x2: { type: "number" },
+      z2: { type: "number" },
+      height: { type: "number" },
+      thickness: { type: "number" },
+      kind: { type: "string", enum: ["obstacle", "occluder", "breakable"] },
+    }),
+  },
+  {
+    type: "function" as const,
+    name: "add_wall_chain",
+    description: "Add a connected orthogonal wall chain. 2 to 7 points. Atomic. Corners overlap so there is no player-sized crack.",
+    strict: true,
+    allowed_callers: ["direct" as const],
+    parameters: obj(["points", "height", "thickness", "kind"], {
+      points: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["x", "z"],
+          properties: { x: { type: "number" }, z: { type: "number" } },
+        },
+      },
+      height: { type: "number" },
+      thickness: { type: "number" },
+      kind: { type: "string", enum: ["obstacle", "occluder", "breakable"] },
     }),
   },
   {
@@ -168,6 +213,19 @@ export const RUN_PLAYTEST_FUNCTION_TOOL = {
   },
 };
 
+export const TRACE_ROUTE_FUNCTION_TOOL = {
+  type: "function" as const,
+  name: TRACE_ROUTE_TOOL,
+  description:
+    "Read-only path between named anchors such as ghost-spawn-0, spawn-1, A, or B. Returns simplified waypoints.",
+  strict: true,
+  allowed_callers: ["direct" as const],
+  parameters: obj(["fromId", "toId"], {
+    fromId: { type: "string" },
+    toId: { type: "string" },
+  }),
+};
+
 export const FINISH_FUNCTION_TOOL = {
   type: "function" as const,
   name: FINISH_DESIGN_TOOL,
@@ -184,10 +242,11 @@ export const FINISH_FUNCTION_TOOL = {
 };
 
 export function productToolNames(mode: ArenaGameMode): string[] {
-  const names = [PROPOSE_DESIGN_PLAN_TOOL, ...PRODUCT_GEOMETRY_TOOLS, FINISH_DESIGN_TOOL];
+  const names = [PROPOSE_DESIGN_PLAN_TOOL, ...PRODUCT_GEOMETRY_TOOLS];
   if (mode === "search_destroy") {
-    names.splice(5, 0, PLACE_OBJECTIVE_TOOL, "move_objective", RUN_PLAYTEST_TOOL);
+    names.push(PLACE_OBJECTIVE_TOOL, "move_objective", RUN_PLAYTEST_TOOL);
   }
+  names.push(TRACE_ROUTE_TOOL, FINISH_DESIGN_TOOL);
   return names;
 }
 
@@ -196,7 +255,7 @@ export function productFunctionTools(mode: ArenaGameMode) {
   if (mode === "search_destroy") {
     tools.push(PLACE_OBJECTIVE_FUNCTION_TOOL, MOVE_OBJECTIVE_FUNCTION_TOOL, RUN_PLAYTEST_FUNCTION_TOOL);
   }
-  tools.push(FINISH_FUNCTION_TOOL);
+  tools.push(TRACE_ROUTE_FUNCTION_TOOL, FINISH_FUNCTION_TOOL);
   return tools;
 }
 
@@ -236,6 +295,9 @@ The human envelope is fixed. Human spawn locations are fixed. Do not try to move
 ${modeLine}
 
 Publish exactly one public design plan first with propose_design_plan.
+Build with add_block, add_wall, and add_wall_chain. Those tools are grounded. Do not supply y.
+Walls must be axis-aligned. Use move_solid, resize_solid, and remove_solid for corrections.
+Use trace_route to see where a path travels. It does not change the map.
 Call exactly one tool per turn.
 The deterministic evaluator is authoritative for geometry, navigation, and line of sight.
 Preserve viable routes. Finish when further edits are unlikely to help and the map meets the hard completion checks.`;
@@ -292,6 +354,38 @@ export function rejectOutOfEnvelope(
   return undefined;
 }
 
+export function productInspection(workspace: ArenaWorkspace) {
+  const inspection = workspace.inspect();
+  if (workspace.mode !== "deathmatch") return inspection;
+  return {
+    ...inspection,
+    deathmatchPairs: deathmatchAllPairs(workspace.currentMap()),
+  };
+}
+
+export function applyProductLayoutEdit(
+  workspace: ArenaWorkspace,
+  rawName: string,
+  rawArgs: unknown,
+  envelope: MapBoundsRect,
+): AgentToolOutput {
+  const parsed = parseProductLayoutAction(rawName, rawArgs);
+  if (typeof parsed === "string") {
+    return { ok: false, error: { code: "invalid-args", target: parsed }, inspection: productInspection(workspace) };
+  }
+  const planned = layoutSolidActions(workspace.currentMap(), parsed, envelope);
+  if (!planned.ok) {
+    return { ok: false, error: planned.error, inspection: productInspection(workspace) };
+  }
+  const changedIds: string[] = [];
+  for (const solid of planned.actions) {
+    const result = applyProductEdit(workspace, solid, envelope);
+    if (!result.ok) return result;
+    changedIds.push(...result.changedIds);
+  }
+  return { ok: true, changedIds, inspection: productInspection(workspace) };
+}
+
 export function applyProductEdit(
   workspace: ArenaWorkspace,
   action: ArenaEditAction,
@@ -306,9 +400,10 @@ export function applyProductEdit(
   }
   const blocked = rejectOutOfEnvelope(workspace.currentMap(), action, envelope);
   if (blocked) {
-    return { ok: false, error: blocked, inspection: workspace.inspect() };
+    return { ok: false, error: blocked, inspection: productInspection(workspace) };
   }
-  return applyEditTool(workspace, action);
+  const output = applyEditTool(workspace, action);
+  return { ...output, inspection: productInspection(workspace) };
 }
 
 export function productCompletionIssues(
@@ -336,13 +431,17 @@ export function productCompletionIssues(
   return [...new Set(issues)];
 }
 
-export { parseEditToolArgs, parseFinishSummary, readIntent, FINISH_DESIGN_TOOL };
+export { parseEditToolArgs, parseFinishSummary, readIntent, FINISH_DESIGN_TOOL, isProductLayoutTool };
 export type { AgentToolOutput };
 
 export function isProductGeometryTool(name: string): boolean {
   return (PRODUCT_GEOMETRY_TOOLS as readonly string[]).includes(name)
     || name === PLACE_OBJECTIVE_TOOL
     || name === "move_objective";
+}
+
+export function isProductObservationalTool(name: string): boolean {
+  return name === TRACE_ROUTE_TOOL;
 }
 
 export function circleFitsEnvelope(

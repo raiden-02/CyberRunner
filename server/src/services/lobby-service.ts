@@ -1,4 +1,4 @@
-export type RoomGameMode = "deathmatch" | "search_destroy";
+export type RoomGameMode = "deathmatch" | "search_destroy" | "explore";
 
 export interface RoomInfo {
   roomId: string;

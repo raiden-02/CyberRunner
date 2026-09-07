@@ -70,7 +70,7 @@ describe("blank arena builder", () => {
 describe("product designer", () => {
   it("rejects geometry before a public design plan", async () => {
     const session = new ScriptedPlaytestSession([
-      call("add_solid", { kind: "obstacle", x: 0, y: 1, z: 0, hx: 1, hy: 1, hz: 1, hp: null }),
+      call("add_block", { kind: "obstacle", x: 0, z: 0, width: 2, depth: 2, height: 2, hp: null }),
       call("propose_design_plan", {
         summary: "Three-route layout.",
         layout: ["west cover", "center", "east"],
@@ -95,8 +95,8 @@ describe("product designer", () => {
         layout: ["west cover", "center", "east"],
         priorities: ["spawn safety"],
       }),
-      call("add_solid", { kind: "obstacle", x: 0, y: 1, z: 0, hx: 1, hy: 1, hz: 1, hp: null }),
-      call("add_solid", { kind: "obstacle", x: 40, y: 1, z: 0, hx: 1, hy: 1, hz: 1, hp: null }),
+      call("add_block", { kind: "obstacle", x: 0, z: 0, width: 2, depth: 2, height: 2, hp: null }),
+      call("add_block", { kind: "obstacle", x: 40, z: 0, width: 2, depth: 2, height: 2, hp: null }),
       call("move_spawn", { spawnId: "ghost-spawn-0", x: 0, y: 1, z: 0 }),
       call("finish_design", { summary: "done" }),
     ]);
@@ -118,13 +118,14 @@ describe("product designer", () => {
     const dm = productToolNames("deathmatch");
     expect(snd).toEqual(expect.arrayContaining([
       "propose_design_plan",
-      "add_solid",
+      "add_block",
       "place_objective",
       "move_objective",
       "run_playtest",
       "finish_design",
     ]));
-    expect(dm).toEqual(expect.arrayContaining(["propose_design_plan", "add_solid", "finish_design"]));
+    expect(dm).toEqual(expect.arrayContaining(["propose_design_plan", "add_block", "add_wall", "add_wall_chain", "trace_route", "finish_design"]));
+    expect(dm).not.toContain("add_solid");
     expect(dm).not.toContain("run_playtest");
     expect(dm).not.toContain("place_objective");
     expect(dm).not.toContain("move_spawn");
@@ -168,7 +169,7 @@ describe("product designer", () => {
         layout: ["ring"],
         priorities: ["cover"],
       }),
-      call("add_solid", { kind: "occluder", x: 0, y: 1.5, z: 0, hx: 2, hy: 1.5, hz: 0.4, hp: null }),
+      call("add_block", { kind: "occluder", x: 0, z: 0, width: 4, depth: 0.8, height: 3, hp: null }),
       call("finish_design", { summary: "good enough" }),
     ]);
     const result = await runArenaDesigner({
