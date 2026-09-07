@@ -67,7 +67,9 @@ export function applyProductMutation(
   envelope: MapBoundsRect,
 ): string[] {
   if (isProductLayoutTool(record.tool)) {
-    const output = applyProductLayoutEdit(workspace, record.tool, record.arguments, envelope);
+    const output = applyProductLayoutEdit(workspace, record.tool, record.arguments, envelope, {
+      enforceClearance: false,
+    });
     if (!output.ok) {
       throw new Error(`product replay failed: ${record.tool} (${output.error.code})`);
     }
@@ -77,7 +79,7 @@ export function applyProductMutation(
   if (typeof parsed === "string") {
     throw new Error(`product replay parse failed: ${record.tool}: ${parsed}`);
   }
-  const output = applyProductEdit(workspace, parsed, envelope);
+  const output = applyProductEdit(workspace, parsed, envelope, { enforceClearance: false });
   if (!output.ok) {
     throw new Error(`product replay failed: ${record.tool} (${output.error.code})`);
   }

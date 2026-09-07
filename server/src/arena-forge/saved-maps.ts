@@ -9,7 +9,7 @@ import { isDatabaseEnabled, query } from "../db/pool.js";
 import { getDesignJob, type DesignJobRecord } from "./design-jobs.js";
 import { guestMapOwnerId } from "./guest-map-session.js";
 import { exportGameplayMap } from "./export-map.js";
-import { productCompletionIssues } from "./product-tools.js";
+import { productCompletionIssues, productModeCompletionIssues } from "./product-tools.js";
 import { isNativeDemoJobId, loadNativeRecordedDemo } from "./native-recorded-demo.js";
 import { NATIVE_DEMO_ID } from "./native-demo-spec.js";
 import type { ArenaMap } from "./types.js";
@@ -371,7 +371,9 @@ export async function saveCompletedDesign(args: {
   if ("ok" in source && source.ok === false) return source;
 
   const design = source as SaveableProductDesign;
-  const blockers = productCompletionIssues(design.finalMap, design.evaluation, design.mode);
+  const blockers = isNativeDemoJobId(design.sourceJobId)
+    ? productModeCompletionIssues(design.finalMap, design.evaluation, design.mode)
+    : productCompletionIssues(design.finalMap, design.evaluation, design.mode);
   if (blockers.length) {
     return { ok: false, status: 409, error: `Map is not ready to save: ${blockers.join(", ")}.` };
   }
@@ -397,7 +399,9 @@ export async function saveCompletedDesign(args: {
     if (design.mode === "search_destroy") assertSearchDestroyMap(mapDefinition);
     else assertDeathmatchMap(mapDefinition);
     const ev = evaluateGameplayMap(mapDefinition, design.mode);
-    const again = productCompletionIssues(design.finalMap, ev, design.mode);
+    const again = isNativeDemoJobId(design.sourceJobId)
+      ? productModeCompletionIssues(design.finalMap, ev, design.mode)
+      : productCompletionIssues(design.finalMap, ev, design.mode);
     if (again.length) {
       return { ok: false, status: 409, error: `Map failed validation: ${again.join(", ")}.` };
     }

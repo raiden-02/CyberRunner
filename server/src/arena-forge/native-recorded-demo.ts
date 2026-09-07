@@ -22,7 +22,7 @@ import {
   NATIVE_DEMO_SPEC,
   NATIVE_DEMO_VERSION,
 } from "./native-demo-spec.js";
-import { productCompletionIssues } from "./product-tools.js";
+import { productModeCompletionIssues } from "./product-tools.js";
 import type { ProductDesignerRunResult } from "./product-designer.js";
 import type { ArenaMap } from "./types.js";
 
@@ -148,7 +148,7 @@ export function validateNativeRecordedDemo(raw: NativeRecordedDemo): NativeRecor
   assertExploreMap(initialExport);
   const finalExport = exportGameplayMap(raw.finalMap, { id: "native-final", name: raw.mapName });
   assertSearchDestroyMap(finalExport);
-  const blockers = productCompletionIssues(raw.finalMap, raw.result.finalEvaluation, "search_destroy");
+  const blockers = productModeCompletionIssues(raw.finalMap, raw.result.finalEvaluation, "search_destroy");
   if (blockers.length) {
     throw new Error(`Native demo final map is not saveable: ${blockers.join(", ")}.`);
   }

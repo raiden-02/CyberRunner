@@ -3,12 +3,14 @@ import { parseArenaDesignSpec } from "../../shared/world/arena-design-spec.js";
 import { ScriptedPlaytestSession } from "../src/arena-forge/playtest-agent.js";
 import { buildBlankArena } from "../src/arena-forge/blank-map.js";
 import { runArenaDesigner } from "../src/arena-forge/product-designer.js";
+import { inspectProductClearance } from "../src/arena-forge/product-clearance.js";
 import {
   MAX_PRODUCT_DEATHMATCH_PLAYTESTS,
   MAX_PRODUCT_EDIT_ATTEMPTS,
   MAX_PRODUCT_MODEL_CALLS,
   MAX_PRODUCT_SND_PLAYTESTS,
   productFunctionTools,
+  productSystemPrompt,
   productToolNames,
 } from "../src/arena-forge/product-tools.js";
 import type { AgentTurnDecision } from "../src/arena-forge/agent.js";
@@ -180,5 +182,90 @@ describe("product designer", () => {
     expect(result.status).toBe("completed");
     expect(result.designPlan?.summary).toBe("Loops.");
     expect(result.finalMap.objectives).toEqual([]);
+  });
+
+  it("blocks finish_design while a narrow passage remains", async () => {
+    const map = buildBlankArena(sndSpec.spec);
+    map.solids = [
+      {
+        id: "occluder-0",
+        kind: "occluder",
+        x: 0,
+        y: 1.5,
+        z: -0.75,
+        hx: 2,
+        hy: 1.5,
+        hz: 0.5,
+      },
+      {
+        id: "occluder-1",
+        kind: "occluder",
+        x: 0,
+        y: 1.5,
+        z: 0.75,
+        hx: 2,
+        hy: 1.5,
+        hz: 0.5,
+      },
+    ];
+    const session = new ScriptedPlaytestSession([
+      call("propose_design_plan", {
+        summary: "Sites only.",
+        layout: ["open"],
+        priorities: ["sites"],
+      }),
+      call("place_objective", { objectiveId: "A", x: -4, y: 0, z: -4, radius: 2 }),
+      call("place_objective", { objectiveId: "B", x: 4, y: 0, z: 4, radius: 2 }),
+      call("finish_design", { summary: "should stay blocked" }),
+    ]);
+    const result = await runArenaDesigner({
+      spec: sndSpec.spec,
+      map,
+      session,
+    });
+    const finish = result.turns.find((t) => t.tool === "finish_design");
+    expect(finish?.outcome?.ok).toBe(false);
+    expect(finish?.outcome?.error?.code).toBe("finish-blocked");
+    expect(String(finish?.outcome?.error?.target)).toContain("narrow-passage");
+    expect(result.status).not.toBe("completed");
+  });
+
+  it("rejects a 0.5 m passage, counts the attempt, then accepts a connected repair and finish", async () => {
+    const session = new ScriptedPlaytestSession([
+      call("propose_design_plan", {
+        summary: "Cover with a closed mid wall.",
+        layout: ["center wall"],
+        priorities: ["no slits"],
+      }),
+      call("add_wall", {
+        kind: "occluder",
+        x1: -4,
+        z1: 0,
+        x2: 4,
+        z2: 0,
+        height: 3,
+        thickness: 0.4,
+      }),
+      call("add_block", { kind: "occluder", x: 0, z: 1.2, width: 4, depth: 1, height: 3, hp: null }),
+      call("add_block", { kind: "occluder", x: 0, z: 0.7, width: 4, depth: 1, height: 3, hp: null }),
+      call("place_objective", { objectiveId: "A", x: -4, y: 0, z: -4, radius: 2 }),
+      call("place_objective", { objectiveId: "B", x: 4, y: 0, z: 4, radius: 2 }),
+      call("finish_design", { summary: "Walls meet. Sites are down." }),
+    ]);
+    const result = await runArenaDesigner({
+      spec: sndSpec.spec,
+      map: buildBlankArena(sndSpec.spec),
+      session,
+    });
+    const rejected = result.turns.find((t) => t.tool === "add_block" && t.outcome?.ok === false);
+    const accepted = result.turns.find((t) => t.tool === "add_block" && t.outcome?.ok === true);
+    expect(rejected?.outcome?.error?.code).toBe("passage-too-narrow");
+    expect(rejected?.outcome?.error?.gapMeters).toBe(0.5);
+    expect(accepted?.outcome?.ok).toBe(true);
+    expect(result.editAttempts).toBeGreaterThanOrEqual(5);
+    expect(result.successfulEdits).toBe(4);
+    expect(result.status).toBe("completed");
+    expect(inspectProductClearance(result.finalMap).issues).toEqual([]);
+    expect(productSystemPrompt("search_destroy")).toContain("Deterministic clearance checks are authoritative.");
   });
 });
