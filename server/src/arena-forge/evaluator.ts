@@ -1,3 +1,4 @@
+import { isUsableBounds, resolveMapBounds, type MapBoundsRect } from "@shared/world/map-bounds.js";
 import {
   circleInsideBounds,
   circleOverlapsAabb,
@@ -47,13 +48,18 @@ function finitePoint(x: number, y: number, z: number): boolean {
   return isFiniteNumber(x) && isFiniteNumber(y) && isFiniteNumber(z);
 }
 
-function boundsAreUsable(boundsHalfSize: number): boolean {
-  return isFiniteNumber(boundsHalfSize) && boundsHalfSize > 0;
+function mapRect(map: ArenaMap): MapBoundsRect {
+  return resolveMapBounds(map);
+}
+
+function boundsAreUsable(map: ArenaMap): boolean {
+  return isUsableBounds(mapRect(map));
 }
 
 function checkGeometry(map: ArenaMap): HardIssue[] {
   const issues: HardIssue[] = [];
-  const usableBounds = boundsAreUsable(map.boundsHalfSize);
+  const bounds = mapRect(map);
+  const usableBounds = isUsableBounds(bounds);
   if (!usableBounds) {
     const reason = Number.isNaN(map.boundsHalfSize)
       ? "nan"
@@ -83,7 +89,7 @@ function checkGeometry(map: ArenaMap): HardIssue[] {
       });
     }
     if (usableBounds) {
-      for (const o of solidBoundOverhangs(solid, map.boundsHalfSize)) {
+      for (const o of solidBoundOverhangs(solid, bounds)) {
         issues.push({
           code: "solid-out-of-bounds",
           id: solid.id,
@@ -123,7 +129,7 @@ function checkSpawn(map: ArenaMap, spawn: ArenaSpawn, usableBounds: boolean): Sp
     issues.push({ code: "non-finite-spawn", id: spawn.id });
     return { id: spawn.id, role: spawn.role, valid: false, issues };
   }
-  if (usableBounds && !circleInsideBounds(spawn.x, spawn.z, PLAYER_RADIUS, map.boundsHalfSize)) {
+  if (usableBounds && !circleInsideBounds(spawn.x, spawn.z, PLAYER_RADIUS, mapRect(map))) {
     issues.push({
       code: "spawn-out-of-bounds",
       id: spawn.id,
@@ -164,7 +170,7 @@ function checkObjective(map: ArenaMap, obj: ArenaObjective, grid: NavGrid | null
   if (obj.radius <= 0) {
     issues.push({ code: "non-positive-radius", id, radius: obj.radius });
   }
-  if (usableBounds && !pointInsideBounds(obj.x, obj.z, map.boundsHalfSize)) {
+  if (usableBounds && !pointInsideBounds(obj.x, obj.z, mapRect(map))) {
     issues.push({ code: "objective-center-out-of-bounds", id, x: obj.x, z: obj.z });
   }
   const cells = grid ? grid.objectiveCells(obj) : [];
@@ -180,7 +186,40 @@ function checkObjective(map: ArenaMap, obj: ArenaObjective, grid: NavGrid | null
   };
 }
 
-function pathPairs(map: ArenaMap, grid: NavGrid, spawnChecks: SpawnCheck[]): PathPair[] {
+function deathmatchPathPairs(map: ArenaMap, grid: NavGrid, spawnChecks: SpawnCheck[]): PathPair[] {
+  const generals = map.spawns.filter((s) => s.role === "general");
+  if (generals.length < 2) return [];
+  const valid = new Set(spawnChecks.filter((s) => s.valid).map((s) => s.id));
+  const pairs: PathPair[] = [];
+  const hub = generals[0]!;
+  for (const spawn of generals.slice(1)) {
+    if (!valid.has(hub.id) || !valid.has(spawn.id)) {
+      pairs.push({ from: spawn.id, to: hub.id, reachable: false });
+      continue;
+    }
+    const fromIdx = grid.spawnCell(spawn);
+    const goal = grid.spawnCell(hub);
+    if (fromIdx === null || goal === null) {
+      pairs.push({ from: spawn.id, to: hub.id, reachable: false });
+      continue;
+    }
+    const meters = grid.pathMeters(fromIdx, [goal]);
+    if (meters === null) {
+      pairs.push({ from: spawn.id, to: hub.id, reachable: false });
+    } else {
+      pairs.push({ from: spawn.id, to: hub.id, reachable: true, distanceMeters: roundMeters(meters) });
+    }
+  }
+  return pairs;
+}
+
+function pathPairs(
+  map: ArenaMap,
+  grid: NavGrid,
+  spawnChecks: SpawnCheck[],
+  mode: ArenaEvaluationMode,
+): PathPair[] {
+  if (mode === "deathmatch") return deathmatchPathPairs(map, grid, spawnChecks);
   const ghosts = map.spawns.filter((s) => s.role === "ghost");
   const sentinels = map.spawns.filter((s) => s.role === "sentinel");
   if (ghosts.length === 0 || sentinels.length === 0 || map.objectives.length === 0) {
@@ -214,7 +253,17 @@ function pathPairs(map: ArenaMap, grid: NavGrid, spawnChecks: SpawnCheck[]): Pat
   return pairs;
 }
 
-function aggregates(pairs: PathPair[], map: ArenaMap): DistanceAggregate[] {
+function aggregates(pairs: PathPair[], map: ArenaMap, mode: ArenaEvaluationMode): DistanceAggregate[] {
+  if (mode === "deathmatch") {
+    const dists = pairs.filter((p) => p.reachable && p.distanceMeters !== undefined).map((p) => p.distanceMeters!);
+    return [{
+      fromRole: "general",
+      to: "general-spawn",
+      sampleCount: dists.length,
+      minMeters: dists.length ? roundMeters(Math.min(...dists)) : undefined,
+      medianMeters: median(dists),
+    }];
+  }
   const roles: SpawnRole[] = ["ghost", "sentinel"];
   const out: DistanceAggregate[] = [];
   for (const role of roles) {
@@ -281,12 +330,26 @@ function losPairs(
   map: ArenaMap,
   spawnChecks: SpawnCheck[],
   objectiveChecks: ObjectiveCheck[],
+  mode: ArenaEvaluationMode,
 ): ReturnType<typeof losPair>[] {
   const validSpawn = new Set(spawnChecks.filter((s) => s.valid).map((s) => s.id));
   const validObj = new Set(objectiveChecks.filter((o) => o.valid).map((o) => o.id));
+  const pairs: ReturnType<typeof losPair>[] = [];
+
+  if (mode === "deathmatch") {
+    const generals = map.spawns.filter((s) => s.role === "general" && validSpawn.has(s.id));
+    for (let i = 0; i < generals.length; i++) {
+      for (let j = i + 1; j < generals.length; j++) {
+        const a = generals[i]!;
+        const b = generals[j]!;
+        pairs.push(losPair(map, a.id, a, b.id, b));
+      }
+    }
+    return pairs;
+  }
+
   const ghosts = map.spawns.filter((s) => s.role === "ghost" && validSpawn.has(s.id));
   const sentinels = map.spawns.filter((s) => s.role === "sentinel" && validSpawn.has(s.id));
-  const pairs: ReturnType<typeof losPair>[] = [];
 
   for (const g of ghosts) {
     for (const s of sentinels) {
@@ -325,12 +388,12 @@ export function evaluateArena(
 ): ArenaEvaluation {
   const geometryIssues = checkGeometry(map);
   const modeIssues = checkMode(map, mode);
-  const usableBounds = boundsAreUsable(map.boundsHalfSize);
+  const usableBounds = boundsAreUsable(map);
   const spawnResults = map.spawns.map((s) => checkSpawn(map, s, usableBounds));
 
   const grid = usableBounds ? new NavGrid(map) : null;
   const objectiveResults = map.objectives.map((o) => checkObjective(map, o, grid, usableBounds));
-  const paths = grid ? pathPairs(map, grid, spawnResults) : [];
+  const paths = grid ? pathPairs(map, grid, spawnResults, mode) : [];
 
   const navigation = grid
     ? (() => {
@@ -351,7 +414,7 @@ export function evaluateArena(
         },
         anchors: anchors(map, grid, spawnResults),
         paths,
-        aggregates: aggregates(paths, map),
+        aggregates: aggregates(paths, map, mode),
       };
     })()
     : emptyNavigation("Navigation skipped: arena boundsHalfSize is not a finite positive size.");
@@ -373,7 +436,7 @@ export function evaluateArena(
     navigation,
     lineOfSight: {
       eyeHeight: EYE_HEIGHT,
-      pairs: losPairs(map, spawnResults, objectiveResults),
+      pairs: losPairs(map, spawnResults, objectiveResults, mode),
     },
     summary: {
       hardFailureCount: hardFailures.length,

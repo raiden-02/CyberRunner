@@ -8,6 +8,7 @@ import { BaseLevel } from "../core/BaseLevel.js";
 import { MATERIAL_PRESETS } from "../core/MaterialFactory.js";
 import type { NeonColorKey } from "../core/NeonColors.js";
 import { SHOOT_HOUSE_VISUALS } from "../maps/shoot-house-neon.js";
+import { resolveMapBounds } from "@shared/world/map-bounds.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import type {
   Building,
@@ -48,8 +49,8 @@ export class ShootHouseNeonLevel extends BaseLevel {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private createGround(map: GameplayMapDefinition): void {
-    const size = map.boundsHalfSize * 2;
-    this.createGroundPlane(size + 4, "floorWet", true, 50);
+    const bounds = resolveMapBounds(map);
+    this.createGroundFromBounds(bounds, "floorWet", true, 50, 4);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -57,11 +58,12 @@ export class ShootHouseNeonLevel extends BaseLevel {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private createWalls(map: GameplayMapDefinition): void {
-    this.createBoundaryWalls(map.boundsHalfSize, map.wallHeight, map.wallThickness, "wall");
+    const bounds = resolveMapBounds(map);
+    this.createBoundaryWallsFromBounds(bounds, map.wallHeight, map.wallThickness, "wall");
 
     const y = map.wallHeight * 0.9;
-    const len = map.boundsHalfSize * 2;
-    const halfSize = map.boundsHalfSize;
+    const len = Math.max(bounds.halfWidth, bounds.halfDepth) * 2;
+    const halfSize = bounds.halfWidth;
 
     this.addWallNeonStrip(-halfSize - 0.5, y, 0, len, 0, "orange", 0.04, 0.02);
     this.addWallNeonStrip(halfSize + 0.5, y, 0, len, 0, "teal", 0.04, 0.02);

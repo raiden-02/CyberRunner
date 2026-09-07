@@ -1,4 +1,21 @@
+import {
+  aabbOverhangs,
+  circleInsideRect,
+  pointInsideRect,
+  resolveMapBounds,
+  type BoundSide,
+  type MapBoundsRect,
+} from "@shared/world/map-bounds.js";
 import { PLAYER_RADIUS, STANDING_CAPSULE_TOP, type ArenaSolid } from "./types.js";
+
+export type BoundsInput = number | MapBoundsRect;
+
+function asRect(bounds: BoundsInput): MapBoundsRect {
+  if (typeof bounds === "number") {
+    return { centerX: 0, centerZ: 0, halfWidth: bounds, halfDepth: bounds };
+  }
+  return bounds;
+}
 
 export function isFiniteNumber(n: number): boolean {
   return Number.isFinite(n);
@@ -37,43 +54,36 @@ export function solidOverlapsStandingCapsule(solid: ArenaSolid, cx: number, cz: 
   return circleOverlapsAabb(cx, cz, PLAYER_RADIUS, solid);
 }
 
-export function pointInsideBounds(x: number, z: number, boundsHalfSize: number): boolean {
-  return Math.abs(x) <= boundsHalfSize && Math.abs(z) <= boundsHalfSize;
+export type { BoundSide };
+
+export function pointInsideBounds(x: number, z: number, bounds: BoundsInput): boolean {
+  return pointInsideRect(x, z, asRect(bounds));
 }
 
-export function circleInsideBounds(x: number, z: number, radius: number, boundsHalfSize: number): boolean {
-  return (
-    x - radius >= -boundsHalfSize &&
-    x + radius <= boundsHalfSize &&
-    z - radius >= -boundsHalfSize &&
-    z + radius <= boundsHalfSize
-  );
+export function circleInsideBounds(
+  x: number,
+  z: number,
+  radius: number,
+  bounds: BoundsInput,
+): boolean {
+  return circleInsideRect(x, z, radius, asRect(bounds));
 }
-
-export type BoundSide = "x+" | "x-" | "z+" | "z-";
 
 export function solidBoundOverhangs(
   solid: ArenaSolid,
-  boundsHalfSize: number,
+  bounds: BoundsInput,
 ): Array<{ side: BoundSide; overhangMeters: number }> {
-  const overhangs: Array<{ side: BoundSide; overhangMeters: number }> = [];
-  const minX = solid.x - solid.hx;
-  const maxX = solid.x + solid.hx;
-  const minZ = solid.z - solid.hz;
-  const maxZ = solid.z + solid.hz;
-  if (maxX > boundsHalfSize) {
-    overhangs.push({ side: "x+", overhangMeters: roundMeters(maxX - boundsHalfSize) });
-  }
-  if (minX < -boundsHalfSize) {
-    overhangs.push({ side: "x-", overhangMeters: roundMeters(-boundsHalfSize - minX) });
-  }
-  if (maxZ > boundsHalfSize) {
-    overhangs.push({ side: "z+", overhangMeters: roundMeters(maxZ - boundsHalfSize) });
-  }
-  if (minZ < -boundsHalfSize) {
-    overhangs.push({ side: "z-", overhangMeters: roundMeters(-boundsHalfSize - minZ) });
-  }
-  return overhangs;
+  return aabbOverhangs(
+    solid.x - solid.hx,
+    solid.x + solid.hx,
+    solid.z - solid.hz,
+    solid.z + solid.hz,
+    asRect(bounds),
+  );
+}
+
+export function mapBoundsOf(map: { bounds?: MapBoundsRect; boundsHalfSize: number }): MapBoundsRect {
+  return resolveMapBounds(map);
 }
 
 /**

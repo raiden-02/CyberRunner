@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { resolveMapBounds } from "@shared/world/map-bounds.js";
 import { BaseLevel } from "../core/BaseLevel.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { UploadTerminalMesh } from "../components/upload-terminal.js";
@@ -20,9 +21,9 @@ export class CoreLevel extends BaseLevel {
 
   protected build(): void {
     const map = this.gameplayMap;
-    const size = map.boundsHalfSize * 2;
-    this.createGroundPlane(size + 4, "floor", true, 24);
-    this.createBoundaryWalls(map.boundsHalfSize, map.wallHeight, map.wallThickness, "wall");
+    const bounds = resolveMapBounds(map);
+    this.createGroundFromBounds(bounds, "floor", true, 24, 4);
+    this.createBoundaryWallsFromBounds(bounds, map.wallHeight, map.wallThickness, "wall");
     this.createObstaclesFromData(map.obstacles);
     this.createOccludersFromData(map.occluders);
     this.createBreakablesFromData(map.breakables);

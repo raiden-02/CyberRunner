@@ -1,3 +1,5 @@
+import type { MapBoundsRect } from "./map-bounds.js";
+
 export type BoxObstacle = {
   x: number;
   y: number;
@@ -29,6 +31,8 @@ export type UploadTerminal = {
 
 export interface MapCollisionData {
   boundsHalfSize: number;
+  /** Native rectangular envelope. Absent on legacy square maps. */
+  bounds?: MapBoundsRect;
   wallHeight: number;
   wallThickness: number;
   groundThickness: number;

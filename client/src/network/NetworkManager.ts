@@ -165,6 +165,7 @@ export class NetworkManager {
     gameMode?: string;
     mapId?: string;
     forgeMapId?: string;
+    savedMapLaunchId?: string;
   } = {}): Promise<void> {
     try {
       const roomOptions: Record<string, any> = {};
@@ -172,8 +173,13 @@ export class NetworkManager {
       if (options.primaryWeaponId) roomOptions.primaryWeaponId = options.primaryWeaponId;
       if (options.secondaryWeaponId) roomOptions.secondaryWeaponId = options.secondaryWeaponId;
       if (options.gameMode) roomOptions.gameMode = options.gameMode;
+      const sources = [options.mapId, options.forgeMapId, options.savedMapLaunchId].filter(Boolean);
+      if (sources.length > 1) {
+        throw new Error("Room request names more than one map source");
+      }
       if (options.mapId) roomOptions.mapId = options.mapId;
       if (options.forgeMapId) roomOptions.forgeMapId = options.forgeMapId;
+      if (options.savedMapLaunchId) roomOptions.savedMapLaunchId = options.savedMapLaunchId;
       
       if (options.roomId) {
         this.room = await this.client.joinById(options.roomId, roomOptions);

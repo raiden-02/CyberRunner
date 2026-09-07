@@ -12,7 +12,9 @@ Guest play works. Two tabs can share a Deathmatch with the 6-letter HUD code.
 
 The server runs movement and hits at a fixed 60 Hz RAPIER tick. The client predicts locally, reconciles on each ack, and fires through a bounded rewind window.
 
-ArenaForge edits real map geometry with a small tool set. A deterministic checker covers navigation, spawns, and line of sight. A seeded scripted playtest can show route and timing effects before the agent revises. The result launches into Search & Destroy.
+Draw an arena boundary, place the starting positions, and give ArenaForge a brief. The agent publishes a plan, builds the map through bounded level-editing tools, reads deterministic gameplay checks, and can revise before the result is saved and launched in CyberRunner.
+
+Search & Destroy and Deathmatch are both supported. Playing a saved map does not call a model.
 
 ## Gameplay
 
@@ -27,9 +29,36 @@ ArenaForge edits real map geometry with a small tool set. A deterministic checke
 
 ## ArenaForge
 
-Open Arena Forge in the lobby. The recorded run is already there. Watch the timeline, then Play Result. No model key.
+Open Arena Forge in the lobby.
 
-To run live design on your machine, put an OpenAI or Anthropic key on the server. See [`docs/arena-forge-live.md`](docs/arena-forge-live.md). The public site keeps live design off unless you turn it on with sign-in and daily caps.
+- **Recorded Run** is already there. Watch the timeline, then Play Result. No model key.
+- **New Design** is the product path: mouse-draw a rectangle, place starts, write a brief, Generate.
+
+Saved maps show up in Create Game as `FORGE · <name>`. Quick Play stays official maps only.
+
+```text
+Human design setup
+      ↓
+ArenaForge agent
+      ↓
+ArenaMap
+      ↓
+evaluator / scripted playtest
+      ↓
+GameplayMapDefinition
+      ↓
+ ┌───────────────┐
+ │               │
+Play now       Save
+ │               │
+Room          Postgres
+                 ↓
+              Lobby
+                 ↓
+               Room
+```
+
+To run live design on your machine, put an OpenAI or Anthropic key on the server. See [`docs/arena-forge-live.md`](docs/arena-forge-live.md). Guests can Save Map for the current session. Keeping maps on a profile needs Postgres and a signed-in user. The public site keeps live design off unless you turn it on with sign-in and daily caps.
 
 The recorded numbers used OpenAI. Both providers can run live. That is not a claim they produce the same maps.
 
@@ -104,7 +133,6 @@ Production (Caddy, systemd, Postgres): [`server/DEPLOY.md`](server/DEPLOY.md).
 - Client prediction does not collide with other players.
 - Hitscan rewinds. Projectiles use current poses.
 - Aim direction is client-trusted after a sanity check.
-- ArenaForge V1 generates Search & Destroy variants only.
-- Live design is one active job per process.
+- Live design is one active job per process. Saving personal maps needs Postgres and a signed-in profile.
 
 The source is public to read. It is not open source. See `LICENSE`. Shipped media: [`ASSETS.md`](ASSETS.md).

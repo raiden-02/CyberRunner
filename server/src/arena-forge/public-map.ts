@@ -10,6 +10,7 @@ const EDIT_TOOLS = new Set<string>(AGENT_EDIT_TOOLS);
 export function toPublicArenaMapView(map: ArenaMap): PublicArenaMapView {
   return {
     boundsHalfSize: map.boundsHalfSize,
+    ...(map.bounds ? { bounds: map.bounds } : {}),
     wallHeight: map.wallHeight,
     wallThickness: map.wallThickness,
     groundThickness: map.groundThickness,

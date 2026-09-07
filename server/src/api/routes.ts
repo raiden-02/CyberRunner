@@ -2,7 +2,18 @@ import { Router, Request, Response } from "express";
 import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
 import { getDesignJobView } from "../arena-forge/design-jobs.js";
 import { getForgeQuotaStore } from "../arena-forge/forge-quota.js";
-import { admitLiveDesign, publicLiveCapability } from "../arena-forge/live-design-admission.js";
+import { admitLiveDesign, admitProductDesign, publicLiveCapability } from "../arena-forge/live-design-admission.js";
+import {
+  getSavedMapStore,
+  loadValidatedSavedMap,
+  parseSavedMapName,
+  parseSavedRuntimeMapId,
+  getGuestSavedMapStore,
+  saveCompletedDesign,
+} from "../arena-forge/saved-maps.js";
+import { ensureGuestMapSession, guestMapOwnerId } from "../arena-forge/guest-map-session.js";
+import { issueSavedMapLaunch } from "../arena-forge/saved-map-launches.js";
+import { getSavedRuntimeMap } from "../arena-forge/saved-runtime-maps.js";
 import { LIVE_DISABLED_MESSAGE, resolveLiveForgePolicy } from "../arena-forge/live-forge-policy.js";
 import { resolveArenaForgeProviderConfig } from "../arena-forge/provider.js";
 import { recordedDemoView } from "../arena-forge/recorded-demo.js";
@@ -18,6 +29,23 @@ const router = Router();
 const isProduction = process.env.NODE_ENV === "production";
 
 // Cookie options
+function mapActor(req: Request, res: Response):
+  | { ok: true; userId: string; store: NonNullable<ReturnType<typeof getSavedMapStore>>; sessionOnly: boolean }
+  | { ok: false; status: number; error: string } {
+  if (req.user) {
+    const store = getSavedMapStore();
+    if (!store) return { ok: false, status: 503, error: "Saved maps require Postgres." };
+    return { ok: true, userId: req.user.id, store, sessionOnly: false };
+  }
+  const guestSession = ensureGuestMapSession(req, res);
+  return {
+    ok: true,
+    userId: guestMapOwnerId(guestSession),
+    store: getGuestSavedMapStore(),
+    sessionOnly: true,
+  };
+}
+
 function getSessionCookieOptions() {
   return {
     httpOnly: true,
@@ -41,9 +69,30 @@ router.get("/arena-forge/maps", (_req: Request, res: Response) => {
   res.json({ maps: listForgeCatalog() });
 });
 
-router.get("/arena-forge/preview-map", (req: Request, res: Response) => {
+router.get("/arena-forge/preview-map", async (req: Request, res: Response) => {
   try {
     const id = typeof req.query.id === "string" ? req.query.id : undefined;
+    if (id && (id.startsWith("user-map:") || parseSavedRuntimeMapId(id))) {
+      const runtime = getSavedRuntimeMap(id.startsWith("user-map:") ? id : `user-map:${id}`);
+      if (runtime) {
+        res.json(runtime);
+        return;
+      }
+      const uuid = parseSavedRuntimeMapId(id.startsWith("user-map:") ? id : `user-map:${id}`);
+      if (!uuid) {
+        res.status(404).json({ error: "Saved map is not available.", mapId: id });
+        return;
+      }
+      const record =
+        (await getGuestSavedMapStore().get(uuid)) ??
+        (await getSavedMapStore()?.get(uuid));
+      if (!record) {
+        res.status(404).json({ error: "Saved map is not available.", mapId: id });
+        return;
+      }
+      res.json(loadValidatedSavedMap(record));
+      return;
+    }
     res.json(loadForgeMap(id));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -102,17 +151,26 @@ router.post("/arena-forge/design", async (req: Request, res: Response) => {
     return;
   }
 
-  const started = await admitLiveDesign(
-    {
-      brief: req.body?.brief,
-      mapId: req.body?.mapId,
-    },
-    {
-      userId: req.user?.id,
-      quota: policy.requiresQuota ? getForgeQuotaStore() : null,
-      policy,
-    },
-  );
+  const isProduct = req.body?.envelope != null || req.body?.spawnSetup != null;
+  const guestSessionId = req.user ? undefined : ensureGuestMapSession(req, res);
+  const started = isProduct
+    ? await admitProductDesign(req.body, {
+        userId: req.user?.id,
+        guestSessionId,
+        quota: policy.requiresQuota ? getForgeQuotaStore() : null,
+        policy,
+      })
+    : await admitLiveDesign(
+        {
+          brief: req.body?.brief,
+          mapId: req.body?.mapId,
+        },
+        {
+          userId: req.user?.id,
+          quota: policy.requiresQuota ? getForgeQuotaStore() : null,
+          policy,
+        },
+      );
   if (!started.ok) {
     res.status(started.status).json({ error: started.error });
     return;
@@ -291,6 +349,141 @@ router.post("/lobby/join", (req: Request, res: Response) => {
     playerCount: room.playerCount,
     maxPlayers: room.maxPlayers,
   });
+});
+
+router.get("/me/maps", async (req: Request, res: Response) => {
+  const actor = mapActor(req, res);
+  if (!actor.ok) {
+    res.status(actor.status).json({ error: actor.error });
+    return;
+  }
+  try {
+    const maps = (await actor.store.list(actor.userId)).map((m) =>
+      actor.sessionOnly ? { ...m, sessionOnly: true } : m,
+    );
+    res.json({ maps });
+  } catch (err) {
+    console.error("[API] List maps error:", err);
+    res.status(503).json({ error: "Saved maps are unavailable." });
+  }
+});
+
+router.get("/me/maps/:id", async (req: Request, res: Response) => {
+  const actor = mapActor(req, res);
+  if (!actor.ok) {
+    res.status(actor.status).json({ error: actor.error });
+    return;
+  }
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const record = id ? await actor.store.get(id) : undefined;
+  if (!record || record.userId !== actor.userId) {
+    res.status(404).json({ error: "Map not found." });
+    return;
+  }
+  try {
+    res.json({
+      id: record.id,
+      name: record.name,
+      mode: record.mode,
+      brief: record.brief,
+      designPlan: record.designPlan,
+      mapDefinition: loadValidatedSavedMap(record),
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      sessionOnly: actor.sessionOnly,
+    });
+  } catch (err) {
+    res.status(409).json({ error: err instanceof Error ? err.message : "Saved map is invalid." });
+  }
+});
+
+router.post("/me/maps", async (req: Request, res: Response) => {
+  const actor = mapActor(req, res);
+  if (!actor.ok) {
+    res.status(actor.status).json({ error: actor.error });
+    return;
+  }
+  const saved = await saveCompletedDesign({
+    userId: actor.userId,
+    jobId: typeof req.body?.jobId === "string" ? req.body.jobId : "",
+    name: req.body?.name,
+    store: actor.store,
+  });
+  if (!saved.ok) {
+    res.status(saved.status).json({ error: saved.error });
+    return;
+  }
+  res.status(201).json({
+    id: saved.record.id,
+    name: saved.record.name,
+    mode: saved.record.mode,
+    createdAt: saved.record.createdAt,
+    updatedAt: saved.record.updatedAt,
+    sessionOnly: actor.sessionOnly,
+  });
+});
+
+router.patch("/me/maps/:id", async (req: Request, res: Response) => {
+  const actor = mapActor(req, res);
+  if (!actor.ok) {
+    res.status(actor.status).json({ error: actor.error });
+    return;
+  }
+  const named = parseSavedMapName(req.body?.name);
+  if (!named.ok) {
+    res.status(400).json({ error: named.error });
+    return;
+  }
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!id) {
+    res.status(404).json({ error: "Map not found." });
+    return;
+  }
+  const ok = await actor.store.updateName(id, actor.userId, named.name);
+  if (!ok) {
+    res.status(404).json({ error: "Map not found." });
+    return;
+  }
+  res.json({ id, name: named.name });
+});
+
+router.delete("/me/maps/:id", async (req: Request, res: Response) => {
+  const actor = mapActor(req, res);
+  if (!actor.ok) {
+    res.status(actor.status).json({ error: actor.error });
+    return;
+  }
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!id) {
+    res.status(404).json({ error: "Map not found." });
+    return;
+  }
+  const ok = await actor.store.delete(id, actor.userId);
+  if (!ok) {
+    res.status(404).json({ error: "Map not found." });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+router.post("/me/maps/:id/launch", async (req: Request, res: Response) => {
+  const actor = mapActor(req, res);
+  if (!actor.ok) {
+    res.status(actor.status).json({ error: actor.error });
+    return;
+  }
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const record = id ? await actor.store.get(id) : undefined;
+  if (!record || record.userId !== actor.userId) {
+    res.status(404).json({ error: "Map not found." });
+    return;
+  }
+  try {
+    const grant = issueSavedMapLaunch(record, actor.userId);
+    res.status(201).json({ launchId: grant.id, mode: grant.mode, expiresAt: grant.expiresAt });
+  } catch (err) {
+    res.status(409).json({ error: err instanceof Error ? err.message : "Could not launch map." });
+  }
 });
 
 export default router;

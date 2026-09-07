@@ -4,6 +4,7 @@
  * Shows map layout, player positions, terminals, and objectives
  */
 
+import { resolveMapBounds, type MapBoundsRect } from "@shared/world/map-bounds.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 
 export interface MinimapConfig {
@@ -50,7 +51,7 @@ export class Minimap {
   private players: PlayerMarker[] = [];
   private droppedSpikePos: { x: number; z: number } | null = null;
   private mapObstacles: MapObstacle[] = [];
-  private mapBoundsHalf: number = 28;
+  private mapBounds: MapBoundsRect = { centerX: 0, centerZ: 0, halfWidth: 28, halfDepth: 28 };
 
   constructor(config: Partial<MinimapConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -101,8 +102,8 @@ export class Minimap {
   }
 
   setMap(map: GameplayMapDefinition): void {
-    this.mapBoundsHalf = map.boundsHalfSize;
-    this.config.mapSize = map.boundsHalfSize * 2;
+    this.mapBounds = resolveMapBounds(map);
+    this.config.mapSize = Math.max(this.mapBounds.halfWidth, this.mapBounds.halfDepth) * 2;
     this.mapObstacles = [
       ...map.obstacles.map((o) => ({ x: o.x, z: o.z, hx: o.hx, hz: o.hz })),
       ...map.occluders.map((o) => ({ x: o.x, z: o.z, hx: o.hx, hz: o.hz })),
@@ -313,11 +314,12 @@ export class Minimap {
     centerZ: number,
     rotation: number
   ): void {
+    const b = this.mapBounds;
     const corners = [
-      { x: -this.mapBoundsHalf, z: -this.mapBoundsHalf },
-      { x: this.mapBoundsHalf, z: -this.mapBoundsHalf },
-      { x: this.mapBoundsHalf, z: this.mapBoundsHalf },
-      { x: -this.mapBoundsHalf, z: this.mapBoundsHalf },
+      { x: b.centerX - b.halfWidth, z: b.centerZ - b.halfDepth },
+      { x: b.centerX + b.halfWidth, z: b.centerZ - b.halfDepth },
+      { x: b.centerX + b.halfWidth, z: b.centerZ + b.halfDepth },
+      { x: b.centerX - b.halfWidth, z: b.centerZ + b.halfDepth },
     ];
 
     // Draw lines between corners that are visible

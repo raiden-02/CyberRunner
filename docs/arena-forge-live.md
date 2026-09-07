@@ -2,7 +2,7 @@
 
 The public site shows a recorded agent run with no model account. Live design is separate. It calls OpenAI or Anthropic from the server and can spend a lot of tokens.
 
-The recorded evaluation used OpenAI. Live design talks to OpenAI or Anthropic with the same tools and prompt. Those two paths were not compared as a benchmark.
+The recorded evaluation used OpenAI and the historical P5 tool set. New Design uses a separate product agent: plan first, human envelope and spawns locked, mode-aware tools. Those two paths were not compared as a benchmark.
 
 ## Keys stay on the server
 
@@ -38,9 +38,24 @@ npm run dev:server
 npm run dev:client
 ```
 
-Open `http://localhost:5173`. Play as Guest → Arena Forge → Run your own design → Run live design.
+Open `http://localhost:5173`. Play as Guest → Arena Forge → New Design → draw the envelope, place starts, Generate.
 
-The sample brief is already filled. Postgres and Google auth are not required for self-host live Forge.
+The sample brief is already filled. Postgres and Google auth are not required for self-host **unsaved** live design.
+
+### Saved personal maps
+
+Guests can Save Map for the current browser session. Those maps live in server memory. They disappear on restart.
+
+Keeping maps on a profile needs:
+
+- Postgres (`DATABASE_URL`)
+- a real signed-in Google profile
+
+Guest client IDs are not database identities. Playing a saved map later does not call a model.
+
+```bash
+sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/004_arena_forge_maps.sql
+```
 
 ## Local Anthropic
 
@@ -73,7 +88,7 @@ Hosted live also needs `DATABASE_URL`, Google sign-in, and daily caps. Recommend
 ARENA_FORGE_LIVE_AGENT_ENABLED=false
 ```
 
-or leave the flag unset. Visitors still get the recorded run, timeline, Play Original, and Play Result.
+or leave the flag unset. Visitors still get the recorded run, timeline, Play Original, and Play Result. Generating a new map can cost money. Playing a saved map does not call a model.
 
 ## Check configuration
 

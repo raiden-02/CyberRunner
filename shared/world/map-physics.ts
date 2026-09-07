@@ -1,4 +1,5 @@
 import type RAPIER from "@dimforge/rapier3d-compat";
+import { boundaryWalls, resolveMapBounds } from "./map-bounds.js";
 import type { MapCollisionData } from "./map-types.js";
 import { COLLISION_GROUPS } from "../physics/collision-groups.js";
 
@@ -14,27 +15,20 @@ export function buildMapColliders(
   world: RAPIER.World,
   map: MapCollisionData,
 ): { breakableColliders: RAPIER.Collider[] } {
-  // Ground plane
+  const bounds = resolveMapBounds(map);
+
   world.createCollider(
-    RAPIER_NS.ColliderDesc.cuboid(map.boundsHalfSize, map.groundThickness, map.boundsHalfSize)
-      .setTranslation(0, -map.groundThickness, 0)
+    RAPIER_NS.ColliderDesc.cuboid(bounds.halfWidth, map.groundThickness, bounds.halfDepth)
+      .setTranslation(bounds.centerX, -map.groundThickness, bounds.centerZ)
       .setFriction(1.0)
       .setCollisionGroups(COLLISION_GROUPS.WORLD),
   );
 
-  // Boundary walls (4 sides)
-  const wt = map.wallThickness;
   const wh = map.wallHeight / 2;
-  const hs = map.boundsHalfSize;
-  for (const [tx, tz, hx, hz] of [
-    [hs + wt, 0, wt, hs],
-    [-hs - wt, 0, wt, hs],
-    [0, hs + wt, hs, wt],
-    [0, -hs - wt, hs, wt],
-  ] as [number, number, number, number][]) {
+  for (const wall of boundaryWalls(bounds, map.wallThickness)) {
     world.createCollider(
-      RAPIER_NS.ColliderDesc.cuboid(hx, wh, hz)
-        .setTranslation(tx, wh, tz)
+      RAPIER_NS.ColliderDesc.cuboid(wall.hx, wh, wall.hz)
+        .setTranslation(wall.tx, wh, wall.tz)
         .setFriction(0.8)
         .setCollisionGroups(COLLISION_GROUPS.WORLD),
     );

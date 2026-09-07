@@ -1,3 +1,4 @@
+import { resolveMapBounds } from "@shared/world/map-bounds.js";
 import type { ArenaMapDiff } from "@shared/world/arena-map-view.js";
 import type {
   ForgePlaytestReplay,
@@ -54,14 +55,16 @@ export class TacticalMap {
     ctx.fillStyle = THEME.ink;
     ctx.fillRect(0, 0, cssW, cssH);
 
-    const half = state.map.boundsHalfSize;
+    const bounds = resolveMapBounds(state.map);
+    const spanX = bounds.halfWidth * 2;
+    const spanZ = bounds.halfDepth * 2;
     const pad = 16;
     const size = Math.min(cssW, cssH) - pad * 2;
     const originX = (cssW - size) / 2;
     const originY = (cssH - size) / 2;
-    const toX = (x: number) => originX + ((x + half) / (half * 2)) * size;
-    const toY = (z: number) => originY + ((z + half) / (half * 2)) * size;
-    const toW = (w: number) => (w / (half * 2)) * size;
+    const toX = (x: number) => originX + ((x - (bounds.centerX - bounds.halfWidth)) / spanX) * size;
+    const toY = (z: number) => originY + ((z - (bounds.centerZ - bounds.halfDepth)) / spanZ) * size;
+    const toW = (w: number) => (w / Math.max(spanX, spanZ)) * size;
 
     ctx.strokeStyle = THEME.panelBorder;
     ctx.lineWidth = 1;

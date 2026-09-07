@@ -487,13 +487,15 @@ export class Game {
       forceCreate:
         action?.type === "create" ||
         action?.type === "quickplay" ||
-        Boolean(action?.forgeMapId),
+        Boolean(action?.forgeMapId) ||
+        Boolean(action?.savedMapLaunchId),
       displayName,
       primaryWeaponId,
       secondaryWeaponId,
       gameMode,
       mapId: action?.mapId,
       forgeMapId: action?.forgeMapId,
+      savedMapLaunchId: action?.savedMapLaunchId,
     });
 
     await this.applyAuthoritativeMap();
@@ -510,16 +512,19 @@ export class Game {
       throw new Error(msg);
     }
 
-    const map = mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID)
-      ? await fetchArenaForgePreviewMap(
-          mapId === ARENA_FORGE_PREVIEW_MAP_ID
-            ? undefined
-            : mapId.slice(`${ARENA_FORGE_PREVIEW_MAP_ID}::`.length),
-        )
-      : getGameplayMap(mapId);
-    const visuals = mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID)
-      ? { displayName: map.name }
-      : getMapVisuals(map.id);
+    const map = mapId.startsWith("user-map:")
+      ? await fetchArenaForgePreviewMap(mapId)
+      : mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID)
+        ? await fetchArenaForgePreviewMap(
+            mapId === ARENA_FORGE_PREVIEW_MAP_ID
+              ? undefined
+              : mapId.slice(`${ARENA_FORGE_PREVIEW_MAP_ID}::`.length),
+          )
+        : getGameplayMap(mapId);
+    const visuals =
+      mapId.startsWith(ARENA_FORGE_PREVIEW_MAP_ID) || mapId.startsWith("user-map:")
+        ? { displayName: map.name }
+        : getMapVisuals(map.id);
     this.currentMap = map;
 
     this.localPlayer.configureMap(map);

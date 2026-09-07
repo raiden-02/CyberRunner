@@ -1,3 +1,4 @@
+import { resolveMapBounds, type MapBoundsRect } from "./map-bounds.js";
 import type { GameplayMapDefinition } from "./map-types.js";
 
 export type PublicSolidKind = "obstacle" | "occluder" | "breakable";
@@ -34,6 +35,7 @@ export type PublicArenaObjective = {
 /** Sanitized map slice for Forge visualization. No SDK, prompt, or eval payloads. */
 export type PublicArenaMapView = {
   boundsHalfSize: number;
+  bounds?: MapBoundsRect;
   wallHeight: number;
   wallThickness: number;
   groundThickness: number;
@@ -110,6 +112,7 @@ export function gameplayFromPublicView(
     id: runtime.id,
     name: runtime.name,
     boundsHalfSize: view.boundsHalfSize,
+    ...(view.bounds ? { bounds: view.bounds } : {}),
     wallHeight: view.wallHeight,
     wallThickness: view.wallThickness,
     groundThickness: view.groundThickness,
@@ -157,10 +160,11 @@ export type ShowcaseFraming = {
 
 /** Orbit framing from map bounds and solids. Works for smoke, Forge revisions, and Shoot House. */
 export function computeShowcaseFraming(view: PublicArenaMapView): ShowcaseFraming {
-  let minX = -view.boundsHalfSize;
-  let maxX = view.boundsHalfSize;
-  let minZ = -view.boundsHalfSize;
-  let maxZ = view.boundsHalfSize;
+  const bounds = resolveMapBounds(view);
+  let minX = bounds.centerX - bounds.halfWidth;
+  let maxX = bounds.centerX + bounds.halfWidth;
+  let minZ = bounds.centerZ - bounds.halfDepth;
+  let maxZ = bounds.centerZ + bounds.halfDepth;
   let maxY = view.wallHeight;
   for (const s of view.solids) {
     minX = Math.min(minX, s.x - s.hx);

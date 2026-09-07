@@ -1,7 +1,8 @@
 import { getGameplayMap, getPublicMaps, type PublicMapInfo } from "@shared/world/map-registry.js";
 import { quickPlayFollowThrough } from "@shared/net/quickplay-action.js";
 import { lobbyModeCopy } from "@shared/ui/mode-copy.js";
-import { api, type UserProfile } from "../../api/client.js";
+import { forgeMapTitle, personalMapsForMode, type PersonalMapMeta } from "@shared/ui/lobby-maps.js";
+import { api, type SavedMapMeta, type UserProfile } from "../../api/client.js";
 import { MapShowcase } from "../../world/MapShowcase.js";
 import { BaseScreen } from "./BaseScreen.js";
 
@@ -14,6 +15,7 @@ export interface PlayAction {
   gameMode?: GameModeId;
   mapId?: string;
   forgeMapId?: string;
+  savedMapLaunchId?: string;
 }
 
 export class LobbyScreen extends BaseScreen {
@@ -30,9 +32,13 @@ export class LobbyScreen extends BaseScreen {
   private previewHost!: HTMLDivElement;
   private previewTitle!: HTMLDivElement;
   private selectedMapId = getPublicMaps()[0]?.id ?? "shoot-house-neon";
+  private selectedSavedMapId: string | undefined;
   private selectedMode: GameModeId = "deathmatch";
+  private personalMaps: SavedMapMeta[] = [];
+  private personalMapsError = "";
   private modeButtons: HTMLButtonElement[] = [];
   private showcase = new MapShowcase();
+  private personalHint!: HTMLDivElement;
 
   constructor() {
     super("lobby-screen", true);
@@ -95,13 +101,16 @@ export class LobbyScreen extends BaseScreen {
     this.mapList = document.createElement("div");
     this.mapList.style.cssText = "display:flex;flex-direction:column;gap:8px;margin:4px 0 12px;";
     play.appendChild(this.mapList);
+    this.personalHint = document.createElement("div");
+    this.personalHint.className = "cr-copy cr-copy--left";
+    play.appendChild(this.personalHint);
 
     const quick = this.createButton("Quick Play", true);
     quick.onclick = () => void this.handleQuickPlay();
     play.appendChild(quick);
 
     const create = this.createButton("Create Game", false);
-    create.onclick = () => this.handleCreate();
+    create.onclick = () => void this.handleCreate();
     play.appendChild(create);
 
     play.appendChild(this.label("Join code"));
@@ -141,7 +150,7 @@ export class LobbyScreen extends BaseScreen {
     fk.className = "cr-kicker";
     fk.textContent = "Arena Forge";
     const ft = document.createElement("div");
-    ft.textContent = "Design a Search & Destroy variant with a bounded agent.";
+    ft.textContent = "Draw an arena, place starts, and let ArenaForge build a playable map.";
     ft.className = "cr-copy cr-copy--left";
     const steps = document.createElement("div");
     steps.className = "cr-copy cr-copy--left";
@@ -171,14 +180,78 @@ export class LobbyScreen extends BaseScreen {
   private renderMapCards(): void {
     const maps = getPublicMaps();
     this.mapList.replaceChildren();
+    const officialHead = document.createElement("div");
+    officialHead.className = "cr-kicker";
+    officialHead.textContent = "Official";
+    this.mapList.appendChild(officialHead);
     for (const map of maps) {
       this.mapList.appendChild(this.mapCard(map));
+    }
+    const yours = personalMapsForMode(this.personalMaps, this.selectedMode);
+    const yourHead = document.createElement("div");
+    yourHead.className = "cr-kicker";
+    yourHead.style.marginTop = "10px";
+    yourHead.textContent = "Your Maps";
+    this.mapList.appendChild(yourHead);
+    if (this.personalMapsError) {
+      const err = document.createElement("div");
+      err.className = "cr-copy cr-copy--left";
+      err.textContent = this.personalMapsError;
+      this.mapList.appendChild(err);
+    } else if (yours.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "cr-copy cr-copy--left";
+      empty.textContent = this.isPersistentUser()
+        ? "No saved Forge maps for this mode."
+        : "No session maps for this mode. Generate in Arena Forge, then Save Map.";
+      this.mapList.appendChild(empty);
+    }
+    for (const map of yours) {
+      this.mapList.appendChild(this.personalCard(map));
+    }
+    if (this.selectedSavedMapId && yours.some((m) => m.id === this.selectedSavedMapId)) {
+      const row = document.createElement("div");
+      row.className = "cr-row";
+      row.style.marginTop = "8px";
+      const rename = this.createButton("Rename", false);
+      rename.classList.add("cr-button--inline");
+      rename.onclick = () => void this.renameSelected();
+      const del = this.createButton("Delete", false);
+      del.classList.add("cr-button--inline");
+      del.onclick = () => void this.deleteSelected();
+      row.append(rename, del);
+      this.mapList.appendChild(row);
     }
     this.syncPreviewCopy();
   }
 
+  private personalCard(map: SavedMapMeta): HTMLButtonElement {
+    const selected = map.id === this.selectedSavedMapId;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `cr-card${selected ? " is-selected" : ""}`;
+    const created = new Date(map.createdAt);
+    const when = Number.isNaN(created.getTime())
+      ? ""
+      : created.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    btn.innerHTML = `
+      <div class="cr-kicker">FORGE</div>
+      <div>${map.name}</div>
+      <div class="cr-copy cr-copy--left" style="margin:8px 0 0">${forgeMapTitle(map.name)}</div>
+      <div class="cr-copy cr-copy--left">${map.mode === "deathmatch" ? "Deathmatch" : "Search & Destroy"}${when ? ` · ${when}` : ""}${map.sessionOnly ? " · This session" : ""}</div>
+      <div class="cr-copy cr-copy--left">${selected ? "Selected" : "Select"}</div>
+    `;
+    btn.onclick = () => {
+      this.selectedSavedMapId = map.id;
+      this.errorDiv.textContent = "";
+      this.renderMapCards();
+      void this.refreshPersonalShowcase(map.id);
+    };
+    return btn;
+  }
+
   private mapCard(map: PublicMapInfo): HTMLButtonElement {
-    const selected = map.id === this.selectedMapId;
+    const selected = !this.selectedSavedMapId && map.id === this.selectedMapId;
     const supports = map.modes.includes(this.selectedMode);
     const btn = document.createElement("button");
     btn.type = "button";
@@ -194,6 +267,7 @@ export class LobbyScreen extends BaseScreen {
     `;
     btn.onclick = () => {
       this.selectedMapId = map.id;
+      this.selectedSavedMapId = undefined;
       this.errorDiv.textContent = "";
       this.renderMapCards();
       this.refreshShowcase();
@@ -202,8 +276,18 @@ export class LobbyScreen extends BaseScreen {
   }
 
   private syncPreviewCopy(): void {
+    if (this.selectedSavedMapId) {
+      const map = this.personalMaps.find((m) => m.id === this.selectedSavedMapId);
+      this.previewTitle.textContent = map ? forgeMapTitle(map.name) : "Selected map";
+      return;
+    }
     const map = getPublicMaps().find((m) => m.id === this.selectedMapId);
     this.previewTitle.textContent = map?.title ?? "Selected map";
+  }
+
+  private isPersistentUser(): boolean {
+    const id = this.user?.id ?? "";
+    return Boolean(id) && !id.startsWith("guest-") && !id.startsWith("dev-user-");
   }
 
   private refreshShowcase(): void {
@@ -269,14 +353,18 @@ export class LobbyScreen extends BaseScreen {
     this.showcase.attach(this.previewHost);
     this.refreshShowcase();
     this.showcase.start();
+    void this.loadPersonalMaps();
   }
 
   protected override onHide(): void {
     this.showcase.dispose();
   }
 
-  private selectedCreate(): { gameMode: GameModeId; mapId: string } | undefined {
-    const map = getPublicMaps().find((m) => m.id === this.selectedMapId);
+  private selectedOfficial(): { gameMode: GameModeId; mapId: string } | undefined {
+    const officialId = this.selectedSavedMapId
+      ? getPublicMaps().find((m) => m.modes.includes(this.selectedMode))?.id
+      : this.selectedMapId;
+    const map = getPublicMaps().find((m) => m.id === officialId);
     if (!map) {
       this.errorDiv.textContent = "Choose a production map.";
       return undefined;
@@ -286,6 +374,10 @@ export class LobbyScreen extends BaseScreen {
       return undefined;
     }
     return { gameMode: this.selectedMode, mapId: map.id };
+  }
+
+  private selectedCreate(): { gameMode: GameModeId; mapId: string } | undefined {
+    return this.selectedOfficial();
   }
 
   private async handleQuickPlay(): Promise<void> {
@@ -317,9 +409,31 @@ export class LobbyScreen extends BaseScreen {
     }
   }
 
-  private handleCreate(): void {
+  private async handleCreate(): Promise<void> {
     this.errorDiv.textContent = "";
-    const selected = this.selectedCreate();
+    if (this.selectedSavedMapId) {
+      const personal = this.personalMaps.find((m) => m.id === this.selectedSavedMapId);
+      if (!personal) {
+        this.errorDiv.textContent = "Choose a map.";
+        return;
+      }
+      if (personal.mode !== this.selectedMode) {
+        this.errorDiv.textContent = "That Forge map was designed for a different mode.";
+        return;
+      }
+      try {
+        const launched = await api.launchMyMap(personal.id);
+        this.onPlay({
+          type: "create",
+          gameMode: personal.mode,
+          savedMapLaunchId: launched.launchId,
+        });
+      } catch (err) {
+        this.errorDiv.textContent = err instanceof Error ? err.message : "Failed to launch map.";
+      }
+      return;
+    }
+    const selected = this.selectedOfficial();
     if (!selected) return;
     this.onPlay({ type: "create", gameMode: selected.gameMode, mapId: selected.mapId });
   }
@@ -346,6 +460,54 @@ export class LobbyScreen extends BaseScreen {
       // Ignore logout errors
     }
     this.onLogout();
+  }
+
+  private async loadPersonalMaps(): Promise<void> {
+    this.personalMapsError = "";
+    try {
+      this.personalMaps = await api.listMyMaps();
+    } catch {
+      this.personalMaps = [];
+      this.personalMapsError = "Could not load your maps. Official maps still work.";
+    }
+    this.renderMapCards();
+  }
+
+  private async refreshPersonalShowcase(id: string): Promise<void> {
+    if (!this.visible) return;
+    try {
+      const detail = await api.getMyMap(id);
+      this.showcase.setGameplayMap(detail.mapDefinition);
+    } catch {
+      this.refreshShowcase();
+    }
+  }
+
+  private async renameSelected(): Promise<void> {
+    if (!this.selectedSavedMapId) return;
+    const current = this.personalMaps.find((m) => m.id === this.selectedSavedMapId);
+    const next = window.prompt("Rename map", current?.name ?? "");
+    if (next == null) return;
+    try {
+      await api.renameMyMap(this.selectedSavedMapId, next);
+      await this.loadPersonalMaps();
+    } catch (err) {
+      this.errorDiv.textContent = err instanceof Error ? err.message : "Rename failed.";
+    }
+  }
+
+  private async deleteSelected(): Promise<void> {
+    if (!this.selectedSavedMapId) return;
+    if (!window.confirm("Delete this Forge map?")) return;
+    try {
+      await api.deleteMyMap(this.selectedSavedMapId);
+      this.selectedSavedMapId = undefined;
+      this.selectedMapId = getPublicMaps()[0]?.id ?? "shoot-house-neon";
+      await this.loadPersonalMaps();
+      this.refreshShowcase();
+    } catch (err) {
+      this.errorDiv.textContent = err instanceof Error ? err.message : "Delete failed.";
+    }
   }
 
   override destroy(): void {

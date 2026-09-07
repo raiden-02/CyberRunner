@@ -118,7 +118,7 @@ export class GameRoom extends Room<GameState> {
     return true;
   }
 
-  async onCreate(options: { gameMode?: string; mapId?: string; forgeMapId?: string } = {}) {
+  async onCreate(options: { gameMode?: string; mapId?: string; forgeMapId?: string; savedMapLaunchId?: string } = {}) {
     this.setState(new GameState());
 
     this.maxPlayers = Number(process.env.MAX_PLAYERS || DEFAULT_MAX_PLAYERS);
@@ -131,7 +131,7 @@ export class GameRoom extends Room<GameState> {
     this.map = resolved.map;
     this.state.mapId = resolved.stateMapId;
 
-    const modeId = assertCreatedRoomMode(options, this.map, process.env.MAP_ID);
+    const modeId = assertCreatedRoomMode(options, this.map, process.env.MAP_ID, resolved);
     this.gameMode = createGameMode(modeId, this.map.uploadTerminals || []);
 
     const roomInfo = LobbyService.registerRoom(this.roomId, {

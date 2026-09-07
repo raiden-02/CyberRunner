@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { MaterialFactory, MATERIAL_PRESETS, type MaterialParams } from "./MaterialFactory.js";
 import type { NeonColorKey } from "./NeonColors.js";
+import { boundaryWalls, type MapBoundsRect } from "@shared/world/map-bounds.js";
 import type { BoxObstacle } from "@shared/world/map-types.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 
@@ -46,59 +47,79 @@ export abstract class BaseLevel {
   // COMMON CONSTRUCTION METHODS
   // ═══════════════════════════════════════════════════════════════
 
-  /**
-   * Create the ground plane with optional grid
-   */
   protected createGroundPlane(
     size: number,
     materialPreset: keyof typeof MATERIAL_PRESETS = "floor",
     showGrid = true,
     gridDivisions = 60
   ): void {
+    this.createGroundFromBounds(
+      { centerX: 0, centerZ: 0, halfWidth: size / 2, halfDepth: size / 2 },
+      materialPreset,
+      showGrid,
+      gridDivisions,
+    );
+  }
+
+  protected createGroundFromBounds(
+    bounds: MapBoundsRect,
+    materialPreset: keyof typeof MATERIAL_PRESETS = "floor",
+    showGrid = true,
+    gridDivisions = 60,
+    pad = 0,
+  ): void {
+    const width = bounds.halfWidth * 2 + pad;
+    const depth = bounds.halfDepth * 2 + pad;
     const floorMat = this.materialFactory.createMaterial(MATERIAL_PRESETS[materialPreset]);
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(size, size),
+      new THREE.PlaneGeometry(width, depth),
       floorMat
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = 0;
+    floor.position.set(bounds.centerX, 0, bounds.centerZ);
     floor.receiveShadow = true;
     this.addMesh(floor);
 
     if (showGrid) {
-      const grid = new THREE.GridHelper(size, gridDivisions, 0x8a8274, 0x6a6862);
-      grid.position.y = 0.01;
+      const span = Math.max(width, depth);
+      const grid = new THREE.GridHelper(span, gridDivisions, 0x8a8274, 0x6a6862);
+      grid.position.set(bounds.centerX, 0.01, bounds.centerZ);
       this.scene.add(grid);
     }
   }
 
-  /**
-   * Create boundary walls around the map
-   */
   protected createBoundaryWalls(
     halfSize: number,
     wallHeight: number,
     wallThickness: number,
     materialPreset: keyof typeof MATERIAL_PRESETS = "wall"
   ): void {
+    this.createBoundaryWallsFromBounds(
+      { centerX: 0, centerZ: 0, halfWidth: halfSize, halfDepth: halfSize },
+      wallHeight,
+      wallThickness,
+      materialPreset,
+    );
+  }
+
+  protected createBoundaryWallsFromBounds(
+    bounds: MapBoundsRect,
+    wallHeight: number,
+    wallThickness: number,
+    materialPreset: keyof typeof MATERIAL_PRESETS = "wall",
+  ): void {
     const wallMat = this.materialFactory.createMaterial(MATERIAL_PRESETS[materialPreset]);
     const posY = wallHeight / 2;
-
-    const wallGeomX = new THREE.BoxGeometry(wallThickness * 2, wallHeight, halfSize * 2);
-    const wallGeomZ = new THREE.BoxGeometry(halfSize * 2, wallHeight, wallThickness * 2);
-
-    const createWall = (geom: THREE.BoxGeometry, x: number, z: number): THREE.Mesh => {
-      const wall = new THREE.Mesh(geom, wallMat);
-      wall.position.set(x, posY, z);
-      wall.castShadow = true;
-      wall.receiveShadow = true;
-      return wall;
-    };
-
-    this.addMesh(createWall(wallGeomX, halfSize + wallThickness, 0));
-    this.addMesh(createWall(wallGeomX, -halfSize - wallThickness, 0));
-    this.addMesh(createWall(wallGeomZ, 0, halfSize + wallThickness));
-    this.addMesh(createWall(wallGeomZ, 0, -halfSize - wallThickness));
+    for (const wall of boundaryWalls(bounds, wallThickness)) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(wall.hx * 2, wallHeight, wall.hz * 2),
+        wallMat,
+      );
+      mesh.position.set(wall.tx, posY, wall.tz);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.addMesh(mesh);
+    }
   }
 
   /**
