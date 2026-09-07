@@ -370,6 +370,7 @@ export async function runArenaDesigner(args: {
         continue;
       }
       record.outcome = { ok: true };
+      record.route = routed;
       record.evaluationAfter = structuredClone(workspace.evaluation);
       commitTurn(record);
       const after = workspace.currentMap();

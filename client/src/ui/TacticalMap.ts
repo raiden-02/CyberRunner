@@ -13,6 +13,7 @@ export type TacticalMapState = {
   hotspot?: ForgePlaytestSummary["firstContact"]["hotspot"];
   replay?: ForgePlaytestReplay;
   replayProgress: number;
+  route?: { waypoints: Array<{ x: number; z: number }> };
 };
 
 const SOLID_COLOR: Record<string, string> = {
@@ -96,6 +97,10 @@ export class TacticalMap {
       ctx.fillStyle = THEME.paper;
       ctx.font = "11px Segoe UI, sans-serif";
       ctx.fillText(obj.id, toX(obj.x) - 4, toY(obj.z) + 4);
+    }
+
+    if (state.route && state.route.waypoints.length >= 2) {
+      drawPath(ctx, state.route.waypoints, toX, toY, THEME.warning);
     }
 
     if (state.replay) {

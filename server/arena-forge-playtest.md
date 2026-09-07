@@ -2,7 +2,7 @@
 
 Seeded scripted-playtest proxy for ArenaForge. Offline design analysis. Not a GameRoom bot, not human play, not combat AI, not a balance score.
 
-The recorded agent run is the JSON at `server/fixtures/arena-forge/p5-demo.json`. That is the same run the lobby Forge screen plays.
+The recorded agent run is the JSON at `server/fixtures/arena-forge/p5-demo.json`. That is frozen P5 evaluation evidence. The public Forge Recorded Design tab plays the native product fixture instead.
 
 ## What it measures
 

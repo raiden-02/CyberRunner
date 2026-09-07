@@ -31,8 +31,8 @@ Search & Destroy and Deathmatch are both supported. Playing a saved map does not
 
 Open Arena Forge in the lobby.
 
-- **Recorded Run** is already there. Watch the timeline, then Play Result. No model key.
-- **New Design** is the product path: mouse-draw a rectangle, place starts, write a brief, Generate.
+- **Recorded Design** replays a complete native S&D design from a blank user-defined arena, including the plan, construction, deterministic checks, route inspection, playtest feedback, and revision. It runs without a model key.
+- **New Design** is the live product path: mouse-draw a rectangle, place starts, write a brief, Generate.
 
 Saved maps show up in Create Game as `FORGE · <name>`. Quick Play stays official maps only.
 
@@ -60,9 +60,9 @@ Room          Postgres
 
 To run live design on your machine, put an OpenAI or Anthropic key on the server. See [`docs/arena-forge-live.md`](docs/arena-forge-live.md). Guests can Save Map for the current session. Keeping maps on a profile needs Postgres and a signed-in user. The public site keeps live design off unless you turn it on with sign-in and daily caps.
 
-The recorded numbers used OpenAI. Both providers can run live. That is not a claim they produce the same maps.
+Recorded Design is a product demonstration of the current native loop. Historical P4 and P5 runs remain evaluation and research evidence. They are not a public Forge tab.
 
-Both designers solved the simple repair cases (blocked spawn, broken routes) in one edit. A harder suite, where a useful edit can break something else, did not show the iterative designer winning overall. The recorded live session queried the playtest, overcorrected, then revised.
+Both historical designers solved the simple repair cases (blocked spawn, broken routes) in one edit. A harder suite, where a useful edit can break something else, did not show the iterative designer winning overall. The historical P5 session queried the playtest, overcorrected, then revised.
 
 Numbers: [`server/arena-forge-evaluation.md`](server/arena-forge-evaluation.md), [`server/arena-forge-evaluation-p4b.md`](server/arena-forge-evaluation-p4b.md), [`server/arena-forge-playtest.md`](server/arena-forge-playtest.md).
 

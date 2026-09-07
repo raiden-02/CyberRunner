@@ -10,6 +10,9 @@ import { getDesignJob, type DesignJobRecord } from "./design-jobs.js";
 import { guestMapOwnerId } from "./guest-map-session.js";
 import { exportGameplayMap } from "./export-map.js";
 import { productCompletionIssues } from "./product-tools.js";
+import { isNativeDemoJobId, loadNativeRecordedDemo } from "./native-recorded-demo.js";
+import { NATIVE_DEMO_ID } from "./native-demo-spec.js";
+import type { ArenaMap } from "./types.js";
 
 export const SAVED_MAP_FORMAT_VERSION = 1;
 export const MAX_SAVED_MAPS_PER_USER = 20;
@@ -297,16 +300,42 @@ export function parseSavedRuntimeMapId(id: string): string | undefined {
   return id.slice("user-map:".length);
 }
 
-export async function saveCompletedDesign(args: {
-  userId: string;
-  jobId: string;
-  name: string;
-  store: SavedMapStore;
-  createId?: () => string;
-}): Promise<{ ok: true; record: SavedMapRecord } | { ok: false; status: number; error: string }> {
-  const job = getDesignJob(args.jobId);
+type SaveableProductDesign = {
+  sourceJobId: string;
+  mode: ArenaGameMode;
+  brief: string;
+  designPlan: PublicDesignPlan;
+  finalMap: ArenaMap;
+  evaluation: ReturnType<typeof evaluateGameplayMap>;
+  provider?: string;
+  model?: string;
+};
+
+function recordedSaveable(): SaveableProductDesign | { ok: false; status: number; error: string } {
+  try {
+    const demo = loadNativeRecordedDemo();
+    return {
+      sourceJobId: NATIVE_DEMO_ID,
+      mode: "search_destroy",
+      brief: demo.brief,
+      designPlan: demo.designPlan,
+      finalMap: demo.finalMap,
+      evaluation: demo.result.finalEvaluation,
+      provider: demo.provider,
+      model: demo.model,
+    };
+  } catch (err) {
+    return { ok: false, status: 404, error: err instanceof Error ? err.message : "Recorded design is not available." };
+  }
+}
+
+function liveSaveable(
+  jobId: string,
+  userId: string,
+): SaveableProductDesign | { ok: false; status: number; error: string } {
+  const job = getDesignJob(jobId);
   if (!job) return { ok: false, status: 404, error: "That design job is gone." };
-  if (!jobOwnedBy(job, args.userId)) {
+  if (!jobOwnedBy(job, userId)) {
     return { ok: false, status: 403, error: "You do not own that design job." };
   }
   if (job.status !== "completed" || !job.result || job.result.status !== "completed") {
@@ -317,8 +346,32 @@ export async function saveCompletedDesign(args: {
   }
   const plan = job.designPlan ?? ("designPlan" in job.result ? job.result.designPlan : undefined);
   if (!plan) return { ok: false, status: 409, error: "Completed design is missing a design plan." };
+  return {
+    sourceJobId: job.id,
+    mode: job.mode,
+    brief: job.brief,
+    designPlan: plan,
+    finalMap: job.result.finalMap,
+    evaluation: job.result.finalEvaluation,
+    provider: job.provider,
+    model: job.providerModel,
+  };
+}
 
-  const blockers = productCompletionIssues(job.result.finalMap, job.result.finalEvaluation, job.mode);
+export async function saveCompletedDesign(args: {
+  userId: string;
+  jobId: string;
+  name: string;
+  store: SavedMapStore;
+  createId?: () => string;
+}): Promise<{ ok: true; record: SavedMapRecord } | { ok: false; status: number; error: string }> {
+  const source = isNativeDemoJobId(args.jobId)
+    ? recordedSaveable()
+    : liveSaveable(args.jobId, args.userId);
+  if ("ok" in source && source.ok === false) return source;
+
+  const design = source as SaveableProductDesign;
+  const blockers = productCompletionIssues(design.finalMap, design.evaluation, design.mode);
   if (blockers.length) {
     return { ok: false, status: 409, error: `Map is not ready to save: ${blockers.join(", ")}.` };
   }
@@ -326,7 +379,7 @@ export async function saveCompletedDesign(args: {
   const named = parseSavedMapName(args.name);
   if (!named.ok) return { ok: false, status: 400, error: named.error };
 
-  const existing = await args.store.findBySourceJob(args.userId, args.jobId);
+  const existing = await args.store.findBySourceJob(args.userId, design.sourceJobId);
   if (existing) return { ok: true, record: existing };
 
   const count = await args.store.count(args.userId);
@@ -336,15 +389,15 @@ export async function saveCompletedDesign(args: {
 
   const id = (args.createId ?? randomUUID)();
   const runtimeId = savedRuntimeMapId(id);
-  const mapDefinition = exportGameplayMap(job.result.finalMap, {
+  const mapDefinition = exportGameplayMap(design.finalMap, {
     id: runtimeId,
     name: named.name,
   });
   try {
-    if (job.mode === "search_destroy") assertSearchDestroyMap(mapDefinition);
+    if (design.mode === "search_destroy") assertSearchDestroyMap(mapDefinition);
     else assertDeathmatchMap(mapDefinition);
-    const ev = evaluateGameplayMap(mapDefinition, job.mode);
-    const again = productCompletionIssues(job.result.finalMap, ev, job.mode);
+    const ev = evaluateGameplayMap(mapDefinition, design.mode);
+    const again = productCompletionIssues(design.finalMap, ev, design.mode);
     if (again.length) {
       return { ok: false, status: 409, error: `Map failed validation: ${again.join(", ")}.` };
     }
@@ -357,14 +410,14 @@ export async function saveCompletedDesign(args: {
     id,
     userId: args.userId,
     name: named.name,
-    mode: job.mode,
-    brief: job.brief,
-    designPlan: plan,
+    mode: design.mode,
+    brief: design.brief,
+    designPlan: design.designPlan,
     mapDefinition,
     mapFormatVersion: SAVED_MAP_FORMAT_VERSION,
-    sourceJobId: job.id,
-    provider: job.provider,
-    model: job.providerModel,
+    sourceJobId: design.sourceJobId,
+    provider: design.provider,
+    model: design.model,
     createdAt: now,
     updatedAt: now,
   };

@@ -144,6 +144,7 @@ export type PlaytestAgentTurnRecord = {
   };
   evaluationAfter?: ArenaEvaluation;
   playtest?: ArenaPlaytestReport;
+  route?: TraceRouteResult;
   latencyMs: number;
   usage?: TokenUsage;
 };

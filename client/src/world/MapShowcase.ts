@@ -74,7 +74,7 @@ export class MapShowcase {
     window.addEventListener("resize", this.onResize);
   }
 
-  setGameplayMap(map: GameplayMapDefinition, highlight?: ShowcaseHighlight): void {
+  setGameplayMap(map: GameplayMapDefinition, highlight?: ShowcaseHighlight | ShowcaseHighlight[]): void {
     if (!this.scene) return;
     const source = showcaseSourceForGameplayMapId(map.id);
     if (source.mapId !== map.id) {
@@ -83,7 +83,7 @@ export class MapShowcase {
     this.applyMap(map, highlight);
   }
 
-  setForgeView(view: PublicArenaMapView, highlight?: ShowcaseHighlight): void {
+  setForgeView(view: PublicArenaMapView, highlight?: ShowcaseHighlight | ShowcaseHighlight[]): void {
     if (!this.scene) return;
     const source = showcaseSourceForForgePreview();
     const map = gameplayFromPublicView(view, {
@@ -94,7 +94,7 @@ export class MapShowcase {
   }
 
   /** @deprecated use setForgeView or setGameplayMap */
-  setMap(view: PublicArenaMapView, highlight?: ShowcaseHighlight): void {
+  setMap(view: PublicArenaMapView, highlight?: ShowcaseHighlight | ShowcaseHighlight[]): void {
     this.setForgeView(view, highlight);
   }
 
@@ -129,7 +129,7 @@ export class MapShowcase {
     this.host = null;
   }
 
-  private applyMap(map: GameplayMapDefinition, highlight?: ShowcaseHighlight): void {
+  private applyMap(map: GameplayMapDefinition, highlight?: ShowcaseHighlight | ShowcaseHighlight[]): void {
     if (!this.scene) return;
     this.clearLevel();
     this.level = createLevelFromMap(this.scene, map);
@@ -157,7 +157,8 @@ export class MapShowcase {
       this.camera.far = this.framing.far;
       this.camera.updateProjectionMatrix();
     }
-    if (highlight) this.addHighlight(highlight);
+    const boxes = highlight ? (Array.isArray(highlight) ? highlight : [highlight]) : [];
+    if (boxes.length) this.addHighlights(boxes);
   }
 
   private tick = (): void => {
@@ -199,19 +200,23 @@ export class MapShowcase {
     this.lights = [hemi, key, fill];
   }
 
-  private addHighlight(box: ShowcaseHighlight): void {
-    if (!this.scene) return;
-    const geom = new THREE.BoxGeometry(box.hx * 2 + 0.1, box.hy * 2 + 0.1, box.hz * 2 + 0.1);
+  private addHighlights(boxes: ShowcaseHighlight[]): void {
+    if (!this.scene || boxes.length === 0) return;
+    const group = new THREE.Group();
     const mat = new THREE.MeshBasicMaterial({
       color: 0x5ec8d8,
       wireframe: true,
       transparent: true,
       opacity: 0.9,
     });
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.set(box.x, box.y, box.z);
-    this.scene.add(mesh);
-    this.highlight = mesh;
+    for (const box of boxes) {
+      const geom = new THREE.BoxGeometry(box.hx * 2 + 0.1, box.hy * 2 + 0.1, box.hz * 2 + 0.1);
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(box.x, box.y, box.z);
+      group.add(mesh);
+    }
+    this.scene.add(group);
+    this.highlight = group;
   }
 
   private clearLevel(): void {

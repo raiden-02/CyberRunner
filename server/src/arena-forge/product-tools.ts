@@ -15,6 +15,11 @@ import {
   type AgentToolOutput,
 } from "./agent-tools.js";
 import { circleInsideBounds, isFiniteNumber } from "./geometry.js";
+import {
+  inspectProductClearance,
+  MIN_PRODUCT_PASSAGE_METERS,
+  rejectClearanceRegression,
+} from "./product-clearance.js";
 import { deathmatchAllPairs } from "./product-dm-diagnostics.js";
 import {
   isProductLayoutTool,
@@ -300,6 +305,7 @@ Walls must be axis-aligned. Use move_solid, resize_solid, and remove_solid for c
 Use trace_route to see where a path travels. It does not change the map.
 Call exactly one tool per turn.
 The deterministic evaluator is authoritative for geometry, navigation, and line of sight.
+Any intentional opening between walls or cover must be at least ${MIN_PRODUCT_PASSAGE_METERS} m wide; otherwise connect the pieces with no gap. Deterministic clearance checks are authoritative.
 Preserve viable routes. Finish when further edits are unlikely to help and the map meets the hard completion checks.`;
 }
 
@@ -356,31 +362,62 @@ export function rejectOutOfEnvelope(
 
 export function productInspection(workspace: ArenaWorkspace) {
   const inspection = workspace.inspect();
-  if (workspace.mode !== "deathmatch") return inspection;
-  return {
+  const withClearance = {
     ...inspection,
+    clearance: inspectProductClearance(workspace.currentMap()),
+  };
+  if (workspace.mode !== "deathmatch") return withClearance;
+  return {
+    ...withClearance,
     deathmatchPairs: deathmatchAllPairs(workspace.currentMap()),
   };
 }
+
+function failProductEdit(
+  workspace: ArenaWorkspace,
+  error: ArenaEditError,
+): AgentToolOutput {
+  return { ok: false, error, inspection: productInspection(workspace) };
+}
+
+export type ProductApplyOptions = {
+  /** Historical timeline replay applies already-accepted edits. Live tools keep this on. */
+  enforceClearance?: boolean;
+};
 
 export function applyProductLayoutEdit(
   workspace: ArenaWorkspace,
   rawName: string,
   rawArgs: unknown,
   envelope: MapBoundsRect,
+  options: ProductApplyOptions = {},
 ): AgentToolOutput {
   const parsed = parseProductLayoutAction(rawName, rawArgs);
   if (typeof parsed === "string") {
-    return { ok: false, error: { code: "invalid-args", target: parsed }, inspection: productInspection(workspace) };
+    return failProductEdit(workspace, { code: "invalid-args", target: parsed });
   }
-  const planned = layoutSolidActions(workspace.currentMap(), parsed, envelope);
+  const before = workspace.currentMap();
+  const planned = layoutSolidActions(before, parsed, envelope);
   if (!planned.ok) {
-    return { ok: false, error: planned.error, inspection: productInspection(workspace) };
+    return failProductEdit(workspace, planned.error);
   }
+  let trialMap = before;
+  for (const solid of planned.actions) {
+    const blocked = rejectOutOfEnvelope(trialMap, solid, envelope);
+    if (blocked) return failProductEdit(workspace, blocked);
+    const next = applyArenaEdit(trialMap, solid, createIdAllocator(trialMap));
+    if (!next.ok) return failProductEdit(workspace, next.error);
+    trialMap = next.map;
+  }
+  if (options.enforceClearance !== false) {
+    const clearance = rejectClearanceRegression(before, trialMap);
+    if (clearance) return failProductEdit(workspace, clearance);
+  }
+
   const changedIds: string[] = [];
   for (const solid of planned.actions) {
-    const result = applyProductEdit(workspace, solid, envelope);
-    if (!result.ok) return result;
+    const result = applyEditTool(workspace, solid);
+    if (!result.ok) return { ...result, inspection: productInspection(workspace) };
     changedIds.push(...result.changedIds);
   }
   return { ok: true, changedIds, inspection: productInspection(workspace) };
@@ -390,23 +427,31 @@ export function applyProductEdit(
   workspace: ArenaWorkspace,
   action: ArenaEditAction,
   envelope: MapBoundsRect,
+  options: ProductApplyOptions = {},
 ): AgentToolOutput {
   if (action.type === "move_spawn") {
     return {
       ok: false,
       error: { code: "spawn-locked", target: action.spawnId },
-      inspection: workspace.inspect(),
+      inspection: productInspection(workspace),
     };
   }
-  const blocked = rejectOutOfEnvelope(workspace.currentMap(), action, envelope);
+  const before = workspace.currentMap();
+  const blocked = rejectOutOfEnvelope(before, action, envelope);
   if (blocked) {
-    return { ok: false, error: blocked, inspection: productInspection(workspace) };
+    return failProductEdit(workspace, blocked);
+  }
+  const trial = trialEdit(before, action);
+  if (trial.ok && options.enforceClearance !== false) {
+    const clearance = rejectClearanceRegression(before, trial.map);
+    if (clearance) return failProductEdit(workspace, clearance);
   }
   const output = applyEditTool(workspace, action);
   return { ...output, inspection: productInspection(workspace) };
 }
 
-export function productCompletionIssues(
+/** Mode/evaluator checks without product-specific design constraints. */
+export function productModeCompletionIssues(
   map: ArenaMap,
   evaluation: ArenaEvaluation,
   mode: ArenaGameMode,
@@ -428,6 +473,16 @@ export function productCompletionIssues(
     if (generals.length < 4) issues.push("need-more-spawns");
     if (map.objectives.length > 0) issues.push("unexpected-objectives");
   }
+  return [...new Set(issues)];
+}
+
+export function productCompletionIssues(
+  map: ArenaMap,
+  evaluation: ArenaEvaluation,
+  mode: ArenaGameMode,
+): string[] {
+  const issues = productModeCompletionIssues(map, evaluation, mode);
+  if (inspectProductClearance(map).issues.length) issues.push("narrow-passage");
   return [...new Set(issues)];
 }
 

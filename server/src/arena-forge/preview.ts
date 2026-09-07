@@ -12,6 +12,8 @@ import { getSavedRuntimeMap } from "./saved-runtime-maps.js";
 import { parseSavedRuntimeMapId } from "./saved-maps.js";
 import { parseDemoCatalogId, parseJobCatalogId } from "./design-view.js";
 import { recordedDemoMap } from "./recorded-demo.js";
+import { nativeRecordedDemoMap, parseNativeDemoCatalogId } from "./native-recorded-demo.js";
+import { assertExploreMap } from "@shared/world/explore-map.js";
 import type { ArenaMap } from "./types.js";
 
 const RESULTS_ROOT = path.join(SERVER_DIR, ".arena-forge-results");
@@ -143,6 +145,17 @@ export function loadForgeMap(catalogId?: string): GameplayMapDefinition {
       return exported;
     }
     if (job?.path === "product" && job.mode === "search_destroy") {
+      return exported;
+    }
+    return asPreview(exported, name);
+  }
+  const nativeWhich = parseNativeDemoCatalogId(catalogId);
+  if (nativeWhich) {
+    const map = nativeRecordedDemoMap(nativeWhich);
+    const name = nativeWhich === "initial" ? "Original setup" : "Crossfire Yard";
+    const exported = exportGameplayMap(map, { id: ARENA_FORGE_PREVIEW_MAP_ID, name });
+    if (nativeWhich === "initial") {
+      assertExploreMap(exported);
       return exported;
     }
     return asPreview(exported, name);
