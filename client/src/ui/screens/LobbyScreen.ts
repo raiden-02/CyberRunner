@@ -426,7 +426,6 @@ export class LobbyScreen extends BaseScreen {
           type: "create",
           gameMode: personal.mode,
           mapLaunchId: launched.launchId,
-          savedMapLaunchId: launched.launchId,
         });
       } catch (err) {
         this.errorDiv.textContent = err instanceof Error ? err.message : "Failed to launch map.";

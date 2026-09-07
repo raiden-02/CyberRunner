@@ -21,6 +21,7 @@ import {
 import { resetSavedRuntimeMaps } from "../src/arena-forge/saved-runtime-maps.js";
 import { assertCreatedRoomMode, resolveCreatedRoomMap } from "../src/room-map.js";
 import type { AgentTurnDecision } from "../src/arena-forge/agent.js";
+import { completeNativeSndJob } from "./arena-snd-fixture.js";
 
 function call(name: string, args: Record<string, unknown>): AgentTurnDecision {
   return { latencyMs: 1, calls: [{ name, arguments: args, callId: name }] };
@@ -406,6 +407,33 @@ describe("launch grants and rooms", () => {
       { gameMode: "search_destroy", forgeMapId: "job:job-blank-snd:initial" },
       resolved.map,
     )).toBe("search_destroy");
+  });
+
+  it("launches a saved native S&D map as a normal match with no general spawns", async () => {
+    const store = new MemorySavedMapStore();
+    const jobId = await completeNativeSndJob("user-a", "job-saved-snd");
+    const saved = await saveCompletedDesign({
+      userId: "user-a",
+      jobId,
+      name: "Split Sites",
+      store,
+      createId: () => "map-snd",
+    });
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) throw new Error(saved.error);
+    expect(saved.record.mapDefinition.spawnPoints).toEqual([]);
+    expect(saved.record.mapDefinition.ghostSpawnPoints?.length).toBeGreaterThan(0);
+    expect(saved.record.mapDefinition.sentinelSpawnPoints?.length).toBeGreaterThan(0);
+
+    const grant = issueSavedMapLaunch(saved.record, "user-a");
+    const options = { gameMode: "search_destroy" as const, mapLaunchId: grant.id };
+    const resolved = resolveCreatedRoomMap(options);
+    expect(resolved.purpose).toBe("match");
+    expect(resolved.allowSoloStart).toBe(false);
+    expect(assertCreatedRoomMode(options, resolved.map, undefined, resolved)).toBe("search_destroy");
+    expect(resolved.map.spawnPoints.length).toBe(0);
+    expect(resolved.map.ghostSpawnPoints?.length).toBeGreaterThan(0);
+    expect(resolved.map.sentinelSpawnPoints?.length).toBeGreaterThan(0);
   });
 });
 

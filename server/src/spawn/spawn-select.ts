@@ -1,8 +1,58 @@
 import { isPointInsideBox } from "@shared/world/map-types.js";
-import type { GameplayMapDefinition } from "@shared/world/map-types.js";
+import type { GameplayMapDefinition, SpawnPoint } from "@shared/world/map-types.js";
 import type { PlayerRuntime } from "../player-runtime.js";
 
 const MIN_SPAWN_DISTANCE = 8;
+
+export type SpawnCandidateSource = "ghosts" | "sentinels" | "general" | "snd-fallback";
+
+function usableSpawns(points: SpawnPoint[] | undefined): SpawnPoint[] | undefined {
+  if (!points || points.length === 0) return undefined;
+  return points;
+}
+
+function requireSpawn(points: SpawnPoint[] | undefined, message: string): SpawnPoint[] {
+  const usable = usableSpawns(points);
+  if (!usable) throw new Error(message);
+  return usable;
+}
+
+function pickDefined(points: SpawnPoint[]): SpawnPoint {
+  return points[Math.floor(Math.random() * points.length)]!;
+}
+
+/**
+ * Team-aware spawn lists. Search & Destroy uses team arrays only.
+ * Empty general spawnPoints is valid for native S&D maps.
+ */
+export function spawnCandidates(
+  map: GameplayMapDefinition,
+  teamId: string | undefined,
+): { points: SpawnPoint[]; source: SpawnCandidateSource } {
+  if (teamId === "ghosts") {
+    return {
+      points: requireSpawn(map.ghostSpawnPoints, "Map has no usable Ghost spawn points."),
+      source: "ghosts",
+    };
+  }
+  if (teamId === "sentinels") {
+    return {
+      points: requireSpawn(map.sentinelSpawnPoints, "Map has no usable Sentinel spawn points."),
+      source: "sentinels",
+    };
+  }
+
+  const general = usableSpawns(map.spawnPoints);
+  if (general) return { points: general, source: "general" };
+
+  const ghosts = usableSpawns(map.ghostSpawnPoints) ?? [];
+  const sentinels = usableSpawns(map.sentinelSpawnPoints) ?? [];
+  if (ghosts.length > 0 || sentinels.length > 0) {
+    return { points: [...ghosts, ...sentinels], source: "snd-fallback" };
+  }
+
+  throw new Error("Map has no usable spawn points.");
+}
 
 export function isInSpawnProtectionZone(
   map: GameplayMapDefinition,
@@ -26,15 +76,8 @@ export function pickSpawnPoint(
   sessionId: string | undefined,
   getPlayerTeam: (sessionId: string) => string | undefined,
 ): { x: number; y: number; z: number } {
-  let spawnPoints = map.spawnPoints;
-  if (sessionId) {
-    const teamId = getPlayerTeam(sessionId);
-    if (teamId === "ghosts" && map.ghostSpawnPoints) {
-      spawnPoints = map.ghostSpawnPoints;
-    } else if (teamId === "sentinels" && map.sentinelSpawnPoints) {
-      spawnPoints = map.sentinelSpawnPoints;
-    }
-  }
+  const teamId = sessionId ? getPlayerTeam(sessionId) : undefined;
+  const spawnPoints = spawnCandidates(map, teamId).points;
 
   const alivePositions: Array<{ x: number; y: number; z: number }> = [];
   for (const [, player] of players) {
@@ -44,8 +87,7 @@ export function pickSpawnPoint(
   }
 
   if (alivePositions.length === 0) {
-    const idx = Math.floor(Math.random() * spawnPoints.length);
-    return spawnPoints[idx];
+    return pickDefined(spawnPoints);
   }
 
   let bestPoint = spawnPoints[0];
@@ -105,12 +147,12 @@ export function pickSpawnPoint(
       return bScore - aScore;
     });
     const pick = sorted[Math.floor(Math.random() * Math.min(3, sorted.length))];
+    if (!pick) return pickDefined(spawnPoints);
     return pick;
   }
 
   if (bestScore === -Infinity) {
-    const idx = Math.floor(Math.random() * spawnPoints.length);
-    return spawnPoints[idx];
+    return pickDefined(spawnPoints);
   }
 
   return bestPoint;
