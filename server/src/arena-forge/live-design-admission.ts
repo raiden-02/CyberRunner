@@ -2,7 +2,9 @@ import { isDatabaseEnabled } from "../db/pool.js";
 import {
   liveAgentGate,
   startDesignJob,
+  startProductDesignJob,
   validateDesignJobStart,
+  validateProductDesignStart,
   type DesignJobDeps,
 } from "./design-jobs.js";
 import type { ForgeQuotaStore } from "./forge-quota.js";
@@ -20,6 +22,7 @@ export type AdmitDesignResult =
 
 export type AdmitLiveDesignContext = {
   userId?: string;
+  guestSessionId?: string;
   quota?: ForgeQuotaStore | null;
   deps?: DesignJobDeps;
   env?: NodeJS.ProcessEnv;
@@ -92,6 +95,48 @@ export async function admitLiveDesign(
     }
 
     return startDesignJob(input, ctx.deps);
+  });
+}
+
+export async function admitProductDesign(
+  input: unknown,
+  ctx: AdmitLiveDesignContext,
+): Promise<AdmitDesignResult> {
+  if (ctx.deps?.isLiveAvailable) {
+    if (!ctx.deps.isLiveAvailable()) {
+      return { ok: false, status: 403, error: LIVE_DISABLED_MESSAGE };
+    }
+  } else {
+    const gate = liveAgentGate(ctx.env ?? process.env);
+    if (!gate.ok) return gate;
+  }
+
+  const policy = policyFromCtx(ctx);
+  if (policy.requiresAuth && !ctx.userId) {
+    return { ok: false, status: 401, error: "Sign in to run live ArenaForge." };
+  }
+  if (policy.requiresQuota && !ctx.quota) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Live design is unavailable. Quota storage is not configured.",
+    };
+  }
+
+  return runSerializedAdmit(async () => {
+    const validated = validateProductDesignStart(input, ctx.deps);
+    if (!validated.ok) return validated;
+    if (policy.requiresQuota && ctx.quota) {
+      const consumed = await ctx.quota.tryConsume(ctx.userId!);
+      if (!consumed.ok) {
+        return { ok: false, status: consumed.status, error: consumed.error };
+      }
+    }
+    return startProductDesignJob(input, {
+      ...ctx.deps,
+      ownerUserId: ctx.userId,
+      guestSessionId: ctx.userId ? undefined : ctx.guestSessionId,
+    });
   });
 }
 

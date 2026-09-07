@@ -3,11 +3,13 @@ import path from "node:path";
 import { SERVER_DIR } from "../project-paths.js";
 import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
-import { assertSearchDestroyMap } from "@shared/world/map-registry.js";
+import { assertDeathmatchMap, assertSearchDestroyMap } from "@shared/world/map-registry.js";
 import { allEvalCases, getEvalCase } from "./eval-cases.js";
 import { getP4BCase, p4bHeldOutCases } from "./eval-cases-p4b.js";
-import { getDesignJobMap } from "./design-jobs.js";
+import { getDesignJob, getDesignJobMap } from "./design-jobs.js";
 import { exportGameplayMap } from "./export-map.js";
+import { getSavedRuntimeMap } from "./saved-runtime-maps.js";
+import { parseSavedRuntimeMapId } from "./saved-maps.js";
 import { parseDemoCatalogId, parseJobCatalogId } from "./design-view.js";
 import { recordedDemoMap } from "./recorded-demo.js";
 import type { ArenaMap } from "./types.js";
@@ -121,6 +123,11 @@ function resolveRunPath(rel: string): string {
 }
 
 export function loadForgeMap(catalogId?: string): GameplayMapDefinition {
+  if (catalogId) {
+    const saved = getSavedRuntimeMap(catalogId) ??
+      (parseSavedRuntimeMapId(catalogId) ? getSavedRuntimeMap(catalogId) : undefined);
+    if (saved) return saved;
+  }
   if (!catalogId) {
     return loadArenaForgePreview();
   }
@@ -129,7 +136,16 @@ export function loadForgeMap(catalogId?: string): GameplayMapDefinition {
     const map = getDesignJobMap(jobRef.jobId, jobRef.which);
     if (!map) throw new Error(`forge job map not found: ${catalogId}`);
     const name = `ArenaForge job ${jobRef.which}`;
-    return asPreview(exportGameplayMap(map, { id: ARENA_FORGE_PREVIEW_MAP_ID, name }), name);
+    const exported = exportGameplayMap(map, { id: ARENA_FORGE_PREVIEW_MAP_ID, name });
+    const job = getDesignJob(jobRef.jobId);
+    if (job?.path === "product" && job.mode === "deathmatch") {
+      assertDeathmatchMap(exported);
+      return exported;
+    }
+    if (job?.path === "product" && job.mode === "search_destroy") {
+      return exported;
+    }
+    return asPreview(exported, name);
   }
   const demoWhich = parseDemoCatalogId(catalogId);
   if (demoWhich) {

@@ -41,6 +41,7 @@ export function importGameplayMap(map: GameplayMapDefinition): ArenaMap {
   return {
     sourceMapId: map.id,
     boundsHalfSize: map.boundsHalfSize,
+    ...(map.bounds ? { bounds: map.bounds } : {}),
     wallHeight: map.wallHeight,
     wallThickness: map.wallThickness,
     groundThickness: map.groundThickness,

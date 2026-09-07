@@ -112,6 +112,14 @@ export class HUD {
       return;
     }
 
+    if (s.gameMode === "explore") {
+      this.gameModeElement.innerHTML = `
+        <div class="cr-hud-row">
+          <div><div class="cr-hud-label">Map test</div><div class="cr-hud-value">Explore</div></div>
+        </div>`;
+      return;
+    }
+
     if (s.gameMode === "deathmatch") {
       this.gameModeElement.innerHTML = `
         <div class="cr-hud-row">

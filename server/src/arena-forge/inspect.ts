@@ -1,3 +1,4 @@
+import { resolveMapBounds } from "@shared/world/map-bounds.js";
 import type { ArenaEvaluation, ArenaMap } from "./types.js";
 
 /**
@@ -10,6 +11,7 @@ export function inspectArena(map: ArenaMap, evaluation?: ArenaEvaluation) {
   return structuredClone({
     sourceMapId: map.sourceMapId,
     boundsHalfSize: map.boundsHalfSize,
+    bounds: resolveMapBounds(map),
     wallHeight: map.wallHeight,
     wallThickness: map.wallThickness,
     groundThickness: map.groundThickness,

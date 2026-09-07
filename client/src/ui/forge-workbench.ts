@@ -11,6 +11,7 @@ export function forgeActivityText(view: ForgeDesignView): string {
   if (view.status === "completed") return "Finished";
   const last = view.turns[view.turns.length - 1];
   if (!last) return "Inspecting map…";
+  if (last.kind === "plan") return "Published design plan";
   if (last.kind === "playtest") return "Running scripted playtest…";
   if (last.kind === "edit") {
     return last.rejected ? "Edit rejected. Reassessing…" : "Applying map edit…";
@@ -64,6 +65,9 @@ export function formatTurnCard(turn: ForgeDesignTurn): string {
   if (turn.kind === "playtest" && turn.playtest) {
     const g = turn.playtest.ghost.siteChoice;
     return `${n} PLAYTEST\nA ${g.A} / B ${g.B}`;
+  }
+  if (turn.kind === "plan") {
+    return `${n} PLAN\n${turn.intent ?? "Design plan"}`.trim();
   }
   if (turn.kind === "finish") {
     return `${n} COMPLETE\n${turn.finishSummary ?? ""}`.trim();

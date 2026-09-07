@@ -76,8 +76,18 @@ export class AnthropicPlaytestAgentSession implements PlaytestAgentSession {
   readonly requestedModel: string;
   private readonly client: AnthropicMessagesClient;
   private readonly messages: AnthropicMessageParam[] = [];
+  private readonly tools: AnthropicToolSchema[];
+  private readonly systemPrompt: string;
+  private readonly formatStart: (input: PlaytestAgentStartInput) => string;
 
-  constructor(opts?: { apiKey?: string; model?: string; client?: AnthropicMessagesClient }) {
+  constructor(opts?: {
+    apiKey?: string;
+    model?: string;
+    client?: AnthropicMessagesClient;
+    tools?: AnthropicToolSchema[];
+    systemPrompt?: string;
+    formatStart?: (input: PlaytestAgentStartInput) => string;
+  }) {
     if (opts?.client) {
       this.client = opts.client;
     } else {
@@ -86,13 +96,16 @@ export class AnthropicPlaytestAgentSession implements PlaytestAgentSession {
       this.client = new Anthropic({ apiKey: key }) as unknown as AnthropicMessagesClient;
     }
     this.requestedModel = opts?.model ?? DEFAULT_ANTHROPIC_MODEL;
+    this.tools = opts?.tools ?? anthropicToolsFromPlaytest();
+    this.systemPrompt = opts?.systemPrompt ?? PLAYTEST_SYSTEM_PROMPT;
+    this.formatStart = opts?.formatStart ?? formatPlaytestStartMessage;
   }
 
   async start(input: PlaytestAgentStartInput): Promise<AgentTurnDecision> {
     this.messages.length = 0;
     this.messages.push({
       role: "user",
-      content: formatPlaytestStartMessage(input),
+      content: this.formatStart(input),
     });
     return this.request();
   }
@@ -119,8 +132,8 @@ export class AnthropicPlaytestAgentSession implements PlaytestAgentSession {
       response = await this.client.messages.create({
         model: this.requestedModel,
         max_tokens: 4096,
-        system: PLAYTEST_SYSTEM_PROMPT,
-        tools: anthropicToolsFromPlaytest(),
+        system: this.systemPrompt,
+        tools: this.tools,
         tool_choice: { type: "any", disable_parallel_tool_use: true },
         messages: this.messages,
       });

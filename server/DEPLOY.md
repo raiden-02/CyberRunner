@@ -120,6 +120,7 @@ cd /opt/CyberRunner
 sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/001_init.sql
 sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/002_loadout.sql
 sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/003_arena_forge_usage.sql
+sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/004_arena_forge_maps.sql
 ```
 
 4. Write `/opt/CyberRunner/server.env` with the table above. `chmod 600` that file. URL-encode the DB password if it contains `/`, `+`, or `@`.
@@ -187,7 +188,9 @@ New SQL files under `server/src/db/migrations/` must be applied once:
 sudo -u postgres psql -d cyberrunner -f server/src/db/migrations/00X_name.sql
 ```
 
-`001_init.sql`, `002_loadout.sql`, and `003_arena_forge_usage.sql` use `IF NOT EXISTS` and are safe to re-run.
+`001_init.sql`, `002_loadout.sql`, `003_arena_forge_usage.sql`, and `004_arena_forge_maps.sql` use `IF NOT EXISTS` and are safe to re-run.
+
+Playing a saved Forge map does not call a model. Generating a new map can.
 
 ## Smoke test
 

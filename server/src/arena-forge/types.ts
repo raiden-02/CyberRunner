@@ -1,4 +1,5 @@
 import { CAPSULE } from "@shared/physics/constants.js";
+import type { MapBoundsRect } from "@shared/world/map-bounds.js";
 
 /** Standing XZ occupancy grid. 0.5 m is enough for the 56 m Shoot House. */
 export const GRID_CELL_METERS = 0.5;
@@ -60,6 +61,7 @@ export type ArenaZone = {
 export type ArenaMap = {
   sourceMapId?: string;
   boundsHalfSize: number;
+  bounds?: MapBoundsRect;
   wallHeight: number;
   wallThickness: number;
   groundThickness: number;

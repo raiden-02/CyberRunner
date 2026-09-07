@@ -86,7 +86,7 @@ export type OneShotRunResult = {
   finalMap: ArenaMap;
 };
 
-const ACTION_TYPES = new Set<string>(ACTION_VOCABULARY);
+const ACTION_TYPES = new Set<string>([...ACTION_VOCABULARY, "place_objective"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -144,6 +144,24 @@ export function parseArenaEditAction(raw: unknown): ArenaEditAction | string {
       return "move_spawn requires spawnId and finite x,y,z";
     }
     return { type: "move_spawn", spawnId: raw.spawnId, x: raw.x, y: raw.y, z: raw.z };
+  }
+  if (raw.type === "place_objective") {
+    if (raw.objectiveId !== "A" && raw.objectiveId !== "B") {
+      return "place_objective requires objectiveId A|B";
+    }
+    if (!isFiniteNumber(raw.x) || !isFiniteNumber(raw.y) || !isFiniteNumber(raw.z)) {
+      return "place_objective requires finite x,y,z";
+    }
+    const action: ArenaEditAction = {
+      type: "place_objective",
+      objectiveId: raw.objectiveId,
+      x: raw.x, y: raw.y, z: raw.z,
+    };
+    if (raw.radius !== undefined && raw.radius !== null) {
+      if (!isFiniteNumber(raw.radius)) return "place_objective radius must be finite when supplied";
+      action.radius = raw.radius;
+    }
+    return action;
   }
   if (raw.type === "move_objective") {
     if (raw.objectiveId !== "A" && raw.objectiveId !== "B") {

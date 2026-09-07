@@ -11,6 +11,7 @@ import {
 } from "./agent-tools.js";
 import type { AgentStartInput, AgentTurnDecision, TokenUsage } from "./agent.js";
 import type { ArenaInspection } from "./inspect.js";
+import type { TraceRouteResult } from "./product-route.js";
 import {
   PLAYTEST_ROLLOUTS,
   PLAYTEST_SEED,
@@ -74,7 +75,8 @@ export type PlaytestAgentStartInput = AgentStartInput & {
 
 export type PlaytestToolOutput =
   | AgentToolOutput
-  | { ok: true; playtest: ArenaPlaytestReport; inspection: ArenaInspection };
+  | { ok: true; playtest: ArenaPlaytestReport; inspection: ArenaInspection }
+  | { ok: true; route: TraceRouteResult; inspection: ArenaInspection };
 
 export type PlaytestAgentToolFeedback = {
   callId?: string;

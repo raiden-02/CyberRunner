@@ -166,6 +166,14 @@ export class MainMenu {
     }
   }
 
+  showForge(): void {
+    if (this.currentUser) {
+      this.forgeScreen.show();
+    } else {
+      this.authScreen.show();
+    }
+  }
+
   getCurrentUser(): UserProfile | null {
     return this.currentUser;
   }

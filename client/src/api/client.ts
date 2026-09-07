@@ -112,6 +112,7 @@ export interface ForgePublicObjective {
 
 export interface ForgePublicMapView {
   boundsHalfSize: number;
+  bounds?: { centerX: number; centerZ: number; halfWidth: number; halfDepth: number };
   wallHeight: number;
   wallThickness: number;
   groundThickness: number;
@@ -127,9 +128,15 @@ export interface ForgePlaytestReplay {
   firstContact?: { seconds: number; x: number; z: number };
 }
 
+export interface ForgeDesignPlan {
+  summary: string;
+  layout: string[];
+  priorities: string[];
+}
+
 export interface ForgeDesignTurn {
   turn: number;
-  kind: "edit" | "playtest" | "finish";
+  kind: "plan" | "edit" | "playtest" | "finish";
   tool: string;
   intent?: string;
   target?: string;
@@ -140,11 +147,23 @@ export interface ForgeDesignTurn {
   mapRevision: number;
 }
 
+export interface SavedMapMeta {
+  id: string;
+  name: string;
+  mode: "search_destroy" | "deathmatch";
+  createdAt: string;
+  updatedAt?: string;
+  sessionOnly?: boolean;
+}
+
 export interface ForgeDesignView {
   jobId: string;
   status: ForgeDesignStatus;
   source: "live" | "recorded";
   startingMapId: string;
+  path?: "product" | "historical";
+  mode?: "search_destroy" | "deathmatch";
+  designPlan?: ForgeDesignPlan;
   brief: string;
   error?: string;
   finishSummary?: string;
@@ -272,7 +291,7 @@ class ApiClient {
     return res.json();
   }
 
-  async startForgeDesign(input: { brief: string; mapId: string }): Promise<{ jobId: string }> {
+  async startForgeDesign(input: Record<string, unknown>): Promise<{ jobId: string }> {
     const res = await fetch(`${this.baseUrl}/arena-forge/design`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -283,6 +302,30 @@ class ApiClient {
     if (!res.ok) throw new Error(body.error || "Failed to start design");
     if (!body.jobId) throw new Error("Design job id missing");
     return { jobId: body.jobId };
+  }
+
+  async exploreForgeDesign(
+    jobId: string,
+    which: "original" | "generated",
+  ): Promise<{ launchId: string; purpose: string; designedMode: string }> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/design/${encodeURIComponent(jobId)}/explore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ which }),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      launchId?: string;
+      purpose?: string;
+      designedMode?: string;
+      error?: string;
+    };
+    if (!res.ok || !body.launchId) throw new Error(body.error || "Could not launch map explore");
+    return {
+      launchId: body.launchId,
+      purpose: body.purpose ?? "explore",
+      designedMode: body.designedMode ?? "search_destroy",
+    };
   }
 
   async getForgeDesign(jobId: string): Promise<ForgeDesignView> {
@@ -311,6 +354,80 @@ class ApiClient {
       throw new Error(err.error || "Failed to join room");
     }
     return res.json();
+  }
+
+  async listMyMaps(): Promise<SavedMapMeta[]> {
+    const res = await fetch(`${this.baseUrl}/me/maps`, { credentials: "include" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || "Failed to load your maps");
+    }
+    const data = (await res.json()) as { maps: SavedMapMeta[] };
+    return data.maps;
+  }
+
+  async getMyMap(id: string): Promise<{
+    id: string;
+    name: string;
+    mode: "search_destroy" | "deathmatch";
+    brief: string;
+    designPlan: ForgeDesignPlan;
+    mapDefinition: import("@shared/world/map-types.js").GameplayMapDefinition;
+    createdAt: string;
+    updatedAt: string;
+  }> {
+    const res = await fetch(`${this.baseUrl}/me/maps/${encodeURIComponent(id)}`, {
+      credentials: "include",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((body as { error?: string }).error || "Map not found");
+    return body;
+  }
+
+  async saveMyMap(jobId: string, name: string): Promise<SavedMapMeta> {
+    const res = await fetch(`${this.baseUrl}/me/maps`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ jobId, name }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((body as { error?: string }).error || "Failed to save map");
+    return body as SavedMapMeta;
+  }
+
+  async renameMyMap(id: string, name: string): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/me/maps/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || "Failed to rename map");
+    }
+  }
+
+  async deleteMyMap(id: string): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/me/maps/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || "Failed to delete map");
+    }
+  }
+
+  async launchMyMap(id: string): Promise<{ launchId: string; mode: string }> {
+    const res = await fetch(`${this.baseUrl}/me/maps/${encodeURIComponent(id)}/launch`, {
+      method: "POST",
+      credentials: "include",
+    });
+    const body = (await res.json().catch(() => ({}))) as { launchId?: string; mode?: string; error?: string };
+    if (!res.ok || !body.launchId) throw new Error(body.error || "Failed to launch map");
+    return { launchId: body.launchId, mode: body.mode ?? "search_destroy" };
   }
 }
 

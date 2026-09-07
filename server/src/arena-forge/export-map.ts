@@ -1,3 +1,4 @@
+import { compatibilityHalfSize, resolveMapBounds } from "@shared/world/map-bounds.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { DEFAULT_BREAKABLE_HP } from "./actions.js";
 import type { ArenaMap } from "./types.js";
@@ -23,10 +24,12 @@ export function exportGameplayMap(
       hp: hp ?? DEFAULT_BREAKABLE_HP,
     }));
 
+  const bounds = resolveMapBounds(map);
   return {
     id: runtime.id,
     name: runtime.name,
-    boundsHalfSize: map.boundsHalfSize,
+    boundsHalfSize: map.bounds ? compatibilityHalfSize(bounds) : map.boundsHalfSize,
+    ...(map.bounds ? { bounds } : {}),
     wallHeight: map.wallHeight,
     wallThickness: map.wallThickness,
     groundThickness: map.groundThickness,

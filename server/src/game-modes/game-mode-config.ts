@@ -1,4 +1,4 @@
-export type GameModeId = "deathmatch" | "search_destroy";
+export type GameModeId = "deathmatch" | "search_destroy" | "explore";
 
 export interface GameModeConfig {
   id: GameModeId;
@@ -40,6 +40,19 @@ export const GAME_MODES: Record<GameModeId, GameModeConfig> = {
     roundBased: true,
     roundTimeLimit: 90,
     teamBased: true,
+  },
+  explore: {
+    id: "explore",
+    name: "Explore",
+    description: "Walk a map without starting a match.",
+    maxLives: 0,
+    respawnDelay: 2,
+    scoreLimit: 0,
+    timeLimit: 0,
+    roundsToWin: 0,
+    roundBased: false,
+    roundTimeLimit: 0,
+    teamBased: false,
   },
 };
 

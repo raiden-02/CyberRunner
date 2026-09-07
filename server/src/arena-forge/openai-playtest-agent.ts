@@ -66,8 +66,18 @@ export class OpenAIPlaytestAgentSession implements PlaytestAgentSession {
   readonly requestedModel: string;
   private readonly client: OpenAIResponsesClient;
   private previousResponseId: string | undefined;
+  private readonly tools: unknown;
+  private readonly instructions: string;
+  private readonly formatStart: (input: PlaytestAgentStartInput) => string;
 
-  constructor(opts?: { apiKey?: string; model?: string; client?: OpenAIResponsesClient }) {
+  constructor(opts?: {
+    apiKey?: string;
+    model?: string;
+    client?: OpenAIResponsesClient;
+    tools?: unknown;
+    systemPrompt?: string;
+    formatStart?: (input: PlaytestAgentStartInput) => string;
+  }) {
     if (opts?.client) {
       this.client = opts.client;
     } else {
@@ -76,11 +86,14 @@ export class OpenAIPlaytestAgentSession implements PlaytestAgentSession {
       this.client = new OpenAI({ apiKey: key }) as unknown as OpenAIResponsesClient;
     }
     this.requestedModel = opts?.model ?? resolveArenaForgeModel();
+    this.tools = opts?.tools ?? PLAYTEST_FUNCTION_TOOLS;
+    this.instructions = opts?.systemPrompt ?? PLAYTEST_SYSTEM_PROMPT;
+    this.formatStart = opts?.formatStart ?? formatPlaytestStartMessage;
   }
 
   async start(input: PlaytestAgentStartInput): Promise<AgentTurnDecision> {
     return this.request({
-      input: formatPlaytestStartMessage(input),
+      input: this.formatStart(input),
     });
   }
 
@@ -107,8 +120,8 @@ export class OpenAIPlaytestAgentSession implements PlaytestAgentSession {
     try {
       response = await this.client.responses.create({
         model: this.requestedModel,
-        instructions: PLAYTEST_SYSTEM_PROMPT,
-        tools: PLAYTEST_FUNCTION_TOOLS,
+        instructions: this.instructions,
+        tools: this.tools,
         tool_choice: "required",
         parallel_tool_calls: false,
         store: true,

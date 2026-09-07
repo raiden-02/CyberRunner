@@ -1,3 +1,4 @@
+import { resolveMapBounds, type MapBoundsRect } from "@shared/world/map-bounds.js";
 import { circleInsideBounds, hypot2, solidOverlapsStandingCapsule } from "./geometry.js";
 import {
   GRID_CELL_METERS,
@@ -35,11 +36,18 @@ export class NavGrid {
   readonly component: number[];
   readonly componentCount: number;
   readonly walkableCount: number;
+  readonly bounds: MapBoundsRect;
+  private readonly originX: number;
+  private readonly originZ: number;
 
   constructor(private readonly map: ArenaMap) {
-    const span = map.boundsHalfSize * 2;
-    this.cols = Math.max(1, Math.round(span / this.cell));
-    this.rows = this.cols;
+    this.bounds = resolveMapBounds(map);
+    const width = this.bounds.halfWidth * 2;
+    const depth = this.bounds.halfDepth * 2;
+    this.cols = Math.max(1, Math.round(width / this.cell));
+    this.rows = Math.max(1, Math.round(depth / this.cell));
+    this.originX = this.bounds.centerX - this.bounds.halfWidth;
+    this.originZ = this.bounds.centerZ - this.bounds.halfDepth;
     const n = this.cols * this.rows;
     this.walkable = new Array(n).fill(false);
 
@@ -48,7 +56,7 @@ export class NavGrid {
       for (let i = 0; i < this.cols; i++) {
         const { x, z } = this.cellCenter(i, j);
         const idx = this.index(i, j);
-        if (!circleInsideBounds(x, z, PLAYER_RADIUS, map.boundsHalfSize)) continue;
+        if (!circleInsideBounds(x, z, PLAYER_RADIUS, this.bounds)) continue;
         let blocked = false;
         for (const solid of map.solids) {
           if (solidOverlapsStandingCapsule(solid, x, z)) {
@@ -83,17 +91,15 @@ export class NavGrid {
   }
 
   cellCenter(i: number, j: number): { x: number; z: number } {
-    const origin = -this.map.boundsHalfSize;
     return {
-      x: origin + (i + 0.5) * this.cell,
-      z: origin + (j + 0.5) * this.cell,
+      x: this.originX + (i + 0.5) * this.cell,
+      z: this.originZ + (j + 0.5) * this.cell,
     };
   }
 
   worldToCell(x: number, z: number): { i: number; j: number } | null {
-    const origin = -this.map.boundsHalfSize;
-    const i = Math.floor((x - origin) / this.cell);
-    const j = Math.floor((z - origin) / this.cell);
+    const i = Math.floor((x - this.originX) / this.cell);
+    const j = Math.floor((z - this.originZ) / this.cell);
     if (i < 0 || j < 0 || i >= this.cols || j >= this.rows) return null;
     return { i, j };
   }

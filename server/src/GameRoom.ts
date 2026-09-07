@@ -31,7 +31,10 @@ import {
 import { LagCompensation } from "./systems/lag-compensation.js";
 import { ProjectileManager } from "./systems/projectile-system.js";
 import { createPlayerRuntime, type PlayerRuntime } from "./player-runtime.js";
+import { pickExploreSpawn } from "@shared/world/explore-map.js";
 import { pickSpawnPoint, isInSpawnProtectionZone } from "./spawn/spawn-select.js";
+import { beginRoomJoin, rollbackRoomJoin } from "./spawn/join-spawn.js";
+import { ExploreMode } from "./game-modes/explore-mode.js";
 import {
   processFiringPlayers,
   updateProjectiles,
@@ -118,7 +121,7 @@ export class GameRoom extends Room<GameState> {
     return true;
   }
 
-  async onCreate(options: { gameMode?: string; mapId?: string; forgeMapId?: string } = {}) {
+  async onCreate(options: { gameMode?: string; mapId?: string; forgeMapId?: string; savedMapLaunchId?: string; mapLaunchId?: string } = {}) {
     this.setState(new GameState());
 
     this.maxPlayers = Number(process.env.MAX_PLAYERS || DEFAULT_MAX_PLAYERS);
@@ -131,7 +134,7 @@ export class GameRoom extends Room<GameState> {
     this.map = resolved.map;
     this.state.mapId = resolved.stateMapId;
 
-    const modeId = assertCreatedRoomMode(options, this.map, process.env.MAP_ID);
+    const modeId = assertCreatedRoomMode(options, this.map, process.env.MAP_ID, resolved);
     this.gameMode = createGameMode(modeId, this.map.uploadTerminals || []);
 
     const roomInfo = LobbyService.registerRoom(this.roomId, {
@@ -412,50 +415,55 @@ export class GameRoom extends Room<GameState> {
       this.state.hostId = client.sessionId;
     }
 
-    const spawn = this.pickSpawnPoint(client.sessionId);
-    const schema = new PlayerState();
-    schema.x = spawn.x;
-    schema.y = spawn.y;
-    schema.z = spawn.z;
-    schema.rotationY = calculateSpawnFacing(spawn.x, spawn.z);
-    schema.pitch = 0;
-    schema.movementState = MovementState.Walking;
-    schema.isSpawnProtected = true;
-    schema.spawnProtectionTime = 2.5;
-    schema.displayName = options?.displayName || "Player";
-    schema.primaryWeaponId = options?.primaryWeaponId || "AR_1";
-    schema.secondaryWeaponId = options?.secondaryWeaponId || "PISTOL_1";
-    schema.activeSlot = 0;
-    schema.equippedWeapon = schema.primaryWeaponId;
+    const joined = beginRoomJoin({
+      sessionId: client.sessionId,
+      gameMode: this.gameMode,
+      pickSpawn: (sessionId) => this.pickSpawnPoint(sessionId),
+    });
 
-    const weaponConfig = getWeaponConfig(schema.equippedWeapon);
-    if (weaponConfig) {
-      schema.ammoInMag = weaponConfig.magazineSize;
-      schema.ammoReserve = weaponConfig.reserveMax;
+    try {
+      const schema = new PlayerState();
+      schema.x = joined.spawn.x;
+      schema.y = joined.spawn.y;
+      schema.z = joined.spawn.z;
+      schema.rotationY = calculateSpawnFacing(joined.spawn.x, joined.spawn.z);
+      schema.pitch = 0;
+      schema.movementState = MovementState.Walking;
+      schema.isSpawnProtected = true;
+      schema.spawnProtectionTime = 2.5;
+      schema.displayName = options?.displayName || "Player";
+      schema.primaryWeaponId = options?.primaryWeaponId || "AR_1";
+      schema.secondaryWeaponId = options?.secondaryWeaponId || "PISTOL_1";
+      schema.activeSlot = 0;
+      schema.equippedWeapon = schema.primaryWeaponId;
+      if (joined.teamId) schema.teamId = joined.teamId;
+
+      const weaponConfig = getWeaponConfig(schema.equippedWeapon);
+      if (weaponConfig) {
+        schema.ammoInMag = weaponConfig.magazineSize;
+        schema.ammoReserve = weaponConfig.reserveMax;
+      }
+
+      const modeConfig = this.gameMode.getConfig();
+      schema.livesRemaining = modeConfig.maxLives > 0 ? modeConfig.maxLives : 99;
+      schema.roundsWon = 0;
+
+      this.state.players.set(client.sessionId, schema);
+
+      const { body, collider, controller } = createPlayerPhysics(
+        RAPIER, this.world,
+        schema.x, schema.y, schema.z,
+        CAPSULE.HalfHeight, CAPSULE.Radius
+      );
+
+      const ctrl = new CharacterController(body, collider, controller);
+      const hitboxes = createHitboxes(this.world, body, client.sessionId, this.hitboxRegistry);
+      this.players.set(client.sessionId, createPlayerRuntime(ctrl, schema, hitboxes));
+    } catch (err) {
+      this.state.players.delete(client.sessionId);
+      rollbackRoomJoin(this.gameMode, client.sessionId);
+      throw err;
     }
-
-    this.gameMode.addPlayer(client.sessionId);
-    const modeConfig = this.gameMode.getConfig();
-    schema.livesRemaining = modeConfig.maxLives > 0 ? modeConfig.maxLives : 99;
-    schema.roundsWon = 0;
-
-    const sdMode = this.getSDMode();
-    if (sdMode) {
-      const teamId = sdMode.getTeamManager().autoAssignTeam(client.sessionId);
-      schema.teamId = teamId;
-    }
-
-    this.state.players.set(client.sessionId, schema);
-
-    const { body, collider, controller } = createPlayerPhysics(
-      RAPIER, this.world,
-      schema.x, schema.y, schema.z,
-      CAPSULE.HalfHeight, CAPSULE.Radius
-    );
-
-    const ctrl = new CharacterController(body, collider, controller);
-    const hitboxes = createHitboxes(this.world, body, client.sessionId, this.hitboxRegistry);
-    this.players.set(client.sessionId, createPlayerRuntime(ctrl, schema, hitboxes));
 
     LobbyService.updatePlayerCount(this.roomId, this.clients.length);
 
@@ -701,6 +709,9 @@ export class GameRoom extends Room<GameState> {
   }
 
   private pickSpawnPoint(sessionId?: string): { x: number; y: number; z: number } {
+    if (this.gameMode instanceof ExploreMode) {
+      return pickExploreSpawn(this.map);
+    }
     const sdMode = this.getSDMode();
     return pickSpawnPoint(
       this.map,

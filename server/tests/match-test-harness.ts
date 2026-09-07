@@ -6,6 +6,7 @@ import { SearchDestroyMode } from "../src/game-modes/search-destroy-mode.js";
 import { MatchLifecycle, type MatchRoomAccess } from "../src/match/match-lifecycle.js";
 import type { PlayerRuntime } from "../src/player-runtime.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
+import { pickSpawnPoint } from "../src/spawn/spawn-select.js";
 
 export type TestPlayer = PlayerRuntime;
 
@@ -158,14 +159,12 @@ function makeRoom(partial: {
       player.schema.z = z;
     },
     pickSpawnPoint: (sessionId) => {
-      const team = partial.players.get(sessionId ?? "")?.schema.teamId;
-      if (team === "ghosts" && partial.map.ghostSpawnPoints?.[0]) {
-        return { ...partial.map.ghostSpawnPoints[0], y: 1 };
-      }
-      if (team === "sentinels" && partial.map.sentinelSpawnPoints?.[0]) {
-        return { ...partial.map.sentinelSpawnPoints[0], y: 1 };
-      }
-      return { x: 0, y: 1, z: 0 };
+      return pickSpawnPoint(
+        partial.map,
+        partial.players,
+        sessionId,
+        (id) => partial.getSDMode()?.getTeamManager().getPlayerTeam(id),
+      );
     },
     get map() {
       return partial.map;

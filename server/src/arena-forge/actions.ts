@@ -29,6 +29,14 @@ export type ArenaEditAction =
       y: number;
       z: number;
       radius?: number;
+    }
+  | {
+      type: "place_objective";
+      objectiveId: "A" | "B";
+      x: number;
+      y: number;
+      z: number;
+      radius?: number;
     };
 
 export type ArenaEditError = {
@@ -195,6 +203,29 @@ export function applyArenaEdit(
       obj.y = action.y;
       obj.z = action.z;
       if (action.radius !== undefined) obj.radius = action.radius;
+      return { ok: true, action, changedIds: [action.objectiveId], map: next, ids: nextIds };
+    }
+    case "place_objective": {
+      if (action.objectiveId !== "A" && action.objectiveId !== "B") {
+        return fail("unsupported-objective", { target: String(action.objectiveId) });
+      }
+      if (!finiteVec(action.x, action.y, action.z)) {
+        return fail("non-finite-coordinates", { target: action.objectiveId });
+      }
+      const radius = action.radius ?? 2;
+      if (!isFiniteNumber(radius) || radius <= 0) {
+        return fail("non-positive-radius", { target: action.objectiveId });
+      }
+      if (next.objectives.some((o) => o.id === action.objectiveId)) {
+        return fail("objective-already-exists", { target: action.objectiveId });
+      }
+      next.objectives.push({
+        id: action.objectiveId,
+        x: action.x,
+        y: action.y,
+        z: action.z,
+        radius,
+      });
       return { ok: true, action, changedIds: [action.objectiveId], map: next, ids: nextIds };
     }
     default: {

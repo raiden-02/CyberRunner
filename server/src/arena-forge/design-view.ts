@@ -7,7 +7,7 @@ import type { PlaytestReplay } from "./playtest-replay.js";
 import { representativeReplay } from "./playtest-replay.js";
 import { PLAYTEST_SEED } from "./playtest.js";
 
-export const DESIGN_BRIEF_MAX = 800;
+export { DESIGN_BRIEF_MAX } from "@shared/world/arena-design-spec.js";
 export const DESIGN_STARTING_MAPS = ["map-contract-smoke"] as const;
 export type DesignStartingMapId = (typeof DESIGN_STARTING_MAPS)[number];
 
@@ -33,9 +33,15 @@ export type PublicPlaytestSummary = {
   mapRevision: number;
 };
 
+export type PublicDesignPlan = {
+  summary: string;
+  layout: string[];
+  priorities: string[];
+};
+
 export type PublicDesignTurn = {
   turn: number;
-  kind: "edit" | "playtest" | "finish";
+  kind: "plan" | "edit" | "playtest" | "finish";
   tool: string;
   intent?: string;
   target?: string;
@@ -51,6 +57,9 @@ export type PublicDesignView = {
   status: DesignJobStatus;
   source: DesignSource;
   startingMapId: string;
+  path?: "product" | "historical";
+  mode?: "search_destroy" | "deathmatch";
+  designPlan?: PublicDesignPlan;
   brief: string;
   error?: string;
   finishSummary?: string;
@@ -121,11 +130,22 @@ export function publicTurnsFromRecords(records: PlaytestAgentTurnRecord[]): Publ
   const out: PublicDesignTurn[] = [];
   let revision = 0;
   for (const record of records) {
-    if (record.outcome?.ok && record.tool !== "run_playtest" && record.tool !== "finish_design") {
+    if (
+      record.outcome?.ok &&
+      record.tool !== "run_playtest" &&
+      record.tool !== "finish_design" &&
+      record.tool !== "propose_design_plan"
+    ) {
       revision += 1;
     }
     const kind: PublicDesignTurn["kind"] =
-      record.tool === "run_playtest" ? "playtest" : record.tool === "finish_design" ? "finish" : "edit";
+      record.tool === "propose_design_plan"
+        ? "plan"
+        : record.tool === "run_playtest"
+          ? "playtest"
+          : record.tool === "finish_design"
+            ? "finish"
+            : "edit";
     const turn: PublicDesignTurn = {
       turn: record.turn,
       kind,
@@ -162,6 +182,9 @@ export function viewFromAgentResult(args: {
   revisionReplays?: PlaytestReplay[];
   provider?: "openai" | "anthropic";
   model?: string;
+  path?: "product" | "historical";
+  mode?: "search_destroy" | "deathmatch";
+  designPlan?: PublicDesignPlan;
 }): PublicDesignView {
   const records = args.result?.turns ?? args.turns ?? [];
   const turns = publicTurnsFromRecords(records);
@@ -180,6 +203,9 @@ export function viewFromAgentResult(args: {
     status: args.status,
     source: args.source,
     startingMapId: args.startingMapId,
+    ...(args.path ? { path: args.path } : {}),
+    ...(args.mode ? { mode: args.mode } : {}),
+    ...(args.designPlan ? { designPlan: args.designPlan } : {}),
     brief: args.brief,
     ...(args.error ? { error: args.error } : {}),
     ...(args.result?.finishSummary ? { finishSummary: args.result.finishSummary } : {}),
