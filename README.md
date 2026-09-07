@@ -60,9 +60,7 @@ Room          Postgres
 
 To run live design on your machine, put an OpenAI or Anthropic key on the server. See [`docs/arena-forge-live.md`](docs/arena-forge-live.md). Guests can Save Map for the current session. Keeping maps on a profile needs Postgres and a signed-in user. The public site keeps live design off unless you turn it on with sign-in and daily caps.
 
-Recorded Design is a product demonstration of the current native loop. Historical P4 and P5 runs remain evaluation and research evidence. They were not replaced.
-
-The historical recorded numbers used OpenAI. Both providers can run live. That is not a claim they produce the same maps.
+Recorded Design is a product demonstration of the current native loop. Historical P4 and P5 runs remain evaluation and research evidence. They are not a public Forge tab.
 
 Both historical designers solved the simple repair cases (blocked spawn, broken routes) in one edit. A harder suite, where a useful edit can break something else, did not show the iterative designer winning overall. The historical P5 session queried the playtest, overcorrected, then revised.
 

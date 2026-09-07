@@ -46,20 +46,6 @@ export function revisionCaption(revision: number, finalRevision: number): string
   return `Revision ${revision} of ${finalRevision}`;
 }
 
-export function recordedStoryLine(view: ForgeDesignView): string | undefined {
-  if (view.source !== "recorded" || view.jobId !== "p5-demo") return undefined;
-  const playtests = view.turns.filter((t) => t.playtest);
-  if (playtests.length < 3) return undefined;
-  const a = playtests[0]?.playtest?.ghost.siteChoice;
-  const b = playtests[1]?.playtest?.ghost.siteChoice;
-  const c = playtests[2]?.playtest?.ghost.siteChoice;
-  if (!a || !b || !c) return undefined;
-  if (a.A !== 15 || a.B !== 49 || b.A !== 44 || b.B !== 20 || c.A !== 30 || c.B !== 34) {
-    return undefined;
-  }
-  return "The first edit overcorrected the scripted route split, so the agent resized the same new occluder after observing the next playtest.";
-}
-
 export function turnCategory(
   turn: ForgeDesignTurn,
   turns: ForgeDesignTurn[],

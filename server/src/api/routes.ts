@@ -16,7 +16,6 @@ import { issueExploreFromJob, issueSavedMapLaunch } from "../arena-forge/saved-m
 import { getSavedRuntimeMap } from "../arena-forge/saved-runtime-maps.js";
 import { LIVE_DISABLED_MESSAGE, resolveLiveForgePolicy } from "../arena-forge/live-forge-policy.js";
 import { resolveArenaForgeProviderConfig } from "../arena-forge/provider.js";
-import { recordedDemoView } from "../arena-forge/recorded-demo.js";
 import { nativeRecordedDemoView } from "../arena-forge/native-recorded-demo.js";
 import { listForgeCatalog, loadForgeMap } from "../arena-forge/preview.js";
 import { AuthService } from "../services/auth-service.js";
@@ -129,15 +128,6 @@ router.get("/arena-forge/capability", async (req: Request, res: Response) => {
 router.get("/arena-forge/demo", (_req: Request, res: Response) => {
   try {
     res.json(nativeRecordedDemoView());
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(404).json({ error: message });
-  }
-});
-
-router.get("/arena-forge/demo/p5", (_req: Request, res: Response) => {
-  try {
-    res.json(recordedDemoView());
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(404).json({ error: message });

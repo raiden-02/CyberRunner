@@ -3,7 +3,14 @@ import type { ArenaEvaluation, ArenaMap } from "./types.js";
 import type { ArenaPlaytestReport } from "./playtest.js";
 import type { PlaytestAgentRunResult, PlaytestAgentTurnRecord } from "./playtest-agent.js";
 import type { ProductDesignerRunResult } from "./product-designer.js";
-import { publicRevisionMaps, revisionMapsFromTurns } from "./public-map.js";
+import { AGENT_EDIT_TOOLS } from "./agent-tools.js";
+import {
+  assertProductReplayMatchesFinal,
+  assertProductViewRevisions,
+  isSuccessfulMapMutation,
+  replayProductTimeline,
+} from "./product-timeline.js";
+import { publicRevisionMaps, revisionMapsFromTurns, toPublicArenaMapView } from "./public-map.js";
 import type { PlaytestReplay } from "./playtest-replay.js";
 import { representativeReplay } from "./playtest-replay.js";
 import { PLAYTEST_SEED } from "./playtest.js";
@@ -55,6 +62,7 @@ export type PublicDesignTurn = {
   intent?: string;
   target?: string;
   rejected?: boolean;
+  changedIds?: string[];
   p0?: PublicP0Summary;
   playtest?: PublicPlaytestSummary;
   route?: PublicRouteTrace;
@@ -136,28 +144,27 @@ function targetOf(tool: string, args: unknown, changedIds?: string[]): string | 
   return changedIds?.[0];
 }
 
-export function publicTurnsFromRecords(records: PlaytestAgentTurnRecord[]): PublicDesignTurn[] {
+function isSuccessfulHistoricalEdit(turn: PlaytestAgentTurnRecord): boolean {
+  return Boolean(turn.outcome?.ok && (AGENT_EDIT_TOOLS as readonly string[]).includes(turn.tool));
+}
+
+export function publicTurnKind(tool: string): PublicDesignTurn["kind"] {
+  if (tool === "propose_design_plan") return "plan";
+  if (tool === "run_playtest") return "playtest";
+  if (tool === "finish_design") return "finish";
+  if (tool === "trace_route") return "route";
+  return "edit";
+}
+
+export function publicTurnsFromRecords(
+  records: PlaytestAgentTurnRecord[],
+  advancesRevision: (turn: PlaytestAgentTurnRecord) => boolean = isSuccessfulHistoricalEdit,
+): PublicDesignTurn[] {
   const out: PublicDesignTurn[] = [];
   let revision = 0;
   for (const record of records) {
-    if (
-      record.outcome?.ok &&
-      record.tool !== "run_playtest" &&
-      record.tool !== "finish_design" &&
-      record.tool !== "propose_design_plan"
-    ) {
-      revision += 1;
-    }
-    const kind: PublicDesignTurn["kind"] =
-      record.tool === "propose_design_plan"
-        ? "plan"
-        : record.tool === "run_playtest"
-          ? "playtest"
-          : record.tool === "finish_design"
-            ? "finish"
-            : record.tool === "trace_route"
-              ? "route"
-              : "edit";
+    if (advancesRevision(record)) revision += 1;
+    const kind = publicTurnKind(record.tool);
     const turn: PublicDesignTurn = {
       turn: record.turn,
       kind,
@@ -167,6 +174,7 @@ export function publicTurnsFromRecords(records: PlaytestAgentTurnRecord[]): Publ
       mapRevision: revision,
     };
     if (record.outcome?.ok === false) turn.rejected = true;
+    if (record.outcome?.changedIds?.length) turn.changedIds = record.outcome.changedIds;
     if (record.evaluationAfter) turn.p0 = compactP0(record.evaluationAfter);
     if (record.playtest) turn.playtest = compactPlaytest(record.playtest, revision);
     if (record.route) {
@@ -208,17 +216,40 @@ export function viewFromAgentResult(args: {
   designPlan?: PublicDesignPlan;
 }): PublicDesignView {
   const records = args.result?.turns ?? args.turns ?? [];
-  const turns = publicTurnsFromRecords(records);
+  const product = args.path === "product";
+  const turns = publicTurnsFromRecords(records, product ? isSuccessfulMapMutation : isSuccessfulHistoricalEdit);
   const playtests = turns.filter((t) => t.playtest).map((t) => t.playtest!);
   const lastPlaytest = playtests.length ? playtests[playtests.length - 1] : undefined;
-  const finalMapRevision = args.result?.successfulEdits ?? turns.reduce((n, t) => (t.kind === "edit" && !t.rejected ? t.mapRevision : n), 0);
+  const productReplay = product && args.initialMap ? replayProductTimeline(args.initialMap, records) : undefined;
+  if (product && args.initialMap && args.result && "finalMap" in args.result && args.result.status === "completed") {
+    assertProductReplayMatchesFinal(args.initialMap, records, args.result.finalMap);
+  }
+  const finalMapRevision =
+    productReplay?.successfulEdits ??
+    args.result?.successfulEdits ??
+    turns.reduce((n, t) => (t.kind === "edit" && !t.rejected ? t.mapRevision : n), 0);
   const lastPlaytestMapRevision = lastPlaytest?.mapRevision;
-  const arenaRevisions =
-    args.initialMap !== undefined ? revisionMapsFromTurns(args.initialMap, records) : undefined;
+  const arenaRevisions = productReplay
+    ? productReplay.maps
+    : args.initialMap !== undefined
+      ? revisionMapsFromTurns(args.initialMap, records)
+      : undefined;
   const revisionMaps = args.revisionMaps ?? (arenaRevisions ? publicRevisionMaps(arenaRevisions) : []);
   const revisionReplays =
     args.revisionReplays ??
     (arenaRevisions ? arenaRevisions.map((m) => representativeReplay(m, PLAYTEST_SEED)) : undefined);
+  if (product) {
+    const finalPublic =
+      args.result && "finalMap" in args.result && args.result.status === "completed"
+        ? toPublicArenaMapView(args.result.finalMap)
+        : undefined;
+    assertProductViewRevisions({
+      turns,
+      revisionMaps,
+      finalMapRevision,
+      ...(finalPublic ? { finalPublic } : {}),
+    });
+  }
   return {
     jobId: args.jobId,
     status: args.status,

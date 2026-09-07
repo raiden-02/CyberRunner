@@ -14,6 +14,7 @@ import {
 import { evaluateArena } from "./evaluator.js";
 import { exportGameplayMap } from "./export-map.js";
 import { assertPublicRecordedPayload, containsSecretMaterial, stripHiddenReasoning } from "./native-demo-sanitize.js";
+import { assertProductReplayMatchesFinal } from "./product-timeline.js";
 import {
   NATIVE_DEMO_ID,
   NATIVE_DEMO_LABEL,
@@ -153,6 +154,7 @@ export function validateNativeRecordedDemo(raw: NativeRecordedDemo): NativeRecor
   }
   if (containsSecretMaterial(raw)) throw new Error("Native demo contains secret material.");
   assertPublicRecordedPayload(raw);
+  assertProductReplayMatchesFinal(raw.initialMap, raw.result.turns, raw.finalMap);
   return raw;
 }
 

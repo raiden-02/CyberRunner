@@ -15,7 +15,6 @@ import {
 import { ArenaSetupEditor } from "../ArenaSetupEditor.js";
 import {
   api,
-  type ForgeCatalogEntry,
   type ForgeDesignTurn,
   type ForgeDesignView,
   type ForgeP0Summary,
@@ -28,11 +27,22 @@ import {
   formatP0Line,
   formatTurnCard,
   forgeActivityText,
-  recordedStoryLine,
   revisionCaption,
 } from "../forge-workbench.js";
 import { TacticalMap } from "../TacticalMap.js";
-import { fillDesignPlan, setUntrustedText } from "@shared/ui/untrusted-text.js";
+import { fillDesignPlan } from "@shared/ui/untrusted-text.js";
+import {
+  evidenceForSelectedTurn,
+  previousSnapshot,
+  selectionAfterPoll,
+  selectionAfterUserPick,
+  selectionFollowLatest,
+  shouldHighlightEdit,
+  shouldShowReplay,
+  shouldShowRoute,
+  snapshotForTurn,
+  turnIndexForRevision,
+} from "@shared/ui/forge-viewer.js";
 import { BaseScreen } from "./BaseScreen.js";
 import type { PlayAction } from "./LobbyScreen.js";
 
@@ -51,6 +61,7 @@ export class ForgeScreen extends BaseScreen {
   private replayId: ReturnType<typeof setInterval> | null = null;
   private busy = false;
   private selectedTurn = 0;
+  private followLatest = true;
   private replayPlaying = true;
   private replayProgress = 0;
   private loadedOnce = false;
@@ -59,10 +70,11 @@ export class ForgeScreen extends BaseScreen {
   private briefEl!: HTMLDivElement;
   private sourceBadge!: HTMLDivElement;
   private activity!: HTMLDivElement;
-  private storyEl!: HTMLDivElement;
   private showcaseHost!: HTMLDivElement;
   private revisionLabel!: HTMLDivElement;
   private revisionRow!: HTMLDivElement;
+  private actionEl!: HTMLDivElement;
+  private followBtn!: HTMLButtonElement;
   private timeline!: HTMLDivElement;
   private tacticalHost!: HTMLDivElement;
   private evidence!: HTMLDivElement;
@@ -77,13 +89,9 @@ export class ForgeScreen extends BaseScreen {
   private liveHint!: HTMLDivElement;
   private liveProvider?: string;
   private liveModel?: string;
-  private inspectList!: HTMLDivElement;
-  private fixturesEl!: HTMLDetailsElement;
   private playNote!: HTMLDivElement;
   private errorDiv!: HTMLDivElement;
   private tab = "design" as "recorded" | "design";
-  private recordedKind = "native" as "native" | "historical";
-  private recordedKindRow!: HTMLDivElement;
   private introEl!: HTMLParagraphElement;
   private timelineHead!: HTMLDivElement;
   private tacNote!: HTMLDivElement;
@@ -149,16 +157,6 @@ export class ForgeScreen extends BaseScreen {
     tabs.append(designTab, recordedTab);
     this.workbench.appendChild(tabs);
 
-    this.recordedKindRow = document.createElement("div");
-    this.recordedKindRow.className = "cr-row";
-    this.recordedKindRow.style.margin = "0 0 12px 0";
-    const nativeKind = this.createButton("Native Design", true);
-    const histKind = this.createButton("Historical Revision Run", false);
-    nativeKind.onclick = () => void this.setRecordedKind("native");
-    histKind.onclick = () => void this.setRecordedKind("historical");
-    this.recordedKindRow.append(nativeKind, histKind);
-    this.workbench.appendChild(this.recordedKindRow);
-
     this.setupHost = document.createElement("div");
     this.setupHost.style.display = "none";
     this.setupHost.appendChild(this.buildSetupPanel());
@@ -189,10 +187,6 @@ export class ForgeScreen extends BaseScreen {
     this.activity.style.cssText = `color: ${THEME.muted}; font-size: 13px; margin-bottom: 8px;`;
     this.workbench.appendChild(this.activity);
 
-    this.storyEl = document.createElement("div");
-    this.storyEl.style.cssText = `color: ${THEME.paper}; font-size: 13px; line-height: 1.45; margin: 0 0 12px 0;`;
-    this.workbench.appendChild(this.storyEl);
-
     this.showcaseHost = document.createElement("div");
     this.showcaseHost.className = "cr-forge__showcase";
     this.workbench.appendChild(this.showcaseHost);
@@ -203,6 +197,15 @@ export class ForgeScreen extends BaseScreen {
     this.revisionLabel = document.createElement("div");
     this.revisionLabel.style.cssText = `color:${THEME.muted};font-size:12px;letter-spacing:0.06em;text-transform:uppercase;`;
     this.workbench.appendChild(this.revisionLabel);
+    this.actionEl = document.createElement("div");
+    this.actionEl.style.cssText = `color:${THEME.paper};font-size:14px;line-height:1.4;margin:0 0 12px 0;`;
+    this.workbench.appendChild(this.actionEl);
+    this.followBtn = this.createButton("Follow latest", false);
+    this.followBtn.style.display = "none";
+    this.followBtn.style.width = "auto";
+    this.followBtn.style.margin = "0 0 12px 0";
+    this.followBtn.onclick = () => this.jumpToLatest();
+    this.workbench.appendChild(this.followBtn);
 
     this.timelineHead = sectionLabel("Design edits");
     this.workbench.appendChild(this.timelineHead);
@@ -262,26 +265,6 @@ export class ForgeScreen extends BaseScreen {
     this.liveBox.style.display = "none";
     this.liveBox.appendChild(this.liveDesignBlock());
     this.workbench.appendChild(this.liveBox);
-
-    this.fixturesEl = document.createElement("details");
-    this.fixturesEl.style.marginTop = "12px";
-    const fixSum = document.createElement("summary");
-    fixSum.textContent = "Evaluation fixtures";
-    fixSum.style.cssText = summaryCss();
-    this.fixturesEl.appendChild(fixSum);
-    const fixHint = document.createElement("p");
-    fixHint.textContent = "Starting maps used for evaluation cases.";
-    fixHint.style.cssText = mutedBlock();
-    this.fixturesEl.appendChild(fixHint);
-    const evalNote = document.createElement("div");
-    evalNote.style.cssText = `color:${THEME.muted};font-size:12px;line-height:1.5;margin-bottom:8px;`;
-    evalNote.textContent =
-      "Inspection maps for the recorded evaluation cases.";
-    this.fixturesEl.appendChild(evalNote);
-    this.inspectList = document.createElement("div");
-    this.inspectList.style.cssText = "display:flex;flex-direction:column;gap:8px;";
-    this.fixturesEl.appendChild(this.inspectList);
-    this.workbench.appendChild(this.fixturesEl);
 
     this.errorDiv = this.createError();
     this.workbench.appendChild(this.errorDiv);
@@ -452,17 +435,12 @@ export class ForgeScreen extends BaseScreen {
     const designing = phase === "designing";
     const result = phase === "result";
     const view = this.view;
-    const showPlaytest = recorded || (view?.mode === "search_destroy" && Boolean(view.lastPlaytest || this.currentTurn()?.playtest));
+    const showPlaytest = shouldShowReplay(this.currentTurn());
 
     this.setupHost.style.display = setup ? "block" : "none";
-    this.recordedKindRow.style.display = recorded ? "flex" : "none";
-    this.fixturesEl.style.display = recorded && this.recordedKind === "historical" ? "block" : "none";
-    this.storyEl.style.display = recorded && this.recordedKind === "historical" ? "block" : "none";
     this.introEl.style.display = setup || recorded ? "block" : "none";
     this.introEl.textContent = recorded
-      ? this.recordedKind === "native"
-        ? "Recorded Design replays a native S&D run from a blank user-defined arena. No model key."
-        : "Historical feedback-revision run. Frozen evaluation evidence, not the current product loop."
+      ? "Recorded Design replays a native S&D run from a blank user-defined arena. No model key."
       : "Draw an arena, place starts, and generate. Playing walks the map. Save Map is the only way into Your Maps.";
     this.timelineHead.textContent = recorded ? "Recorded Design" : "Design edits";
     this.timelineHead.style.display = recorded || designing || result ? "block" : "none";
@@ -484,14 +462,6 @@ export class ForgeScreen extends BaseScreen {
       this.setup.resize();
       this.refreshSetupIssues();
     }
-  }
-
-  private async setRecordedKind(kind: "native" | "historical"): Promise<void> {
-    this.recordedKind = kind;
-    if (this.tab === "recorded") await this.loadRecorded();
-    this.applyChrome();
-    this.renderView();
-    this.syncShowcase();
   }
 
   private setTab(tab: "recorded" | "design"): void {
@@ -558,13 +528,6 @@ export class ForgeScreen extends BaseScreen {
     this.syncShowcase();
     this.showcase.start();
     this.startReplayClock();
-    try {
-      const maps = await api.listForgeMaps();
-      this.renderInspect(maps);
-    } catch (err) {
-      this.inspectList.replaceChildren();
-      this.errorDiv.textContent = err instanceof Error ? err.message : "Failed to load Forge maps";
-    }
   }
 
   protected override onHide(): void {
@@ -635,6 +598,7 @@ export class ForgeScreen extends BaseScreen {
         revisionMaps: [],
       };
       this.selectedTurn = 0;
+      this.followLatest = true;
       this.productView = this.view;
       this.applyChrome();
       this.renderView();
@@ -653,7 +617,12 @@ export class ForgeScreen extends BaseScreen {
         const next = await api.getForgeDesign(jobId);
         this.view = next;
         if (next.path === "product") this.productView = next;
-        if (next.turns.length) this.selectedTurn = next.turns.length - 1;
+        const nextSel = selectionAfterPoll(
+          { selectedTurn: this.selectedTurn, followLatest: this.followLatest },
+          next.turns.length,
+        );
+        this.selectedTurn = nextSel.selectedTurn;
+        this.followLatest = nextSel.followLatest;
         this.renderView();
         this.syncShowcase();
         if (next.status === "completed" || next.status === "failed") {
@@ -683,8 +652,9 @@ export class ForgeScreen extends BaseScreen {
   private async loadRecorded(): Promise<void> {
     this.errorDiv.textContent = "";
     try {
-      this.view = this.recordedKind === "historical" ? await api.getRecordedP5Demo() : await api.getRecordedDemo();
-      this.selectedTurn = Math.max(0, (this.view.turns.length || 1) - 1);
+      this.view = await api.getRecordedDemo();
+      this.selectedTurn = 0;
+      this.followLatest = false;
       this.renderView();
       this.syncShowcase();
     } catch (err) {
@@ -705,10 +675,14 @@ export class ForgeScreen extends BaseScreen {
   }
 
   private currentMap(): ForgePublicMapView | undefined {
-    const maps = this.view?.revisionMaps ?? [];
-    if (maps.length === 0) return undefined;
-    const rev = Math.max(0, Math.min(this.currentRevision(), maps.length - 1));
-    return maps[rev];
+    const view = this.view;
+    if (!view?.revisionMaps?.length) return undefined;
+    try {
+      return snapshotForTurn({ ...view, revisionMaps: view.revisionMaps }, this.selectedTurn);
+    } catch (err) {
+      this.errorDiv.textContent = err instanceof Error ? err.message : "Invalid map revision.";
+      return undefined;
+    }
   }
 
   private renderView(): void {
@@ -717,7 +691,7 @@ export class ForgeScreen extends BaseScreen {
       this.sourceBadge.textContent = "";
       this.activity.textContent = "";
       this.briefEl.textContent = "";
-      this.storyEl.textContent = "";
+      this.actionEl.textContent = "";
       this.timeline.replaceChildren();
       this.evidence.replaceChildren();
       this.playRow.replaceChildren();
@@ -727,14 +701,15 @@ export class ForgeScreen extends BaseScreen {
 
     this.sourceBadge.textContent =
       this.tab === "recorded" || view.source === "recorded"
-        ? this.recordedKind === "historical"
-          ? "Historical revision run"
-          : "Recorded Design"
+        ? "Recorded Design"
         : liveRunBadge(view.provider, view.model ?? view.modelRequested);
     this.sourceBadge.style.color = view.source === "live" ? THEME.accent : THEME.muted;
     this.briefEl.textContent = `Brief: ${view.brief}`;
     this.activity.textContent = forgeActivityText(view);
-    this.storyEl.textContent = this.tab === "recorded" ? recordedStoryLine(view) ?? "" : "";
+    const turn = this.currentTurn();
+    this.actionEl.textContent = selectedActionText(turn);
+    const liveRunning = view.source === "live" && (view.status === "queued" || view.status === "running");
+    this.followBtn.style.display = liveRunning && !this.followLatest ? "inline-flex" : "none";
     if (view.status === "failed" && view.error) this.errorDiv.textContent = view.error;
 
     this.revisionRow.replaceChildren();
@@ -761,22 +736,12 @@ export class ForgeScreen extends BaseScreen {
       card.type = "button";
       card.className = index === this.selectedTurn ? "cr-forge__turn is-selected" : "cr-forge__turn";
       card.textContent = formatTurnCard(turn, view.turns);
-      card.onclick = () => {
-        this.selectedTurn = index;
-        this.replayProgress = 0;
-        this.renderView();
-        this.syncShowcase();
-      };
+      card.onclick = () => this.pickTurn(index);
       this.timeline.appendChild(card);
     });
 
     this.evidence.replaceChildren();
-    const turn = this.currentTurn();
-    const playtest = turn?.playtest ?? view.lastPlaytest;
-    if (playtest) {
-      this.evidence.appendChild(playtestTiles(playtest));
-    }
-    this.evidence.appendChild(this.p0Cards(view));
+    this.evidence.appendChild(this.stepEvidence(view));
 
     this.playRow.replaceChildren();
     const product = view.path === "product";
@@ -835,42 +800,39 @@ export class ForgeScreen extends BaseScreen {
     this.drawTactical();
   }
 
-  private selectRevision(revision: number): void {
-    const view = this.view;
-    if (!view) return;
-    const match = view.turns.findIndex((t) => t.mapRevision === revision);
-    this.selectedTurn = match >= 0 ? match : 0;
-    if (revision === view.finalMapRevision && view.turns.length) {
-      this.selectedTurn = view.turns.length - 1;
-    }
+  private pickTurn(index: number): void {
+    const next = selectionAfterUserPick(index);
+    this.selectedTurn = next.selectedTurn;
+    this.followLatest = next.followLatest;
     this.replayProgress = 0;
     this.renderView();
     this.syncShowcase();
+  }
+
+  private jumpToLatest(): void {
+    const next = selectionFollowLatest(this.view?.turns.length ?? 0);
+    this.selectedTurn = next.selectedTurn;
+    this.followLatest = next.followLatest;
+    this.replayProgress = 0;
+    this.renderView();
+    this.syncShowcase();
+  }
+
+  private selectRevision(revision: number): void {
+    const view = this.view;
+    if (!view) return;
+    this.pickTurn(turnIndexForRevision(view.turns, revision, view.finalMapRevision));
   }
 
   private syncShowcase(): void {
     const map = this.currentMap();
     if (!map || !this.showcaseHost.isConnected) return;
     if (!this.visible) return;
-    const view = this.view;
-    const baseline = view?.revisionMaps?.[0];
     const turn = this.currentTurn();
-    const highlightId = turn?.target;
-    const highlightSolid = highlightId ? map.solids.find((s) => s.id === highlightId) : undefined;
-    const changed =
-      highlightSolid ??
-      (baseline
-        ? map.solids.find((s) => {
-            const prev = baseline.solids.find((p) => p.id === s.id);
-            return !prev || prev.hx !== s.hx || prev.hz !== s.hz || prev.x !== s.x;
-          })
-        : undefined);
-    this.showcase.setForgeView(
-      map,
-      changed && this.currentRevision() > 0
-        ? { x: changed.x, y: changed.y, z: changed.z, hx: changed.hx, hy: changed.hy, hz: changed.hz }
-        : undefined,
-    );
+    const highlights = shouldHighlightEdit(turn)
+      ? highlightBoxes(map, turn?.changedIds ?? (turn?.target ? [turn.target] : []))
+      : [];
+    this.showcase.setForgeView(map, highlights.length ? highlights : undefined);
     this.drawTactical();
   }
 
@@ -878,23 +840,24 @@ export class ForgeScreen extends BaseScreen {
     const map = this.currentMap();
     const view = this.view;
     if (!map || !view) return;
-    const baseline = view.revisionMaps?.[0];
     const turn = this.currentTurn();
-    const replay = view.revisionReplays?.[this.currentRevision()];
+    const revision = turn?.mapRevision ?? 0;
+    const prev = view.revisionMaps ? previousSnapshot({ revisionMaps: view.revisionMaps }, revision) : undefined;
+    const replay = shouldShowReplay(turn) ? view.revisionReplays?.[revision] : undefined;
     this.tactical.setState({
       map,
-      diff: baseline ? diffArenaMapViews(baseline, map) : undefined,
-      hotspot: turn?.playtest?.firstContact.hotspot,
+      diff: shouldHighlightEdit(turn) && prev ? diffArenaMapViews(prev, map) : undefined,
+      hotspot: shouldShowReplay(turn) ? turn?.playtest?.firstContact.hotspot : undefined,
       replay,
-      replayProgress: this.replayProgress,
-      route: turn?.route,
+      replayProgress: shouldShowReplay(turn) ? this.replayProgress : 0,
+      route: shouldShowRoute(turn) ? turn?.route : undefined,
     });
   }
 
   private startReplayClock(): void {
     this.stopReplayClock();
     this.replayId = setInterval(() => {
-      if (!this.replayPlaying) return;
+      if (!this.replayPlaying || !shouldShowReplay(this.currentTurn())) return;
       this.replayProgress = (this.replayProgress + 0.02) % 1;
       this.drawTactical();
     }, 80);
@@ -907,18 +870,29 @@ export class ForgeScreen extends BaseScreen {
     }
   }
 
-  private p0Cards(view: ForgeDesignView): HTMLDivElement {
+  private stepEvidence(view: ForgeDesignView): HTMLDivElement {
     const wrap = document.createElement("div");
     wrap.style.cssText = "margin: 8px 0;";
-    wrap.appendChild(metricCard("Static checks", formatP0Line(view.initialP0) + medianLine(view.initialP0)));
-    if (view.finalP0) {
-      wrap.appendChild(metricCard("After edits", formatP0Line(view.finalP0) + medianLine(view.finalP0)));
+    const evidence = evidenceForSelectedTurn({ ...view, revisionMaps: view.revisionMaps ?? [] }, this.selectedTurn);
+    const playtest = evidence.playtest as ForgePlaytestSummary | undefined;
+    if (playtest) wrap.appendChild(playtestTiles(playtest));
+    if (evidence.route) {
+      const dist = evidence.route.distanceMeters !== undefined ? ` · ${evidence.route.distanceMeters} m` : "";
+      wrap.appendChild(
+        metricCard(
+          "Route",
+          `${evidence.route.fromId} → ${evidence.route.toId}\n${evidence.route.reachable ? "Reachable" : "Unreachable"}${dist}`,
+        ),
+      );
+    }
+    if (evidence.playtestNote) {
+      wrap.appendChild(metricCard("Scripted playtest", evidence.playtestNote));
+    }
+    const p0 = evidence.p0 as ForgeP0Summary | undefined;
+    if (p0 && evidence.p0Title) {
+      wrap.appendChild(metricCard(evidence.p0Title, formatP0Line(p0) + medianLine(p0)));
     }
     return wrap;
-  }
-
-  private playMap(catalogId: string, mode?: ArenaGameMode): void {
-    void this.playCatalog(catalogId, mode);
   }
 
   private defaultSaveName(view: ForgeDesignView): string {
@@ -991,61 +965,8 @@ export class ForgeScreen extends BaseScreen {
     }
   }
 
-  private renderInspect(maps: ForgeCatalogEntry[]): void {
-    this.inspectList.replaceChildren();
-    if (maps.length === 0) {
-      const empty = document.createElement("div");
-      empty.textContent = "No inspect maps yet.";
-      empty.style.cssText = `color: ${THEME.muted}; text-align: center; padding: 12px;`;
-      this.inspectList.appendChild(empty);
-      return;
-    }
-
-    let lastGroup = "";
-    for (const entry of maps) {
-      const group =
-        entry.suite === "p4a"
-          ? "Evaluation cases"
-          : entry.suite === "p4b"
-            ? "More evaluation cases"
-            : "Recorded runs";
-      if (group !== lastGroup) {
-        lastGroup = group;
-        const header = document.createElement("div");
-        header.textContent = group;
-        header.style.cssText = sectionTitleCss();
-        this.inspectList.appendChild(header);
-      }
-      const row = document.createElement("button");
-      row.type = "button";
-      row.style.cssText = `
-        width: 100%;
-        text-align: left;
-        padding: 12px 14px;
-        border: 1px solid ${THEME.panelBorder};
-        border-radius: 3px;
-        background: transparent;
-        color: ${THEME.paper};
-        cursor: pointer;
-      `;
-      const title = document.createElement("div");
-      title.style.fontWeight = "600";
-      setUntrustedText(title, entry.title);
-      const sub = document.createElement("div");
-      sub.style.cssText = `color: ${THEME.muted}; font-size: 12px; margin-top: 4px;`;
-      setUntrustedText(sub, publicCatalogSubtitle(entry));
-      row.append(title, sub);
-      row.onmouseenter = () => {
-        row.style.borderColor = THEME.accent;
-      };
-      row.onmouseleave = () => {
-        row.style.borderColor = THEME.panelBorder;
-      };
-      row.onclick = () => this.playMap(entry.id);
-      this.inspectList.appendChild(row);
-    }
-  }
 }
+
 
 function mutedBlock(): string {
   return `
@@ -1071,31 +992,32 @@ function sectionLabel(text: string): HTMLDivElement {
   return el;
 }
 
-function sectionTitleCss(): string {
-  return `
-    color: ${THEME.muted};
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin: 8px 0 6px 0;
-  `;
+function selectedActionText(turn: ForgeDesignTurn | undefined): string {
+  if (!turn) return "";
+  if (turn.kind === "plan") return turn.intent ? `Plan: ${turn.intent}` : "Published the design plan.";
+  if (turn.kind === "route" && turn.route) {
+    return turn.intent ?? `Traced ${turn.route.fromId} to ${turn.route.toId}.`;
+  }
+  if (turn.kind === "playtest") return turn.intent ?? "Ran the scripted playtest.";
+  if (turn.kind === "finish") return turn.finishSummary ?? "Finished the design.";
+  if (turn.rejected) return turn.intent ? `Rejected: ${turn.intent}` : "This edit was rejected.";
+  return turn.intent ?? `${turn.tool}${turn.target ? ` ${turn.target}` : ""}`;
 }
 
-function summaryCss(): string {
-  return `
-    cursor: pointer;
-    color: ${THEME.paper};
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  `;
-}
-
-function publicCatalogSubtitle(entry: ForgeCatalogEntry): string {
-  if (entry.suite === "p4a" || entry.suite === "p4b") return "Starting map";
-  return entry.which === "final" ? "After edits" : "Before edits";
+function highlightBoxes(map: ForgePublicMapView, ids: string[]): Array<{ x: number; y: number; z: number; hx: number; hy: number; hz: number }> {
+  const boxes: Array<{ x: number; y: number; z: number; hx: number; hy: number; hz: number }> = [];
+  for (const id of ids) {
+    const solid = map.solids.find((s) => s.id === id);
+    if (solid) {
+      boxes.push({ x: solid.x, y: solid.y, z: solid.z, hx: solid.hx, hy: solid.hy, hz: solid.hz });
+      continue;
+    }
+    const obj = map.objectives.find((o) => o.id === id);
+    if (obj) {
+      boxes.push({ x: obj.x, y: obj.y, z: obj.z, hx: obj.radius, hy: 0.4, hz: obj.radius });
+    }
+  }
+  return boxes;
 }
 
 function chipButton(text: string): HTMLButtonElement {

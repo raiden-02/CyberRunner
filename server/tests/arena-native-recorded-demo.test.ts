@@ -13,7 +13,9 @@ import {
 } from "../src/arena-forge/native-recorded-demo.js";
 import { assertPublicRecordedPayload } from "../src/arena-forge/native-demo-sanitize.js";
 import { recordNativeDemo, writeNativeDemoCandidate } from "../src/arena-forge/record-native-demo.js";
+import { isSuccessfulMapMutation, replayProductTimeline } from "../src/arena-forge/product-timeline.js";
 import { recordedDemoView, loadRecordedP5Demo } from "../src/arena-forge/recorded-demo.js";
+import { toPublicArenaMapView } from "../src/arena-forge/public-map.js";
 import { issueExploreFromJob, issueSavedMapLaunch, resetSavedMapLaunches } from "../src/arena-forge/saved-map-launches.js";
 import { MemorySavedMapStore, saveCompletedDesign, resetGuestSavedMaps } from "../src/arena-forge/saved-maps.js";
 import { resetSavedRuntimeMaps } from "../src/arena-forge/saved-runtime-maps.js";
@@ -51,6 +53,24 @@ describe("native recorded demo fixture", () => {
     expect(view.designPlan?.layout.length).toBeGreaterThan(0);
     expect(view.turns.some((t) => t.kind === "route")).toBe(true);
     expect(view.playtestCalls).toBeGreaterThan(0);
+    expect(view.revisionMaps).toHaveLength(demo.successfulEdits + 1);
+    expect(view.revisionMaps[0]).toEqual(toPublicArenaMapView(demo.initialMap));
+    expect(view.revisionMaps[view.revisionMaps.length - 1]).toEqual(toPublicArenaMapView(demo.finalMap));
+    expect(replayProductTimeline(demo.initialMap, demo.result.turns).successfulEdits).toBe(demo.successfulEdits);
+
+    const firstPlaytest = demo.result.turns.findIndex((t) => t.tool === "run_playtest" && t.outcome?.ok);
+    expect(firstPlaytest).toBeGreaterThan(0);
+    expect(demo.result.turns.slice(firstPlaytest + 1).some(isSuccessfulMapMutation)).toBe(true);
+
+    const resize = view.turns.find((t) => t.tool === "resize_solid" && t.target === "occluder-8");
+    expect(resize).toBeDefined();
+    const before = view.revisionMaps[resize!.mapRevision - 1];
+    const after = view.revisionMaps[resize!.mapRevision];
+    const prev = before?.solids.find((s) => s.id === "occluder-8");
+    const next = after?.solids.find((s) => s.id === "occluder-8");
+    expect(prev).toBeDefined();
+    expect(next).toBeDefined();
+    expect(prev).not.toEqual(next);
 
     const original = exportGameplayMap(demo.initialMap, { id: "o", name: "o" });
     const generated = exportGameplayMap(demo.finalMap, { id: "g", name: "g" });
@@ -61,14 +81,26 @@ describe("native recorded demo fixture", () => {
     assertPublicRecordedPayload(demo);
   });
 
-  it("keeps the historical P5 fixture as secondary evidence", () => {
+  it("keeps P5 evaluation evidence without making it the public recorded view", () => {
     const p5 = loadRecordedP5Demo();
     expect(p5.id).toBe("p5-demo");
-    const view = recordedDemoView();
-    expect(view.path).toBe("historical");
-    expect(view.firstPlaytest?.ghost.siteChoice).toEqual({ A: 15, B: 49 });
-    expect(view.lastPlaytest?.ghost.siteChoice).toEqual({ A: 30, B: 34 });
+    const historical = recordedDemoView();
+    expect(historical.path).toBe("historical");
+    expect(historical.firstPlaytest?.ghost.siteChoice).toEqual({ A: 15, B: 49 });
     expect(loadForgeMap("demo:p5:final").occluders.length).toBeGreaterThan(0);
+    expect(nativeRecordedDemoView().jobId).toBe(NATIVE_DEMO_ID);
+    expect(nativeRecordedDemoView().path).toBe("product");
+  });
+
+  it("does not advance the map on route or playtest turns", () => {
+    const view = nativeRecordedDemoView();
+    for (let i = 0; i < view.turns.length; i++) {
+      const turn = view.turns[i]!;
+      if (turn.kind !== "route" && turn.kind !== "playtest") continue;
+      const prev = view.turns[i - 1];
+      expect(turn.mapRevision).toBe(prev?.mapRevision ?? 0);
+      expect(view.revisionMaps[turn.mapRevision]).toEqual(view.revisionMaps[prev?.mapRevision ?? 0]);
+    }
   });
 });
 

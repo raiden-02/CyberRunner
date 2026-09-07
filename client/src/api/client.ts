@@ -141,6 +141,7 @@ export interface ForgeDesignTurn {
   intent?: string;
   target?: string;
   rejected?: boolean;
+  changedIds?: string[];
   p0?: ForgeP0Summary;
   playtest?: ForgePlaytestSummary;
   route?: {
@@ -344,13 +345,6 @@ class ApiClient {
 
   async getRecordedDemo(): Promise<ForgeDesignView> {
     const res = await fetch(`${this.baseUrl}/arena-forge/demo`);
-    const body = (await res.json().catch(() => ({}))) as ForgeDesignView & { error?: string };
-    if (!res.ok) throw new Error(body.error || "Recorded demo not found");
-    return body;
-  }
-
-  async getRecordedP5Demo(): Promise<ForgeDesignView> {
-    const res = await fetch(`${this.baseUrl}/arena-forge/demo/p5`);
     const body = (await res.json().catch(() => ({}))) as ForgeDesignView & { error?: string };
     if (!res.ok) throw new Error(body.error || "Recorded demo not found");
     return body;
