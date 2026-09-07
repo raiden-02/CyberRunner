@@ -82,6 +82,8 @@ export class ForgeScreen extends BaseScreen {
   private playNote!: HTMLDivElement;
   private errorDiv!: HTMLDivElement;
   private tab = "design" as "recorded" | "design";
+  private recordedKind = "native" as "native" | "historical";
+  private recordedKindRow!: HTMLDivElement;
   private introEl!: HTMLParagraphElement;
   private timelineHead!: HTMLDivElement;
   private tacNote!: HTMLDivElement;
@@ -141,11 +143,21 @@ export class ForgeScreen extends BaseScreen {
     tabs.className = "cr-row";
     tabs.style.margin = "12px 0";
     const designTab = this.createButton("New Design", true);
-    const recordedTab = this.createButton("Recorded Run", false);
+    const recordedTab = this.createButton("Recorded Design", false);
     designTab.onclick = () => this.setTab("design");
     recordedTab.onclick = () => this.setTab("recorded");
     tabs.append(designTab, recordedTab);
     this.workbench.appendChild(tabs);
+
+    this.recordedKindRow = document.createElement("div");
+    this.recordedKindRow.className = "cr-row";
+    this.recordedKindRow.style.margin = "0 0 12px 0";
+    const nativeKind = this.createButton("Native Design", true);
+    const histKind = this.createButton("Historical Revision Run", false);
+    nativeKind.onclick = () => void this.setRecordedKind("native");
+    histKind.onclick = () => void this.setRecordedKind("historical");
+    this.recordedKindRow.append(nativeKind, histKind);
+    this.workbench.appendChild(this.recordedKindRow);
 
     this.setupHost = document.createElement("div");
     this.setupHost.style.display = "none";
@@ -443,13 +455,16 @@ export class ForgeScreen extends BaseScreen {
     const showPlaytest = recorded || (view?.mode === "search_destroy" && Boolean(view.lastPlaytest || this.currentTurn()?.playtest));
 
     this.setupHost.style.display = setup ? "block" : "none";
-    this.fixturesEl.style.display = recorded ? "block" : "none";
-    this.storyEl.style.display = recorded ? "block" : "none";
+    this.recordedKindRow.style.display = recorded ? "flex" : "none";
+    this.fixturesEl.style.display = recorded && this.recordedKind === "historical" ? "block" : "none";
+    this.storyEl.style.display = recorded && this.recordedKind === "historical" ? "block" : "none";
     this.introEl.style.display = setup || recorded ? "block" : "none";
     this.introEl.textContent = recorded
-      ? "Recorded agent run. Frozen evaluation fixtures stay here."
+      ? this.recordedKind === "native"
+        ? "Recorded Design replays a native S&D run from a blank user-defined arena. No model key."
+        : "Historical feedback-revision run. Frozen evaluation evidence, not the current product loop."
       : "Draw an arena, place starts, and generate. Playing walks the map. Save Map is the only way into Your Maps.";
-    this.timelineHead.textContent = recorded ? "Recorded agent run" : "Design edits";
+    this.timelineHead.textContent = recorded ? "Recorded Design" : "Design edits";
     this.timelineHead.style.display = recorded || designing || result ? "block" : "none";
     this.timeline.style.display = recorded || designing || result ? "block" : "none";
     this.revisionRow.style.display = recorded || designing || result ? "flex" : "none";
@@ -458,7 +473,10 @@ export class ForgeScreen extends BaseScreen {
     this.showcaseHost.style.display = recorded || designing || result ? "block" : "none";
     this.playNote.style.display = result || recorded ? "block" : "none";
     this.playRow.style.display = result || recorded ? "flex" : "none";
-    this.saveRow.style.display = result && view?.path === "product" ? "flex" : "none";
+    this.saveRow.style.display =
+      (result || (recorded && view?.path === "product")) && view?.status === "completed" && view.path === "product"
+        ? "flex"
+        : "none";
     this.tacNote.style.display = showPlaytest ? "block" : "none";
     this.replayHint.style.display = showPlaytest ? "block" : "none";
     this.replayBtn.style.display = showPlaytest ? "inline-flex" : "none";
@@ -466,6 +484,14 @@ export class ForgeScreen extends BaseScreen {
       this.setup.resize();
       this.refreshSetupIssues();
     }
+  }
+
+  private async setRecordedKind(kind: "native" | "historical"): Promise<void> {
+    this.recordedKind = kind;
+    if (this.tab === "recorded") await this.loadRecorded();
+    this.applyChrome();
+    this.renderView();
+    this.syncShowcase();
   }
 
   private setTab(tab: "recorded" | "design"): void {
@@ -657,7 +683,7 @@ export class ForgeScreen extends BaseScreen {
   private async loadRecorded(): Promise<void> {
     this.errorDiv.textContent = "";
     try {
-      this.view = await api.getRecordedP5Demo();
+      this.view = this.recordedKind === "historical" ? await api.getRecordedP5Demo() : await api.getRecordedDemo();
       this.selectedTurn = Math.max(0, (this.view.turns.length || 1) - 1);
       this.renderView();
       this.syncShowcase();
@@ -701,7 +727,9 @@ export class ForgeScreen extends BaseScreen {
 
     this.sourceBadge.textContent =
       this.tab === "recorded" || view.source === "recorded"
-        ? "Recorded agent run"
+        ? this.recordedKind === "historical"
+          ? "Historical revision run"
+          : "Recorded Design"
         : liveRunBadge(view.provider, view.model ?? view.modelRequested);
     this.sourceBadge.style.color = view.source === "live" ? THEME.accent : THEME.muted;
     this.briefEl.textContent = `Brief: ${view.brief}`;
@@ -732,7 +760,7 @@ export class ForgeScreen extends BaseScreen {
       const card = document.createElement("button");
       card.type = "button";
       card.className = index === this.selectedTurn ? "cr-forge__turn is-selected" : "cr-forge__turn";
-      card.textContent = formatTurnCard(turn);
+      card.textContent = formatTurnCard(turn, view.turns);
       card.onclick = () => {
         this.selectedTurn = index;
         this.replayProgress = 0;
@@ -859,6 +887,7 @@ export class ForgeScreen extends BaseScreen {
       hotspot: turn?.playtest?.firstContact.hotspot,
       replay,
       replayProgress: this.replayProgress,
+      route: turn?.route,
     });
   }
 
@@ -893,6 +922,7 @@ export class ForgeScreen extends BaseScreen {
   }
 
   private defaultSaveName(view: ForgeDesignView): string {
+    if (view.source === "recorded" && view.path === "product") return "Recorded Crossfire Yard";
     const fromPlan = view.designPlan?.summary?.trim() ?? "";
     if (fromPlan.length >= 2) return fromPlan.slice(0, 40);
     return "Forge Arena";

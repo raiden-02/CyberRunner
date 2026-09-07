@@ -136,13 +136,20 @@ export interface ForgeDesignPlan {
 
 export interface ForgeDesignTurn {
   turn: number;
-  kind: "plan" | "edit" | "playtest" | "finish";
+  kind: "plan" | "edit" | "playtest" | "finish" | "route";
   tool: string;
   intent?: string;
   target?: string;
   rejected?: boolean;
   p0?: ForgeP0Summary;
   playtest?: ForgePlaytestSummary;
+  route?: {
+    fromId: string;
+    toId: string;
+    reachable: boolean;
+    distanceMeters?: number;
+    waypoints: Array<{ x: number; z: number }>;
+  };
   finishSummary?: string;
   mapRevision: number;
 }
@@ -332,6 +339,13 @@ class ApiClient {
     const res = await fetch(`${this.baseUrl}/arena-forge/design/${encodeURIComponent(jobId)}`);
     const body = (await res.json().catch(() => ({}))) as ForgeDesignView & { error?: string };
     if (!res.ok) throw new Error(body.error || "Design job not found");
+    return body;
+  }
+
+  async getRecordedDemo(): Promise<ForgeDesignView> {
+    const res = await fetch(`${this.baseUrl}/arena-forge/demo`);
+    const body = (await res.json().catch(() => ({}))) as ForgeDesignView & { error?: string };
+    if (!res.ok) throw new Error(body.error || "Recorded demo not found");
     return body;
   }
 

@@ -10,6 +10,7 @@ import {
   savedRuntimeMapId,
   type SavedMapRecord,
 } from "./saved-maps.js";
+import { isNativeDemoJobId, nativeRecordedDemoMap } from "./native-recorded-demo.js";
 
 export const LAUNCH_GRANT_TTL_MS = 3 * 60 * 1000;
 
@@ -120,18 +121,23 @@ export function issueExploreFromJob(args: {
   now?: number;
   createId?: () => string;
 }): { ok: true; grant: RuntimeMapLaunch } | { ok: false; status: number; error: string } {
-  const job = getDesignJob(args.jobId);
-  if (!job) return { ok: false, status: 404, error: "That design job is gone." };
-  if (!jobOwnedBy(job, args.actorId)) {
-    return { ok: false, status: 403, error: "You do not own that design job." };
+  const recorded = isNativeDemoJobId(args.jobId);
+  const job = recorded ? undefined : getDesignJob(args.jobId);
+  if (!recorded) {
+    if (!job) return { ok: false, status: 404, error: "That design job is gone." };
+    if (!jobOwnedBy(job, args.actorId)) {
+      return { ok: false, status: 403, error: "You do not own that design job." };
+    }
+    if (job.path !== "product" || !job.mode) {
+      return { ok: false, status: 400, error: "Explore is for ArenaForge product designs." };
+    }
+    if (args.which === "generated" && job.status !== "completed") {
+      return { ok: false, status: 409, error: "Generated map is not ready." };
+    }
   }
-  if (job.path !== "product" || !job.mode) {
-    return { ok: false, status: 400, error: "Explore is for ArenaForge product designs." };
-  }
-  if (args.which === "generated" && job.status !== "completed") {
-    return { ok: false, status: 409, error: "Generated map is not ready." };
-  }
-  const arena = getDesignJobMap(args.jobId, args.which === "original" ? "initial" : "final");
+  const arena = recorded
+    ? nativeRecordedDemoMap(args.which === "original" ? "initial" : "final")
+    : getDesignJobMap(args.jobId, args.which === "original" ? "initial" : "final");
   if (!arena) return { ok: false, status: 409, error: "That map snapshot is not available." };
 
   const grantId = (args.createId ?? randomUUID)();
@@ -147,7 +153,7 @@ export function issueExploreFromJob(args: {
 
   const grant = issueRuntimeMapLaunch({
     map,
-    designedMode: job.mode,
+    designedMode: recorded ? "search_destroy" : job!.mode!,
     purpose: "explore",
     ownerUserId: args.actorId,
     now: args.now,

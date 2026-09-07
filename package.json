@@ -15,6 +15,7 @@
     "preview": "npm run build && npm run start -w server",
     "test": "npm test -w server",
     "forge:doctor": "npx tsx --tsconfig server/tsconfig.json server/scripts/arena-forge-doctor.ts",
+    "forge:record-native-demo": "npx tsx --tsconfig server/tsconfig.json server/scripts/record-native-demo.ts",
     "benchmark": "npx tsx --tsconfig server/tsconfig.json server/scripts/benchmark.ts"
   },
   "repository": {

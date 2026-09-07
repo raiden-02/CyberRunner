@@ -2,6 +2,7 @@ import type { PublicArenaMapView } from "@shared/world/arena-map-view.js";
 import type { ArenaEvaluation, ArenaMap } from "./types.js";
 import type { ArenaPlaytestReport } from "./playtest.js";
 import type { PlaytestAgentRunResult, PlaytestAgentTurnRecord } from "./playtest-agent.js";
+import type { ProductDesignerRunResult } from "./product-designer.js";
 import { publicRevisionMaps, revisionMapsFromTurns } from "./public-map.js";
 import type { PlaytestReplay } from "./playtest-replay.js";
 import { representativeReplay } from "./playtest-replay.js";
@@ -39,15 +40,24 @@ export type PublicDesignPlan = {
   priorities: string[];
 };
 
+export type PublicRouteTrace = {
+  fromId: string;
+  toId: string;
+  reachable: boolean;
+  distanceMeters?: number;
+  waypoints: Array<{ x: number; z: number }>;
+};
+
 export type PublicDesignTurn = {
   turn: number;
-  kind: "plan" | "edit" | "playtest" | "finish";
+  kind: "plan" | "edit" | "playtest" | "finish" | "route";
   tool: string;
   intent?: string;
   target?: string;
   rejected?: boolean;
   p0?: PublicP0Summary;
   playtest?: PublicPlaytestSummary;
+  route?: PublicRouteTrace;
   finishSummary?: string;
   mapRevision: number;
 };
@@ -145,7 +155,9 @@ export function publicTurnsFromRecords(records: PlaytestAgentTurnRecord[]): Publ
           ? "playtest"
           : record.tool === "finish_design"
             ? "finish"
-            : "edit";
+            : record.tool === "trace_route"
+              ? "route"
+              : "edit";
     const turn: PublicDesignTurn = {
       turn: record.turn,
       kind,
@@ -157,6 +169,15 @@ export function publicTurnsFromRecords(records: PlaytestAgentTurnRecord[]): Publ
     if (record.outcome?.ok === false) turn.rejected = true;
     if (record.evaluationAfter) turn.p0 = compactP0(record.evaluationAfter);
     if (record.playtest) turn.playtest = compactPlaytest(record.playtest, revision);
+    if (record.route) {
+      turn.route = {
+        fromId: record.route.fromId,
+        toId: record.route.toId,
+        reachable: record.route.reachable,
+        waypoints: record.route.waypoints,
+        ...(record.route.distanceMeters !== undefined ? { distanceMeters: record.route.distanceMeters } : {}),
+      };
+    }
     if (kind === "finish" && typeof (record.arguments as { summary?: unknown } | undefined)?.summary === "string") {
       turn.finishSummary = (record.arguments as { summary: string }).summary;
     }
@@ -172,7 +193,7 @@ export function viewFromAgentResult(args: {
   brief: string;
   status: DesignJobStatus;
   error?: string;
-  result?: PlaytestAgentRunResult;
+  result?: PlaytestAgentRunResult | ProductDesignerRunResult;
   turns?: PlaytestAgentTurnRecord[];
   initialP0: PublicP0Summary;
   playOriginalId: string;

@@ -78,6 +78,8 @@ export function recordedDemoView(): PublicDesignView {
     jobId: demo.id,
     status: "completed",
     source: "recorded",
+    path: "historical",
+    mode: "search_destroy",
     startingMapId: demo.startingMapId,
     brief: demo.brief,
     finishSummary: demo.finishSummary,

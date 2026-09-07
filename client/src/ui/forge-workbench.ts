@@ -60,23 +60,43 @@ export function recordedStoryLine(view: ForgeDesignView): string | undefined {
   return "The first edit overcorrected the scripted route split, so the agent resized the same new occluder after observing the next playtest.";
 }
 
-export function formatTurnCard(turn: ForgeDesignTurn): string {
+export function turnCategory(
+  turn: ForgeDesignTurn,
+  turns: ForgeDesignTurn[],
+): "PLAN" | "BUILD" | "ROUTE" | "CHECK" | "PLAYTEST" | "REVISE" | "FINISH" {
+  if (turn.kind === "plan") return "PLAN";
+  if (turn.kind === "route") return "ROUTE";
+  if (turn.kind === "playtest") return "PLAYTEST";
+  if (turn.kind === "finish") return "FINISH";
+  const index = turns.findIndex((t) => t.turn === turn.turn);
+  const sawPlaytest = turns.slice(0, Math.max(0, index)).some((t) => t.kind === "playtest");
+  if (sawPlaytest) return "REVISE";
+  if (turn.p0 && !turn.rejected && turn.kind === "edit") return "BUILD";
+  return "BUILD";
+}
+
+export function formatTurnCard(turn: ForgeDesignTurn, turns: ForgeDesignTurn[] = []): string {
   const n = String(turn.turn).padStart(2, "0");
+  const category = turnCategory(turn, turns.length ? turns : [turn]);
   if (turn.kind === "playtest" && turn.playtest) {
     const g = turn.playtest.ghost.siteChoice;
-    return `${n} PLAYTEST\nA ${g.A} / B ${g.B}`;
+    return `${n} ${category}\nA ${g.A} / B ${g.B}`;
   }
   if (turn.kind === "plan") {
-    return `${n} PLAN\n${turn.intent ?? "Design plan"}`.trim();
+    return `${n} ${category}\n${turn.intent ?? "Design plan"}`.trim();
+  }
+  if (turn.kind === "route" && turn.route) {
+    const dist = turn.route.distanceMeters !== undefined ? ` ${turn.route.distanceMeters}m` : "";
+    return `${n} ${category}\n${turn.route.fromId} → ${turn.route.toId}${dist}`;
   }
   if (turn.kind === "finish") {
-    return `${n} COMPLETE\n${turn.finishSummary ?? ""}`.trim();
+    return `${n} ${category}\n${turn.finishSummary ?? ""}`.trim();
   }
   const title = turn.target ? `${turn.tool} ${turn.target}` : turn.tool;
-  const lines = [`${n} MAP EDIT`, title];
+  const lines = [`${n} ${category}`, title];
   if (turn.intent) lines.push(turn.intent);
   if (turn.rejected) lines.push("Rejected.");
-  if (turn.p0) lines.push(`Static checks: ${formatP0Line(turn.p0)}`);
+  if (turn.p0) lines.push(`CHECK  ${formatP0Line(turn.p0)}`);
   return lines.join("\n");
 }
 
