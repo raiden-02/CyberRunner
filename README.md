@@ -6,6 +6,8 @@ A browser multiplayer FPS. The server owns movement and hits. ArenaForge is a le
 
 Guest play works. Two tabs can share a Deathmatch with the 6-letter HUD code.
 
+![CyberRunner gameplay](docs/media/gameplay.webp)
+
 ![Netcode architecture](.github/architecture.svg)
 
 ## What this is
