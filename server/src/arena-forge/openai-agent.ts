@@ -2,42 +2,14 @@ import OpenAI from "openai";
 import type {
   AgentSession,
   AgentStartInput,
-  AgentToolCall,
   AgentToolFeedback,
   AgentTurnDecision,
-  TokenUsage,
 } from "./agent.js";
 import { formatAgentStartMessage, AGENT_SYSTEM_PROMPT } from "./agent-prompt.js";
 import { AGENT_FUNCTION_TOOLS } from "./agent-tools.js";
 import { MissingOpenAIKeyError } from "./openai-designer.js";
 import { readOpenAIApiKey, resolveArenaForgeModel } from "./one-shot.js";
-
-function usageOf(response: { usage?: { input_tokens: number; output_tokens: number; total_tokens: number } }): TokenUsage | undefined {
-  if (!response.usage) return undefined;
-  return {
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    totalTokens: response.usage.total_tokens,
-  };
-}
-
-function callsFrom(output: Array<{ type: string }> | undefined): AgentToolCall[] {
-  const calls: AgentToolCall[] = [];
-  for (const item of output ?? []) {
-    if (item.type !== "function_call") continue;
-    const call = item as { name?: string; arguments?: unknown; call_id?: string };
-    let args: unknown = call.arguments;
-    if (typeof call.arguments === "string") {
-      try {
-        args = JSON.parse(call.arguments);
-      } catch {
-        args = { _unparsed: call.arguments };
-      }
-    }
-    calls.push({ name: call.name ?? "", arguments: args, callId: call.call_id });
-  }
-  return calls;
-}
+import { callsFrom, usageOf } from "./openai-playtest-agent.js";
 
 /** Responses API session. previous_response_id + function_call_output. One tool per turn. */
 export class OpenAIAgentSession implements AgentSession {

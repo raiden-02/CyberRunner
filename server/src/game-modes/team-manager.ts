@@ -153,9 +153,7 @@ export class TeamManager {
   awardRoundWin(teamId: TeamId): number {
     const team = this.teams.get(teamId);
     if (team) {
-      const prev = team.roundsWon;
       team.roundsWon++;
-      console.log(`[TEAM] awardRoundWin(${teamId}): ${prev} -> ${team.roundsWon}`);
       return team.roundsWon;
     }
     return 0;
@@ -168,7 +166,6 @@ export class TeamManager {
 
   // Reset for new game
   resetGame(): void {
-    console.log(`[TEAM] resetGame called - resetting all team rounds to 0`);
     for (const team of this.teams.values()) {
       team.roundsWon = 0;
       team.alivePlayers = team.players.size;

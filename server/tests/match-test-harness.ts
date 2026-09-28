@@ -4,7 +4,7 @@ import { PlayerState } from "../src/PlayerState.js";
 import { DeathmatchMode } from "../src/game-modes/deathmatch-mode.js";
 import { SearchDestroyMode } from "../src/game-modes/search-destroy-mode.js";
 import { MatchLifecycle, type MatchRoomAccess } from "../src/match/match-lifecycle.js";
-import type { PlayerRuntime } from "../src/player-runtime.js";
+import { createPlayerRuntime, type PlayerRuntime } from "../src/player-runtime.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 import { pickSpawnPoint } from "../src/spawn/spawn-select.js";
 
@@ -14,15 +14,7 @@ export function testPlayer(id: string, extras?: Partial<PlayerState>): TestPlaye
   const schema = new PlayerState();
   schema.displayName = id;
   if (extras) Object.assign(schema, extras);
-  return {
-    schema,
-    ctrl: null as unknown as TestPlayer["ctrl"],
-    hitboxes: null as unknown as TestPlayer["hitboxes"],
-    inputQueue: null as unknown as TestPlayer["inputQueue"],
-    aimDir: null,
-    godMode: false,
-    unlimitedAmmo: false,
-  };
+  return createPlayerRuntime(null as never, schema, null as never);
 }
 
 export type TestRoom = MatchRoomAccess & {
@@ -56,7 +48,6 @@ export function makeDeathmatchRoom(playerIds = ["killer", "victim"]): {
     players,
     gameMode: mode,
     getSDMode: () => null,
-    isSearchDestroyMode: () => false,
     map: getGameplayMap("shoot-house-neon"),
   });
   return { room, match: new MatchLifecycle(room), mode };
@@ -102,7 +93,6 @@ export function makeSearchDestroyRoom(opts?: {
     players,
     gameMode: mode,
     getSDMode: () => mode,
-    isSearchDestroyMode: () => true,
     map,
     clients: [{ sessionId: "ghost" }, { sessionId: "sentinel" }],
     hostId: "ghost",
@@ -115,7 +105,6 @@ function makeRoom(partial: {
   players: Map<string, TestPlayer>;
   gameMode: MatchRoomAccess["gameMode"];
   getSDMode: MatchRoomAccess["getSDMode"];
-  isSearchDestroyMode: MatchRoomAccess["isSearchDestroyMode"];
   map: GameplayMapDefinition;
   clients?: Array<{ sessionId: string }>;
   hostId?: string;
@@ -142,7 +131,6 @@ function makeRoom(partial: {
       return partial.gameMode;
     },
     getSDMode: partial.getSDMode,
-    isSearchDestroyMode: partial.isSearchDestroyMode,
     broadcast: (type, message) => {
       broadcasts.push({ type, message });
     },

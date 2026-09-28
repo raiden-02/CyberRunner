@@ -55,11 +55,3 @@ export function runtimeMapId(id: string): string {
   return `runtime-map:${id}`;
 }
 
-export function parseRuntimeMapId(id: string): string | undefined {
-  if (!id.startsWith("runtime-map:")) return undefined;
-  return id.slice("runtime-map:".length);
-}
-
-export function isDynamicRuntimeMapId(id: string): boolean {
-  return id.startsWith("user-map:") || id.startsWith("runtime-map:");
-}

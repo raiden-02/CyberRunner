@@ -63,3 +63,8 @@ export function getGameModeConfig(modeId: GameModeId): GameModeConfig {
 export function isValidGameMode(modeId: string): modeId is GameModeId {
   return modeId in GAME_MODES;
 }
+
+/** Lives shown for a fresh spawn. Modes with unlimited lives (maxLives 0) display 99. */
+export function startingLives(maxLives: number): number {
+  return maxLives > 0 ? maxLives : 99;
+}

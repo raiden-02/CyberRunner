@@ -1,4 +1,4 @@
-// Weapon configuration for server-authoritative gameplay
+// Gameplay weapon stats. The server is authoritative; the client reads the same numbers for prediction.
 
 export type WeaponType = "hitscan" | "projectile";
 export type FireMode = "semi" | "auto" | "burst";
@@ -11,7 +11,6 @@ export interface DamageFalloff {
 
 export interface WeaponConfig {
   id: string;
-  name: string;
   type: WeaponType;
   damage: number;
   headshotMultiplier: number;
@@ -21,7 +20,6 @@ export interface WeaponConfig {
   magazineSize: number;
   reserveMax: number;
   reloadTime: number;
-  equipTime: number;
   
   // Damage falloff - if undefined, no falloff (sniper, etc.)
   damageFalloff?: DamageFalloff;
@@ -32,7 +30,6 @@ export interface WeaponConfig {
   
   // Projectile-specific
   projectileSpeed?: number;
-  projectileRadius?: number;
   explosionRadius?: number;
   explosionMinDamage?: number; // Damage at edge of explosion radius (percentage 0-1)
 }
@@ -40,7 +37,6 @@ export interface WeaponConfig {
 export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
   AR_1: {
     id: "AR_1",
-    name: "AR-1",
     type: "hitscan",
     damage: 28,
     headshotMultiplier: 1.4,
@@ -50,13 +46,11 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     magazineSize: 30,
     reserveMax: 120,
     reloadTime: 2.3,
-    equipTime: 0.5,
     damageFalloff: { startRange: 30, endRange: 60, minDamagePercent: 0.7 }
   },
 
   SMG_1: {
     id: "SMG_1",
-    name: "SMG-1",
     type: "hitscan",
     damage: 20,
     headshotMultiplier: 1.35,
@@ -66,13 +60,11 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     magazineSize: 32,
     reserveMax: 160,
     reloadTime: 1.9,
-    equipTime: 0.35,
     damageFalloff: { startRange: 12, endRange: 25, minDamagePercent: 0.5 }
   },
 
   LMG_1: {
     id: "LMG_1",
-    name: "LMG-1",
     type: "hitscan",
     damage: 30,
     headshotMultiplier: 1.35,
@@ -82,13 +74,11 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     magazineSize: 100,
     reserveMax: 200,
     reloadTime: 5.5,
-    equipTime: 0.9,
     damageFalloff: { startRange: 35, endRange: 70, minDamagePercent: 0.65 }
   },
 
   SHOTGUN_1: {
     id: "SHOTGUN_1",
-    name: "Shotgun-1",
     type: "hitscan",
     damage: 18,
     pelletCount: 8,
@@ -100,13 +90,11 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     magazineSize: 6,
     reserveMax: 30,
     reloadTime: 0.6,
-    equipTime: 0.6,
     damageFalloff: { startRange: 8, endRange: 15, minDamagePercent: 0.25 }
   },
 
   SNIPER_1: {
     id: "SNIPER_1",
-    name: "Sniper-1",
     type: "hitscan",
     damage: 85,
     headshotMultiplier: 2.0,
@@ -116,13 +104,11 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     magazineSize: 5,
     reserveMax: 25,
     reloadTime: 3.2,
-    equipTime: 0.8
     // No damageFalloff - snipers maintain damage at range
   },
 
   PISTOL_1: {
     id: "PISTOL_1",
-    name: "Pistol-1",
     type: "hitscan",
     damage: 30,
     headshotMultiplier: 1.5,
@@ -132,13 +118,11 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     magazineSize: 15,
     reserveMax: 75,
     reloadTime: 1.4,
-    equipTime: 0.25,
     damageFalloff: { startRange: 15, endRange: 30, minDamagePercent: 0.6 }
   },
 
   ROCKET_1: {
     id: "ROCKET_1",
-    name: "Rocket-1",
     type: "projectile",
     damage: 150,
     headshotMultiplier: 1.0,
@@ -148,16 +132,13 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     magazineSize: 1,
     reserveMax: 4,
     reloadTime: 3.8,
-    equipTime: 1.0,
     projectileSpeed: 40,
-    projectileRadius: 0.15,
     explosionRadius: 4.5,
     explosionMinDamage: 0.2
   },
 
   GL_1: {
     id: "GL_1",
-    name: "GL-1",
     type: "projectile",
     damage: 110,
     headshotMultiplier: 1.0,
@@ -167,20 +148,21 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     magazineSize: 6,
     reserveMax: 18,
     reloadTime: 3.5,
-    equipTime: 0.7,
     projectileSpeed: 25,
-    projectileRadius: 0.1,
     explosionRadius: 3.5,
     explosionMinDamage: 0.22
   }
 };
 
-export function getWeaponConfig(weaponId: string): WeaponConfig | undefined {
-  return WEAPON_CONFIGS[weaponId];
+export const DEFAULT_PRIMARY_WEAPON = "AR_1";
+export const DEFAULT_SECONDARY_WEAPON = "PISTOL_1";
+
+export function isValidWeapon(weaponId: unknown): weaponId is string {
+  return typeof weaponId === "string" && Object.prototype.hasOwnProperty.call(WEAPON_CONFIGS, weaponId);
 }
 
-export function isValidWeapon(weaponId: string): boolean {
-  return weaponId in WEAPON_CONFIGS;
+export function getWeaponConfig(weaponId: string): WeaponConfig | undefined {
+  return isValidWeapon(weaponId) ? WEAPON_CONFIGS[weaponId] : undefined;
 }
 
 /**

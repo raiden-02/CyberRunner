@@ -50,7 +50,7 @@ describe("Deathmatch acceptance", () => {
   it("marks death and respawns after the existing delay", () => {
     const player = makeDeathmatchRoom().room.players.get("victim")!;
     player.schema.health = 20;
-    const lethal = HealthSystem.applyDamage(player.schema, 20, "killer", "AR_1", "hitscan");
+    const lethal = HealthSystem.applyDamage(player.schema, 20);
     expect(lethal.killed).toBe(true);
     expect(player.schema.isDead).toBe(true);
     expect(player.schema.respawnTime).toBe(3);
@@ -139,7 +139,7 @@ describe("combat to game-mode consequence", () => {
   it("applies a lethal hitscan and scores a Deathmatch kill", () => {
     const { match, room } = makeDeathmatchRoom();
     const victim = room.players.get("victim")!;
-    const hit = HealthSystem.applyDamage(victim.schema, 100, "killer", "AR_1", "hitscan");
+    const hit = HealthSystem.applyDamage(victim.schema, 100);
     expect(hit.killed).toBe(true);
     expect(victim.schema.isDead).toBe(true);
 

@@ -103,28 +103,6 @@ export function createCone(
   return mesh;
 }
 
-// Chamfered box (angular cyberpunk look)
-export function createChamferedBox(
-  size: THREE.Vector3,
-  material: THREE.Material,
-  chamfer = 0.02
-): THREE.Object3D {
-  const root = new THREE.Object3D();
-  // Main body
-  const main = createBox(new THREE.Vector3(size.x - chamfer * 2, size.y, size.z), material);
-  root.add(main);
-  // Side chamfers
-  const leftChamfer = createBox(new THREE.Vector3(chamfer, size.y * 0.7, size.z * 0.9), material);
-  leftChamfer.position.set(-size.x / 2 + chamfer / 2, 0, 0);
-  leftChamfer.rotation.z = 0.3;
-  root.add(leftChamfer);
-  const rightChamfer = createBox(new THREE.Vector3(chamfer, size.y * 0.7, size.z * 0.9), material);
-  rightChamfer.position.set(size.x / 2 - chamfer / 2, 0, 0);
-  rightChamfer.rotation.z = -0.3;
-  root.add(rightChamfer);
-  return root;
-}
-
 export function addRail(parent: THREE.Object3D, length: number, material: THREE.Material): void {
   const ridgeCount = Math.max(4, Math.floor(length / 0.12));
   for (let i = 0; i < ridgeCount; i += 1) {

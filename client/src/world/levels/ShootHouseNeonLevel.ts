@@ -1,8 +1,3 @@
-/**
- * SHOOT HOUSE NEON LEVEL
- * Clean, competitive-focused visual construction.
- * Minimal visual clutter, clear sightlines.
- */
 import * as THREE from "three";
 import { BaseLevel } from "../core/BaseLevel.js";
 import { MATERIAL_PRESETS } from "../core/MaterialFactory.js";
@@ -17,6 +12,7 @@ import type {
 } from "../maps/map-types.js";
 import { UploadTerminalMesh } from "../components/upload-terminal.js";
 
+/** Bespoke visuals for Shoot House: low clutter, clear sightlines. */
 export class ShootHouseNeonLevel extends BaseLevel {
   private terminals: UploadTerminalMesh[] = [];
 
@@ -44,18 +40,10 @@ export class ShootHouseNeonLevel extends BaseLevel {
     this.createUploadTerminals(map);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GROUND
-  // ═══════════════════════════════════════════════════════════════════════════
-
   private createGround(map: GameplayMapDefinition): void {
     const bounds = resolveMapBounds(map);
     this.createGroundFromBounds(bounds, "floorWet", true, 50, 4);
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // WALLS
-  // ═══════════════════════════════════════════════════════════════════════════
 
   private createWalls(map: GameplayMapDefinition): void {
     const bounds = resolveMapBounds(map);
@@ -70,10 +58,6 @@ export class ShootHouseNeonLevel extends BaseLevel {
     this.addWallNeonStrip(0, y, -halfSize - 0.5, len, Math.PI / 2, "cyan", 0.04, 0.02);
     this.addWallNeonStrip(0, y, halfSize + 0.5, len, Math.PI / 2, "magenta", 0.04, 0.02);
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // BUILDINGS (Simple structures)
-  // ═══════════════════════════════════════════════════════════════════════════
 
   private createBuildings(buildings: Building[]): void {
     for (const bld of buildings) {
@@ -155,10 +139,6 @@ export class ShootHouseNeonLevel extends BaseLevel {
     group.add(right);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CONNECTORS
-  // ═══════════════════════════════════════════════════════════════════════════
-
   private createConnectors(connectors: Connector[]): void {
     for (const conn of connectors) {
       this.createConnector(conn);
@@ -202,10 +182,6 @@ export class ShootHouseNeonLevel extends BaseLevel {
     this.scene.add(group);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // NEON SIGNS
-  // ═══════════════════════════════════════════════════════════════════════════
-
   private createNeonSigns(signs: NeonSign[]): void {
     for (const sign of signs) {
       this.createNeonSign(sign);
@@ -242,10 +218,6 @@ export class ShootHouseNeonLevel extends BaseLevel {
     this.scene.add(group);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LANE LIGHTS
-  // ═══════════════════════════════════════════════════════════════════════════
-
   private createLaneLights(lights: Array<{ x: number; y: number; z: number; color: number; intensity: number; distance: number; decay: number }>): void {
     for (const cfg of lights) {
       const light = new THREE.PointLight(cfg.color, cfg.intensity, cfg.distance, cfg.decay);
@@ -253,10 +225,6 @@ export class ShootHouseNeonLevel extends BaseLevel {
       this.scene.add(light);
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SPAWN MARKERS
-  // ═══════════════════════════════════════════════════════════════════════════
 
   private createSpawnMarkers(colors: { north: number; south: number }): void {
     // Simple floor glow strips at spawns
@@ -274,10 +242,6 @@ export class ShootHouseNeonLevel extends BaseLevel {
     south.position.set(0, h / 2, 26);
     this.addMesh(south);
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // UPLOAD TERMINALS (S&D Objectives)
-  // ═══════════════════════════════════════════════════════════════════════════
 
   private createUploadTerminals(map: GameplayMapDefinition): void {
     if (!map.uploadTerminals || map.uploadTerminals.length === 0) return;

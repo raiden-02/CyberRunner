@@ -1,14 +1,6 @@
-export type { InputMsg } from "@shared/movement/types.js";
-
 // Weapon messages
 export type WeaponSwitchMsg = {
   weaponId: string;
-};
-
-// Firing messages
-export type FireInputMsg = {
-  firing: boolean;
-  aimDir: { x: number; y: number; z: number };
 };
 
 export type ReloadInputMsg = {
@@ -47,61 +39,12 @@ export type HealthChangeMsg = {
   damage?: number;
 };
 
-export type BreakableDestroyedMsg = {
-  id: number;
-};
-
 // Spike interaction messages (S&D mode)
 export type SpikeActionMsg = {
   action: "upload" | "decrypt" | "pickup" | "cancel";
 };
 
-export type SpikeUpdateMsg = {
-  state: string;
-  carrierId: string;
-  terminalId: string;
-  uploadProgress: number;
-  decryptProgress: number;
-  detonationTime: number;
-  x: number;
-  z: number;
-};
-
-export type RoundEndMsg = {
-  roundNumber: number;
-  winnerId: string;
-  winnerName: string;
-  winnerTeam: string;
-  reason: string; // "elimination" | "spike_detonated" | "spike_decrypted" | "time"
-};
-
 // Team selection message
 export type TeamSelectMsg = {
   teamId: "ghosts" | "sentinels";
-};
-
-// Host control messages
-export type StartGameMsg = {};
-
-export type RestartGameMsg = {};
-
-export type DisbandLobbyMsg = {};
-
-// Lobby state update (sent to clients)
-export type LobbyStateMsg = {
-  lobbyState: "waiting" | "starting" | "playing" | "ended";
-  hostId: string;
-  ghostPlayers: string[];
-  sentinelPlayers: string[];
-  canStart: boolean;
-};
-
-// Game over with team info
-export type GameOverMsg = {
-  winnerId: string | null;
-  winnerName: string;
-  winnerTeam: string;
-  gameMode: string;
-  ghostsRoundsWon: number;
-  sentinelsRoundsWon: number;
 };

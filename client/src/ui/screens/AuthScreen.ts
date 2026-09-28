@@ -2,6 +2,7 @@ import { BaseScreen } from "./BaseScreen.js";
 import { api, type UserProfile } from "../../api/client.js";
 import { getGameplayMap } from "@shared/world/map-registry.js";
 import { MapShowcase } from "../../world/MapShowcase.js";
+import { DEFAULT_PRIMARY_WEAPON, DEFAULT_SECONDARY_WEAPON } from "@shared/weapons/weapon-config.js";
 
 declare global {
   interface Window {
@@ -86,8 +87,8 @@ export class AuthScreen extends BaseScreen {
       id: "guest-" + Date.now(),
       displayName: guestName,
       email: null,
-      primaryWeaponId: "AR_1",
-      secondaryWeaponId: "PISTOL_1",
+      primaryWeaponId: DEFAULT_PRIMARY_WEAPON,
+      secondaryWeaponId: DEFAULT_SECONDARY_WEAPON,
       profileComplete: true,
     };
     this.onAuthenticated(guestUser);
@@ -175,8 +176,8 @@ export class AuthScreen extends BaseScreen {
       id: "dev-user-" + Date.now(),
       displayName: null,
       email: "dev@test.com",
-      primaryWeaponId: "AR_1",
-      secondaryWeaponId: "PISTOL_1",
+      primaryWeaponId: DEFAULT_PRIMARY_WEAPON,
+      secondaryWeaponId: DEFAULT_SECONDARY_WEAPON,
       profileComplete: false,
     };
     this.onAuthenticated(mockUser);

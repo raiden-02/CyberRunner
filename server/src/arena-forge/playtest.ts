@@ -62,7 +62,7 @@ const LIMITATIONS = [
   "Same seed and rollout count replay the same spawn/jitter sequence.",
 ];
 
-class SeededRng {
+export class SeededRng {
   private state: number;
 
   constructor(seed: number) {
@@ -102,10 +102,8 @@ function losClear(map: ArenaMap, ax: number, az: number, bx: number, bz: number)
 
 function pathLengthMeters(path: NavCell[]): number {
   if (path.length <= 1) return 0;
-  return (path.length - 1) * GRID_CELL;
+  return (path.length - 1) * GRID_CELL_METERS;
 }
-
-const GRID_CELL = GRID_CELL_METERS;
 
 function pointAt(path: NavCell[], distance: number): { x: number; z: number } {
   if (path.length === 0) return { x: 0, z: 0 };
@@ -136,15 +134,6 @@ function routeExposure(
     if (opposing.some((s) => losClear(map, cell.x, cell.z, s.x, s.z))) exposed += 1;
   }
   return exposed / path.length;
-}
-
-function emptyRole(): ArenaPlaytestRoleStats {
-  return {
-    siteChoice: { A: 0, B: 0 },
-    medianArrivalSeconds: {},
-    meanRouteExposureFraction: 0,
-    routeConcentration: 0,
-  };
 }
 
 function finishRole(
@@ -178,11 +167,11 @@ function finishRole(
   };
 }
 
-function validRoleSpawns(map: ArenaMap, grid: NavGrid, role: SpawnRole): ArenaSpawn[] {
+export function validRoleSpawns(map: ArenaMap, grid: NavGrid, role: SpawnRole): ArenaSpawn[] {
   return map.spawns.filter((s) => s.role === role && grid.spawnCell(s) !== null);
 }
 
-function chooseRoute(
+export function chooseRoute(
   map: ArenaMap,
   grid: NavGrid,
   spawn: ArenaSpawn,
@@ -211,7 +200,7 @@ function chooseRoute(
   return { site: best.site, path: best.path, exposure: best.exposure, meters: best.meters };
 }
 
-function firstContact(
+export function firstContact(
   map: ArenaMap,
   ghostPath: NavCell[],
   sentinelPath: NavCell[],

@@ -137,12 +137,6 @@ export class ShotgunWeapon extends BaseWeapon {
   }
 }
 
-export class MarksmanRifleWeapon extends BaseWeapon {
-  public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "dot", color: "#d4893a", size: 4, thickness: 0, gap: 0, opacity: 1.0, dotSize: 4 };
-  }
-}
-
 export class SniperRifleWeapon extends BaseWeapon {
   public override createScopeOverlay(): BaseScopeOverlay | null {
     if (this.hasMagnifiedOptic()) {
@@ -162,53 +156,15 @@ export class PistolWeapon extends BaseWeapon {
   }
 }
 
-export class MachinePistolWeapon extends BaseWeapon {
-  public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "chevron", color: "#d4893a", size: 16, thickness: 2, gap: 4, opacity: 0.9 };
-  }
-}
-
-export abstract class LauncherWeapon extends BaseWeapon {}
-
-export class RocketLauncherWeapon extends LauncherWeapon {
+export class RocketLauncherWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
     return { style: "circle", color: "#c45c3a", size: 32, thickness: 2, gap: 0, opacity: 0.9, dotSize: 4 };
   }
 }
 
-export class GrenadeLauncherWeapon extends LauncherWeapon {
+export class GrenadeLauncherWeapon extends BaseWeapon {
   public override getCrosshairConfig(): CrosshairConfig {
     return { style: "circle", color: "#c45c3a", size: 26, thickness: 2, gap: 0, opacity: 0.9, dotSize: 3 };
-  }
-}
-
-export class MeleeWeapon extends BaseWeapon {
-  public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "dot", color: "#ffffff", size: 6, thickness: 0, gap: 0, opacity: 0.8, dotSize: 6 };
-  }
-}
-
-export class EnergyWeapon extends BaseWeapon {
-  public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "cross", color: "#ede6d9", size: 18, thickness: 2, gap: 6, opacity: 0.9, outline: true };
-  }
-}
-
-export class ChargeWeapon extends BaseWeapon {
-  public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "circle", color: "#d4893a", size: 20, thickness: 2, gap: 0, opacity: 0.9, dotSize: 3 };
-  }
-}
-
-export class BeamWeapon extends BaseWeapon {
-  public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "dot", color: "#d4893a", size: 6, thickness: 0, gap: 0, opacity: 1.0, dotSize: 6 };
-  }
-}
-
-export class BowWeapon extends BaseWeapon {
-  public override getCrosshairConfig(): CrosshairConfig {
-    return { style: "chevron", color: "#ede6d9", size: 18, thickness: 2, gap: 5, opacity: 0.9 };
   }
 }
 
@@ -230,26 +186,9 @@ export function createWeapon(weaponId: string): BaseWeapon {
       return new LMGWeapon(def);
     case "Shotgun":
       return new ShotgunWeapon(def);
-    case "DMR":
-      return new MarksmanRifleWeapon(def);
     case "Pistol":
       return new PistolWeapon(def);
-    case "MachinePistol":
-      return new MachinePistolWeapon(def);
-    case "Launcher":
     case "RocketLauncher":
       return new RocketLauncherWeapon(def);
-    case "Melee":
-      return new MeleeWeapon(def);
-    case "Energy":
-      return new EnergyWeapon(def);
-    case "Charge":
-      return new ChargeWeapon(def);
-    case "Beam":
-      return new BeamWeapon(def);
-    case "Bow":
-      return new BowWeapon(def);
-    default:
-      return new AssaultRifleWeapon(def);
   }
 }

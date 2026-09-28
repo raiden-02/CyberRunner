@@ -9,10 +9,6 @@ export type PersonalMapMeta = {
   sessionOnly?: boolean;
 };
 
-export function officialMapTitle(map: PublicMapInfo): string {
-  return map.title;
-}
-
 export function forgeMapTitle(name: string): string {
   return `FORGE · ${name}`;
 }
@@ -22,10 +18,6 @@ export function personalMapsForMode(
   mode: PublicGameMode,
 ): PersonalMapMeta[] {
   return maps.filter((m) => m.mode === mode);
-}
-
-export function isOfficialQuickPlayMap(mapId: string, officialIds: readonly string[]): boolean {
-  return officialIds.includes(mapId);
 }
 
 export type LobbyCreateSelection =
@@ -67,17 +59,6 @@ export function personalLobbyOption(map: PersonalMapMeta): LobbyMapOption {
     modes: [map.mode],
     sessionOnly: map.sessionOnly,
   };
-}
-
-export function lobbyOptionsForMode(
-  official: readonly PublicMapInfo[],
-  personal: readonly PersonalMapMeta[],
-  mode: PublicGameMode,
-): LobbyMapOption[] {
-  return [
-    ...official.map(officialLobbyOption),
-    ...personalMapsForMode(personal, mode).map(personalLobbyOption),
-  ];
 }
 
 export function selectedLobbyOption(

@@ -1,4 +1,5 @@
 import { query } from "../db/pool.js";
+import { DEFAULT_PRIMARY_WEAPON, DEFAULT_SECONDARY_WEAPON } from "@shared/weapons/weapon-config.js";
 
 export interface User {
   id: string;
@@ -94,8 +95,8 @@ export class UserService {
       googleSub: row.google_sub,
       email: row.email,
       displayName: row.display_name,
-      primaryWeaponId: row.primary_weapon_id || "AR_1",
-      secondaryWeaponId: row.secondary_weapon_id || "PISTOL_1",
+      primaryWeaponId: row.primary_weapon_id || DEFAULT_PRIMARY_WEAPON,
+      secondaryWeaponId: row.secondary_weapon_id || DEFAULT_SECONDARY_WEAPON,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

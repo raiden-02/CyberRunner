@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateDamageFalloff, calculateExplosionDamage } from "../src/weapons/weapon-config.js";
+import { calculateDamageFalloff, calculateExplosionDamage } from "../../shared/weapons/weapon-config.js";
 
 describe("calculateDamageFalloff", () => {
   const falloff = { startRange: 10, endRange: 20, minDamagePercent: 0.5 };

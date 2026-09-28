@@ -9,7 +9,7 @@ import {
   readIntent,
   type AgentToolOutput,
 } from "./agent-tools.js";
-import type { AgentStartInput, AgentTurnDecision, TokenUsage } from "./agent.js";
+import { addUsage, type AgentStartInput, type AgentTurnDecision, type TokenUsage } from "./agent.js";
 import type { ArenaInspection } from "./inspect.js";
 import type { TraceRouteResult } from "./product-route.js";
 import {
@@ -179,15 +179,6 @@ export type PlaytestAgentRunResult = {
   finalEvaluation: ArenaEvaluation;
   lastPlaytest?: ArenaPlaytestReport;
 };
-
-function addUsage(into: TokenUsage, extra?: TokenUsage): TokenUsage {
-  if (!extra) return into;
-  return {
-    inputTokens: (into.inputTokens ?? 0) + (extra.inputTokens ?? 0),
-    outputTokens: (into.outputTokens ?? 0) + (extra.outputTokens ?? 0),
-    totalTokens: (into.totalTokens ?? 0) + (extra.totalTokens ?? 0),
-  };
-}
 
 const EDIT_TOOLS = new Set<string>(AGENT_EDIT_TOOLS);
 

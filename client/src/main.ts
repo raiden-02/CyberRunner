@@ -3,10 +3,12 @@ import { Game } from './core/Game.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { initRapier } from './physics/PhysicsWorld.js';
 
-import './debug/weapon-preview.js';
-
 // RAPIER WASM must be initialized before any physics code runs
 await initRapier();
+
+if (import.meta.env.DEV) {
+  await import('./debug/weapon-preview.js');
+}
 
 const googleClientId =
   (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim()
@@ -44,7 +46,3 @@ mainMenu.setOnGameStart(async (options) => {
 });
 
 mainMenu.start().catch(console.error);
-
-if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("skip_menu") === "1") {
-  // MainMenu handles skip_menu internally
-}

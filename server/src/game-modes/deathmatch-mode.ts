@@ -1,6 +1,6 @@
 import { GameState } from "../GameState.js";
 import { PlayerState } from "../PlayerState.js";
-import { GAME_MODES } from "./game-mode-config.js";
+import { GAME_MODES, startingLives } from "./game-mode-config.js";
 import { BaseGameMode, RoundEndResult } from "./base-game-mode.js";
 
 export class DeathmatchMode extends BaseGameMode {
@@ -44,7 +44,7 @@ export class DeathmatchMode extends BaseGameMode {
       }
     }
 
-    return { livesRemaining: 999 };
+    return { livesRemaining: startingLives(this.config.maxLives) };
   }
 
   canRespawn(_sessionId: string): boolean {

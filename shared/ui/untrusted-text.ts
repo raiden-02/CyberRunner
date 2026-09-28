@@ -62,15 +62,3 @@ export function fillDesignPlan<T extends TextSink>(
   }
 }
 
-export function fillNamedLines<T extends TextSink>(
-  host: { replaceChildren: () => void; appendChild: (node: T) => unknown },
-  lines: readonly string[],
-  create: (tag: string) => T,
-): void {
-  host.replaceChildren();
-  for (const line of lines) {
-    const row = create("div");
-    setUntrustedText(row, line);
-    host.appendChild(row);
-  }
-}

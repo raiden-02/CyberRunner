@@ -1,5 +1,6 @@
 import { BaseScreen } from "./BaseScreen.js";
 import { api, type UserProfile } from "../../api/client.js";
+import { DEFAULT_PRIMARY_WEAPON, DEFAULT_SECONDARY_WEAPON } from "@shared/weapons/weapon-config.js";
 
 const PRIMARY_WEAPONS = [
   { value: "AR_1", label: "Assault Rifle" },
@@ -72,8 +73,8 @@ export class ProfileScreen extends BaseScreen {
   setUser(user: UserProfile): void {
     this.user = user;
     this.nameInput.value = user.displayName || "";
-    this.primarySelect.value = user.primaryWeaponId || "AR_1";
-    this.secondarySelect.value = user.secondaryWeaponId || "PISTOL_1";
+    this.primarySelect.value = user.primaryWeaponId || DEFAULT_PRIMARY_WEAPON;
+    this.secondarySelect.value = user.secondaryWeaponId || DEFAULT_SECONDARY_WEAPON;
   }
 
   setOnComplete(callback: (user: UserProfile) => void): void {

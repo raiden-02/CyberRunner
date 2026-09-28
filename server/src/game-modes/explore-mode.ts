@@ -1,6 +1,6 @@
 import { GameState } from "../GameState.js";
 import { PlayerState } from "../PlayerState.js";
-import { GAME_MODES } from "./game-mode-config.js";
+import { GAME_MODES, startingLives } from "./game-mode-config.js";
 import { BaseGameMode, RoundEndResult } from "./base-game-mode.js";
 
 /** Walk a map. No score, rounds, lobby, or victory. */
@@ -35,7 +35,7 @@ export class ExploreMode extends BaseGameMode {
   ): { livesRemaining: number; roundEnd?: RoundEndResult } {
     const victimState = this.playerStates.get(victimId);
     if (!victimState) return { livesRemaining: 0 };
-    return { livesRemaining: 999 };
+    return { livesRemaining: startingLives(this.config.maxLives) };
   }
 
   canRespawn(_sessionId: string): boolean {

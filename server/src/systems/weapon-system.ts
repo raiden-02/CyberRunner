@@ -5,7 +5,7 @@ import {
   calculateDamageFalloff, 
   calculateExplosionDamage,
   generatePelletSpread 
-} from '../weapons/weapon-config.js';
+} from '@shared/weapons/weapon-config.js';
 import { ShotFiredMsg } from '../net/messages.js';
 import { getDamageMultiplier, HitboxRegistry, type BodyPart } from '../physics/hitbox-system.js';
 
@@ -18,17 +18,6 @@ export interface HitResult {
   point?: { x: number; y: number; z: number };
   normal?: { x: number; y: number; z: number };
   colliderHandle?: number;
-}
-
-export interface ShotResult {
-  shotFired: boolean;
-  hits?: Array<{
-    playerId: string;
-    damage: number;
-    bodyPart?: BodyPart;
-  }>;
-  hitColliderHandle?: number;
-  shotMsg?: ShotFiredMsg;
 }
 
 export class WeaponSystem {
@@ -348,7 +337,6 @@ export class WeaponSystem {
 
   static processExplosion(
     explosionCenter: { x: number; y: number; z: number },
-    shooterId: string,
     weaponId: string,
     players: Map<string, { schema: PlayerState; ctrl: any }>
   ): Array<{ playerId: string; damage: number }> {

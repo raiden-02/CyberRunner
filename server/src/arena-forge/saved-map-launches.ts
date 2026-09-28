@@ -28,9 +28,6 @@ export type RuntimeMapLaunch = {
   ownerUserId?: string;
 };
 
-/** Historical name. Same grant as RuntimeMapLaunch. */
-export type SavedMapLaunchGrant = RuntimeMapLaunch;
-
 const grants = new Map<string, RuntimeMapLaunch>();
 
 export function resetSavedMapLaunches(): void {
@@ -76,10 +73,6 @@ export function consumeRuntimeMapLaunch(
   return grant;
 }
 
-export function peekRuntimeMapLaunch(launchId: string): RuntimeMapLaunch | undefined {
-  return grants.get(launchId);
-}
-
 export function issueSavedMapLaunch(
   record: SavedMapRecord,
   ownerUserId: string,
@@ -106,10 +99,6 @@ export function consumeSavedMapLaunch(
   now = Date.now(),
 ): RuntimeMapLaunch | undefined {
   return consumeRuntimeMapLaunch(launchId, now);
-}
-
-export function peekSavedMapLaunch(launchId: string): RuntimeMapLaunch | undefined {
-  return peekRuntimeMapLaunch(launchId);
 }
 
 export type ExploreWhich = "original" | "generated";

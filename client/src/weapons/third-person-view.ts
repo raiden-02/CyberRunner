@@ -12,12 +12,10 @@ interface WeaponPlacement {
 function getWeaponPlacement(family: WeaponFamily): WeaponPlacement {
   switch (family) {
     case "Pistol":
-    case "MachinePistol":
       return { scale: 0.6, position: new THREE.Vector3(0.18, -0.08, 0.25) };
     case "SMG":
       return { scale: 0.7, position: new THREE.Vector3(0.16, -0.1, 0.28) };
     case "AssaultRifle":
-    case "DMR":
       return { scale: 0.8, position: new THREE.Vector3(0.14, -0.12, 0.32) };
     case "Shotgun":
       return { scale: 0.82, position: new THREE.Vector3(0.16, -0.1, 0.28) };
@@ -26,12 +24,9 @@ function getWeaponPlacement(family: WeaponFamily): WeaponPlacement {
     case "Sniper":
       return { scale: 0.88, position: new THREE.Vector3(0.14, -0.12, 0.36) };
     case "RocketLauncher":
-    case "Launcher":
       return { scale: 0.95, position: new THREE.Vector3(0.2, -0.06, 0.26) };
     case "GrenadeLauncher":
       return { scale: 0.82, position: new THREE.Vector3(0.18, -0.1, 0.28) };
-    case "Melee":
-      return { scale: 0.65, position: new THREE.Vector3(0.2, -0.05, 0.18) };
     default:
       return { scale: 0.8, position: new THREE.Vector3(0.14, -0.12, 0.32) };
   }

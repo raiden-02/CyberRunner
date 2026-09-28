@@ -2,8 +2,6 @@
  * District lighting colors — sodium, copper, muted teal.
  * Signs glow; surfaces do not.
  */
-import * as THREE from "three";
-
 export interface NeonColorConfig {
   color: number;
   emissive: number;
@@ -36,15 +34,3 @@ export const NEON_PALETTE: Record<NeonColorKey, NeonColorConfig> = {
   yellow:  { color: 0xb08a3a, emissive: 0xd4b05a, intensity: 1.0 },
   white:   { color: 0xc8c0b4, emissive: 0xede6d9, intensity: 0.9 },
 };
-
-export function getNeonColor(key: NeonColorKey): NeonColorConfig {
-  return NEON_PALETTE[key];
-}
-
-export function getNeonBaseColor(key: NeonColorKey): THREE.Color {
-  return new THREE.Color(NEON_PALETTE[key].color);
-}
-
-export function getNeonEmissiveColor(key: NeonColorKey): THREE.Color {
-  return new THREE.Color(NEON_PALETTE[key].emissive);
-}

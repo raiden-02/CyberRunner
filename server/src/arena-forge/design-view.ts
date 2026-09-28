@@ -135,7 +135,7 @@ export function compactPlaytest(report: ArenaPlaytestReport, mapRevision: number
   };
 }
 
-function targetOf(tool: string, args: unknown, changedIds?: string[]): string | undefined {
+function targetOf(args: unknown, changedIds?: string[]): string | undefined {
   if (!args || typeof args !== "object") return changedIds?.[0];
   const rec = args as Record<string, unknown>;
   if (typeof rec.solidId === "string") return rec.solidId;
@@ -170,7 +170,7 @@ export function publicTurnsFromRecords(
       kind,
       tool: record.tool,
       intent: record.intent,
-      target: targetOf(record.tool, record.arguments, record.outcome?.changedIds),
+      target: targetOf(record.arguments, record.outcome?.changedIds),
       mapRevision: revision,
     };
     if (record.outcome?.ok === false) turn.rejected = true;

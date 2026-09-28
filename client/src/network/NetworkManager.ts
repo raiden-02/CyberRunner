@@ -1,7 +1,8 @@
 import { Client, Room } from "colyseus.js";
 import { isGameplayActive } from "@shared/net/gameplay-input.js";
-import { encodeInputCmd, encodeFireCmd } from "./BinaryCodec.js";
+import { encodeInputCmd, encodeFireCmd } from "@shared/net/binary-codec.js";
 import type { SyncedGameState } from "./synced-state.js";
+import type { InputMsg } from "@shared/movement/types.js";
 
 export interface HealthChangeMessage {
   playerId: string;
@@ -407,7 +408,7 @@ export class NetworkManager {
     });
   }
 
-  public sendInput(data: any): void {
+  public sendInput(data: InputMsg): void {
     if (!this.connected || !this.gameplaySendable()) return;
     this.room!.send("input_bin", encodeInputCmd(data));
   }

@@ -60,6 +60,17 @@ export class WeaponSystem {
     this.isAiming = aiming;
   }
 
+  /**
+   * Adopts the server's ammo while the trigger is up. The server keeps ammo per
+   * weapon across switches and refills on respawn; the local copy only predicts.
+   */
+  public syncAmmo(weaponId: string | undefined, ammoInMag: number, ammoReserve: number): void {
+    if (!this.weapon || this.weapon.id !== weaponId) return;
+    if (this.isFiring || this.weapon.isReloading) return;
+    this.weapon.ammoInMag = ammoInMag;
+    this.weapon.ammoReserve = ammoReserve;
+  }
+
   public startReload(now: number): void {
     if (!this.weapon) return;
     if (this.weapon.startReload(now)) {

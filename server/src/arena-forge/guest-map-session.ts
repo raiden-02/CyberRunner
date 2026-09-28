@@ -10,10 +10,6 @@ export function guestMapOwnerId(sessionId: string): string {
   return `guest-session:${sessionId}`;
 }
 
-export function isGuestMapOwnerId(id: string): boolean {
-  return id.startsWith("guest-session:");
-}
-
 export function readGuestMapSession(req: Request): string | undefined {
   const raw = req.cookies?.[GUEST_MAP_COOKIE];
   if (typeof raw === "string" && UUID_RE.test(raw)) return raw;

@@ -40,7 +40,7 @@ export class NavGrid {
   private readonly originX: number;
   private readonly originZ: number;
 
-  constructor(private readonly map: ArenaMap) {
+  constructor(map: ArenaMap) {
     this.bounds = resolveMapBounds(map);
     const width = this.bounds.halfWidth * 2;
     const depth = this.bounds.halfDepth * 2;

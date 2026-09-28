@@ -23,13 +23,6 @@ export const PRODUCT_MUTATION_TOOLS = [
   "move_objective",
 ] as const;
 
-export const PRODUCT_OBSERVATION_TOOLS = [
-  "propose_design_plan",
-  "trace_route",
-  "run_playtest",
-  "finish_design",
-] as const;
-
 export function isProductMutationTool(tool: string): boolean {
   return (PRODUCT_MUTATION_TOOLS as readonly string[]).includes(tool);
 }

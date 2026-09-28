@@ -1,11 +1,12 @@
 import type { GameState } from "../GameState.js";
-import type { PlayerRuntime } from "../player-runtime.js";
+import { refillAmmo, type PlayerRuntime } from "../player-runtime.js";
+import { startingLives } from "../game-modes/game-mode-config.js";
 import {
   BaseGameMode,
   SearchDestroyMode,
   type TeamId,
 } from "../game-modes/index.js";
-import { calculateSpawnFacing } from "../world/maps/map-registry.js";
+import { calculateSpawnFacing } from "@shared/world/map-types.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 
 export type MatchBroadcast = (type: string, message?: unknown) => void;
@@ -17,7 +18,6 @@ export type MatchRoomAccess = {
   hostId: string;
   gameMode: BaseGameMode;
   getSDMode: () => SearchDestroyMode | null;
-  isSearchDestroyMode: () => boolean;
   broadcast: MatchBroadcast;
   setHostId: (id: string) => void;
   schedule: (fn: () => void, ms: number) => void;
@@ -70,19 +70,7 @@ export class MatchLifecycle {
     this.spawnSpikeOnGround();
 
     for (const [sessionId, player] of this.room.players) {
-      const spawn = this.room.pickSpawnPoint(sessionId);
-      player.schema.isDead = false;
-      player.schema.health = player.schema.maxHealth;
-      player.schema.x = spawn.x;
-      player.schema.y = spawn.y;
-      player.schema.z = spawn.z;
-      player.schema.rotationY = calculateSpawnFacing(spawn.x, spawn.z);
-      player.schema.livesRemaining = this.room.gameMode.getConfig().maxLives || 1;
-      player.schema.hasSpike = false;
-      player.schema.isUploading = false;
-      player.schema.isDecrypting = false;
-
-      this.room.placePlayerAt(player, spawn.x, spawn.y, spawn.z);
+      this.respawnForMatch(sessionId, player);
     }
 
     this.room.broadcast("game_started", {
@@ -114,21 +102,11 @@ export class MatchLifecycle {
     }
 
     for (const [sessionId, player] of this.room.players) {
-      const spawn = this.room.pickSpawnPoint(sessionId);
-      player.schema.isDead = false;
-      player.schema.health = player.schema.maxHealth;
       player.schema.kills = 0;
       player.schema.deaths = 0;
       player.schema.score = 0;
       player.schema.roundsWon = 0;
-      player.schema.hasSpike = false;
-      player.schema.x = spawn.x;
-      player.schema.y = spawn.y;
-      player.schema.z = spawn.z;
-      player.schema.livesRemaining = this.room.gameMode.getConfig().maxLives || 99;
-
-      this.room.placePlayerAt(player, spawn.x, spawn.y, spawn.z);
-
+      this.respawnForMatch(sessionId, player);
       this.room.gameMode.addPlayer(sessionId);
     }
 
@@ -193,56 +171,6 @@ export class MatchLifecycle {
       killerId: killerId !== victimId ? killerId : null,
       victimLivesRemaining: victim?.schema.livesRemaining ?? 0,
     });
-
-    const sdMode = this.room.getSDMode();
-    if (sdMode && this.room.state.isRoundActive) {
-      this.checkEliminationRoundEnd();
-    }
-  }
-
-  checkEliminationRoundEnd(): void {
-    if (!this.room.state.isRoundActive) return;
-
-    const sdMode = this.room.getSDMode();
-    if (!sdMode) return;
-
-    const teamManager = sdMode.getTeamManager();
-
-    const getPlayerLives = (sessionId: string): number => {
-      const player = this.room.players.get(sessionId);
-      return player ? player.schema.livesRemaining : 0;
-    };
-
-    const spikePlanted = this.room.state.spikeState === "uploaded" ||
-      this.room.state.spikeState === "decrypting";
-
-    const ghostsEliminated = teamManager.isTeamEliminated("ghosts", getPlayerLives);
-    const sentinelsEliminated = teamManager.isTeamEliminated("sentinels", getPlayerLives);
-
-    if (sentinelsEliminated) {
-      this.handleTeamRoundEnd("ghosts", "elimination");
-      return;
-    }
-
-    if (ghostsEliminated && !spikePlanted) {
-      this.handleTeamRoundEnd("sentinels", "elimination");
-      return;
-    }
-  }
-
-  checkFFAElimination(): void {
-    if (!this.room.state.isRoundActive) return;
-
-    const alivePlayers: string[] = [];
-    for (const [sessionId, player] of this.room.players) {
-      if (!player.schema.isDead && player.schema.livesRemaining > 0) {
-        alivePlayers.push(sessionId);
-      }
-    }
-
-    if (alivePlayers.length <= 1) {
-      this.handleRoundEnd(alivePlayers[0] || null, "elimination");
-    }
   }
 
   handleGameOver(winnerId: string | null, winnerTeam?: TeamId): void {
@@ -304,32 +232,6 @@ export class MatchLifecycle {
     this.room.schedule(() => this.startNewRound(), 5000);
   }
 
-  handleRoundEnd(winnerId: string | null, reason: string): void {
-    this.room.state.isRoundActive = false;
-    this.room.state.roundWinnerId = winnerId || "";
-
-    const winner = winnerId ? this.room.players.get(winnerId) : null;
-    if (winner) {
-      winner.schema.roundsWon++;
-    }
-
-    const winnerName = winner?.schema.displayName || "Unknown";
-
-    this.room.broadcast("round_end", {
-      roundNumber: this.room.state.currentRound,
-      winnerId,
-      winnerName,
-      reason,
-    });
-
-    if (winner && winner.schema.roundsWon >= this.room.state.roundsToWin) {
-      this.handleGameOver(winnerId);
-      return;
-    }
-
-    this.room.schedule(() => this.startNewRound(), 5000);
-  }
-
   startNewRound(): void {
     this.room.state.currentRound++;
     this.room.state.isRoundActive = true;
@@ -344,24 +246,11 @@ export class MatchLifecycle {
     }
 
     for (const [sessionId, player] of this.room.players) {
-      const spawn = this.room.pickSpawnPoint(sessionId);
-      player.schema.isDead = false;
-      player.schema.health = player.schema.maxHealth;
-      player.schema.x = spawn.x;
-      player.schema.y = spawn.y;
-      player.schema.z = spawn.z;
-      player.schema.rotationY = calculateSpawnFacing(spawn.x, spawn.z);
-      player.schema.livesRemaining = this.room.gameMode.getConfig().maxLives || 1;
-      player.schema.hasSpike = false;
-      player.schema.isUploading = false;
-      player.schema.isDecrypting = false;
-
-      this.room.placePlayerAt(player, spawn.x, spawn.y, spawn.z);
-
+      this.respawnForMatch(sessionId, player);
       this.room.gameMode.addPlayer(sessionId);
     }
 
-    if (this.room.isSearchDestroyMode()) {
+    if (sdMode) {
       this.spawnSpikeOnGround();
     }
 
@@ -370,5 +259,23 @@ export class MatchLifecycle {
       spikeX: this.room.state.spikeX,
       spikeZ: this.room.state.spikeZ,
     });
+  }
+
+  /** Full health, full ammo, fresh lives, at a new spawn. */
+  private respawnForMatch(sessionId: string, player: PlayerRuntime): void {
+    const spawn = this.room.pickSpawnPoint(sessionId);
+    const s = player.schema;
+    s.isDead = false;
+    s.health = s.maxHealth;
+    s.x = spawn.x;
+    s.y = spawn.y;
+    s.z = spawn.z;
+    s.rotationY = calculateSpawnFacing(spawn.x, spawn.z);
+    s.livesRemaining = startingLives(this.room.gameMode.getConfig().maxLives);
+    s.hasSpike = false;
+    s.isUploading = false;
+    s.isDecrypting = false;
+    refillAmmo(player);
+    this.room.placePlayerAt(player, spawn.x, spawn.y, spawn.z);
   }
 }

@@ -43,10 +43,6 @@ export function catalogIdFromMapId(mapId: string): string | undefined {
   return mapId.slice(prefix.length);
 }
 
-export function roomMapIdForCatalog(catalogId: string): string {
-  return `${ARENA_FORGE_PREVIEW_MAP_ID}::${catalogId}`;
-}
-
 function asPreview(map: GameplayMapDefinition, name: string): GameplayMapDefinition {
   const next = { ...map, id: ARENA_FORGE_PREVIEW_MAP_ID, name };
   assertSearchDestroyMap(next);

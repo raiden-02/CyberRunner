@@ -6,9 +6,9 @@ import {
 } from "@shared/world/arena-design-spec.js";
 import {
   LIVE_DOCS_HREF,
-  liveCostCopy,
-  liveDisabledCopy,
-  liveLocalLinkLabel,
+  LIVE_COST_COPY,
+  LIVE_DISABLED_COPY,
+  LIVE_LOCAL_LINK_LABEL,
   liveProviderLine,
   liveRunBadge,
 } from "@shared/ui/forge-live-copy.js";
@@ -54,7 +54,6 @@ export class ForgeScreen extends BaseScreen {
   private onBack: () => void = () => {};
   private liveAvailable = false;
   private liveRequiresSignIn = true;
-  private liveAccessMode: "hosted" | "self_host" = "hosted";
   private remainingRunsToday: number | undefined;
   private view: ForgeDesignView | null = null;
   private pollId: ReturnType<typeof setInterval> | null = null;
@@ -64,7 +63,6 @@ export class ForgeScreen extends BaseScreen {
   private followLatest = true;
   private replayPlaying = true;
   private replayProgress = 0;
-  private loadedOnce = false;
 
   private workbench!: HTMLDivElement;
   private briefEl!: HTMLDivElement;
@@ -373,13 +371,13 @@ export class ForgeScreen extends BaseScreen {
     side.appendChild(this.liveHint);
     this.liveDisabled = document.createElement("div");
     const disabledCopy = document.createElement("p");
-    disabledCopy.textContent = liveDisabledCopy();
+    disabledCopy.textContent = LIVE_DISABLED_COPY;
     disabledCopy.style.cssText = mutedBlock();
     const localLink = document.createElement("a");
     localLink.href = LIVE_DOCS_HREF;
     localLink.target = "_blank";
     localLink.rel = "noreferrer";
-    localLink.textContent = liveLocalLinkLabel();
+    localLink.textContent = LIVE_LOCAL_LINK_LABEL;
     localLink.style.cssText = `color: ${THEME.accent}; font-size: 13px;`;
     this.liveDisabled.append(disabledCopy, localLink);
     side.appendChild(this.liveDisabled);
@@ -504,7 +502,6 @@ export class ForgeScreen extends BaseScreen {
     try {
       const cap = await api.forgeCapability();
       this.liveAvailable = cap.liveAgentAvailable;
-      this.liveAccessMode = cap.accessMode === "self_host" ? "self_host" : "hosted";
       this.liveRequiresSignIn = cap.requiresSignIn !== false;
       this.remainingRunsToday = cap.remainingRunsToday;
       this.liveProvider = cap.provider;
@@ -522,7 +519,6 @@ export class ForgeScreen extends BaseScreen {
     if (this.tab === "recorded" && (!this.view || this.view.path === "product")) {
       await this.loadRecorded();
     }
-    this.loadedOnce = true;
     this.applyChrome();
     this.renderView();
     this.syncShowcase();
@@ -559,8 +555,8 @@ export class ForgeScreen extends BaseScreen {
       return;
     }
     this.liveHint.textContent = this.liveRequiresSignIn
-      ? `${liveCostCopy()} Sign in required.`
-      : liveCostCopy();
+      ? `${LIVE_COST_COPY} Sign in required.`
+      : LIVE_COST_COPY;
   }
 
   private async startLive(): Promise<void> {

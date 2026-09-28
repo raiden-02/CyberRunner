@@ -8,7 +8,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
-import { encodeFireCmd, encodeInputCmd } from "../../client/src/network/BinaryCodec.ts";
+import { encodeFireCmd, encodeInputCmd } from "../../shared/net/binary-codec.js";
 import { initRapier, PhysicsWorld } from "../../client/src/physics/PhysicsWorld.ts";
 import { LocalPlayer } from "../../client/src/player/LocalPlayer.ts";
 import { FIXED_DT, FIXED_TICK_HZ } from "../../shared/net/fixed-tick.js";

@@ -17,7 +17,7 @@ import { DeathmatchMode } from "./deathmatch-mode.js";
 import { SearchDestroyMode } from "./search-destroy-mode.js";
 import { ExploreMode } from "./explore-mode.js";
 import { GameModeId, isValidGameMode } from "./game-mode-config.js";
-import type { UploadTerminal } from "../world/maps/map-types.js";
+import type { UploadTerminal } from "@shared/world/map-types.js";
 
 export function createGameMode(
   modeId: string,

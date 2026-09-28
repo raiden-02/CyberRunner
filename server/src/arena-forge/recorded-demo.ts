@@ -47,10 +47,6 @@ const fixturePath = path.join(SERVER_DIR, "fixtures", "arena-forge", "p5-demo.js
 
 let cached: RecordedP5Demo | undefined;
 
-export function recordedDemoPath(): string {
-  return fixturePath;
-}
-
 export function loadRecordedP5Demo(): RecordedP5Demo {
   if (cached) return cached;
   const raw = JSON.parse(readFileSync(fixturePath, "utf8")) as RecordedP5Demo;

@@ -18,7 +18,6 @@ import {
 } from "./eval-cases.js";
 import { evaluateArena } from "./evaluator.js";
 import {
-  MAX_ONE_SHOT_ACTIONS,
   runOneShotDesign,
   type OneShotDesigner,
   type OneShotRunResult,
@@ -554,18 +553,6 @@ export async function runEvalCaseOnce(args: {
       infrastructureRetry,
     }),
   );
-}
-
-export function assertArmConfiguration(design: DesignTrace, brief: string, map: ArenaMap): void {
-  if (design.brief !== brief) throw new Error("arm brief mismatch");
-  if (JSON.stringify(design.initialMap.solids) !== JSON.stringify(map.solids)) {
-    throw new Error("arm starting solids mismatch");
-  }
-  if (design.kind === "one_shot") {
-    // max budget is enforced by the frozen runner, not a field on the result
-    void MAX_ONE_SHOT_ACTIONS;
-    void P4_MAX_EDIT_BUDGET;
-  }
 }
 
 function emptyArm(arm: P4Arm): ArmAggregate {

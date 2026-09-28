@@ -50,7 +50,7 @@ describe("spike lifecycle", () => {
     state.spikeState = "carried";
     state.spikeCarrierId = "ghost";
 
-    spike.onCarrierDeath("ghost", "sentinel", state, players);
+    spike.onCarrierDeath("ghost", state, players);
     expect(state.spikeState).toBe("dropped");
     expect(state.spikeX).toBe(3);
     expect(state.spikeZ).toBe(4);
@@ -62,7 +62,7 @@ describe("spike lifecycle", () => {
     planted.spikeCarrierId = "ghost";
     const planter = playerAt(siteA.x, siteA.z);
     planter.hasSpike = true;
-    spike.onCarrierDeath("ghost", "sentinel", planted, new Map([["ghost", { schema: planter }]]));
+    spike.onCarrierDeath("ghost", planted, new Map([["ghost", { schema: planter }]]));
     expect(planted.spikeState).toBe("uploaded");
   });
 
@@ -86,6 +86,32 @@ describe("spike lifecycle", () => {
     expect(spike.startDecrypt("sentinel", state, sentinel)).toBe(true);
     for (let i = 0; i < 420; i++) spike.update(1 / 60, state, players);
     expect(state.spikeState).toBe("decrypted");
+  });
+
+  it("stops a decrypt when the decrypter dies or walks off site", () => {
+    const spike = new SpikeManager(map.uploadTerminals);
+    const state = new GameState();
+    const ghost = playerAt(siteA.x, siteA.z);
+    ghost.hasSpike = true;
+    state.spikeState = "carried";
+    state.spikeCarrierId = "ghost";
+    const sentinel = playerAt(siteA.x, siteA.z);
+    const players = new Map([["ghost", { schema: ghost }], ["sentinel", { schema: sentinel }]]);
+    spike.startUpload("ghost", state, ghost, siteA);
+    for (let i = 0; i < 240; i++) spike.update(1 / 60, state, players);
+
+    expect(spike.startDecrypt("sentinel", state, sentinel)).toBe(true);
+    sentinel.isDead = true;
+    spike.update(1 / 60, state, players);
+    expect(state.spikeState).toBe("uploaded");
+    expect(sentinel.isDecrypting).toBe(false);
+
+    sentinel.isDead = false;
+    expect(spike.startDecrypt("sentinel", state, sentinel)).toBe(true);
+    sentinel.x = siteA.x + siteA.radius + 1;
+    spike.update(1 / 60, state, players);
+    expect(state.spikeState).toBe("uploaded");
+    expect(sentinel.isDecrypting).toBe(false);
   });
 
   it("detonates if nobody decrypts in time", () => {

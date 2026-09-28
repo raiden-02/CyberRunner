@@ -5,7 +5,7 @@
 
 import { GameState } from "../GameState.js";
 import { PlayerState } from "../PlayerState.js";
-import type { UploadTerminal } from "../world/maps/map-types.js";
+import type { UploadTerminal } from "@shared/world/map-types.js";
 
 export type SpikeState = "ground" | "carried" | "uploading" | "uploaded" | "dropped" | "decrypting" | "decrypted";
 
@@ -13,6 +13,10 @@ const UPLOAD_TIME = 4.0;    // seconds to upload
 const DECRYPT_TIME = 7.0;   // seconds to decrypt (longer than upload)
 const DETONATE_TIME = 45.0; // seconds after upload completes before detonation
 const PICKUP_RADIUS = 2.5;  // meters to pick up spike
+
+function withinRadius(a: { x: number; z: number }, b: { x: number; z: number }, radius: number): boolean {
+  return Math.hypot(a.x - b.x, a.z - b.z) <= radius;
+}
 
 export class SpikeManager {
   private terminals: UploadTerminal[] = [];
@@ -27,48 +31,9 @@ export class SpikeManager {
     this.terminals = terminals;
   }
 
-  // Assign spike to a random player at round start
-  assignSpikeToRandomPlayer(
-    gameState: GameState,
-    players: Map<string, { schema: PlayerState }>
-  ): void {
-    const alivePlayers: string[] = [];
-    for (const [sessionId, player] of players) {
-      if (!player.schema.isDead) {
-        alivePlayers.push(sessionId);
-        player.schema.hasSpike = false;
-        player.schema.isUploading = false;
-        player.schema.isDecrypting = false;
-      }
-    }
-
-    if (alivePlayers.length === 0) return;
-
-    const carrierId = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
-    const carrier = players.get(carrierId);
-    if (carrier) {
-      carrier.schema.hasSpike = true;
-      gameState.spikeCarrierId = carrierId;
-      gameState.spikeState = "carried";
-      gameState.spikeUploadProgress = 0;
-      gameState.spikeDecryptProgress = 0;
-      gameState.spikeTerminalId = "";
-      this.detonationTimer = 0;
-      this.uploaderId = "";
-    }
-  }
-
   // Check if player is near a terminal
   getNearbyTerminal(x: number, z: number): UploadTerminal | null {
-    for (const terminal of this.terminals) {
-      const dx = x - terminal.x;
-      const dz = z - terminal.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist <= terminal.radius) {
-        return terminal;
-      }
-    }
-    return null;
+    return this.terminals.find((t) => withinRadius({ x, z }, t, t.radius)) ?? null;
   }
 
   // Start uploading (planting)
@@ -111,46 +76,20 @@ export class SpikeManager {
     gameState: GameState,
     player: PlayerState
   ): boolean {
-    console.log(`[SPIKE] startDecrypt attempt by ${sessionId}, spikeState=${gameState.spikeState}, carrierId=${gameState.spikeCarrierId}`);
-    
-    if (gameState.spikeState !== "uploaded") {
-      console.log(`[SPIKE] startDecrypt failed: spikeState is ${gameState.spikeState}, expected "uploaded"`);
-      return false;
-    }
-    if (gameState.spikeCarrierId === sessionId) {
-      console.log(`[SPIKE] startDecrypt failed: player is the uploader`);
-      return false;
-    }
-    if (player.isDead) {
-      console.log(`[SPIKE] startDecrypt failed: player is dead`);
-      return false;
-    }
+    if (gameState.spikeState !== "uploaded") return false;
+    if (gameState.spikeCarrierId === sessionId) return false;
+    if (player.isDead) return false;
 
-    // Check if player is near the uploaded terminal
     const terminal = this.terminals.find(t => t.id === gameState.spikeTerminalId);
-    if (!terminal) {
-      console.log(`[SPIKE] startDecrypt failed: terminal ${gameState.spikeTerminalId} not found`);
-      return false;
-    }
-
-    const dx = player.x - terminal.x;
-    const dz = player.z - terminal.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist > terminal.radius) {
-      console.log(`[SPIKE] startDecrypt failed: player too far from terminal (${dist.toFixed(1)} > ${terminal.radius})`);
-      return false;
-    }
+    if (!terminal || !withinRadius(player, terminal, terminal.radius)) return false;
 
     gameState.spikeState = "decrypting";
     player.isDecrypting = true;
-    console.log(`[SPIKE] startDecrypt SUCCESS - player ${sessionId} now decrypting`);
-
     return true;
   }
 
   // Cancel decrypt
   cancelDecrypt(
-    sessionId: string,
     gameState: GameState,
     player: PlayerState
   ): void {
@@ -165,7 +104,6 @@ export class SpikeManager {
   // Handle spike carrier death
   onCarrierDeath(
     carrierId: string,
-    killerId: string | null,
     gameState: GameState,
     players: Map<string, { schema: PlayerState }>
   ): void {
@@ -201,11 +139,7 @@ export class SpikeManager {
     if (gameState.spikeState !== "ground" && gameState.spikeState !== "dropped") return false;
     if (player.isDead) return false;
 
-    // Check if player is near the spike
-    const dx = player.x - gameState.spikeX;
-    const dz = player.z - gameState.spikeZ;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist > PICKUP_RADIUS) return false;
+    if (!withinRadius(player, { x: gameState.spikeX, z: gameState.spikeZ }, PICKUP_RADIUS)) return false;
 
     player.hasSpike = true;
     gameState.spikeCarrierId = sessionId;
@@ -214,22 +148,14 @@ export class SpikeManager {
     return true;
   }
 
-  // Check if player is near the spike for pickup
-  isNearSpike(player: PlayerState, gameState: GameState): boolean {
-    if (gameState.spikeState !== "ground" && gameState.spikeState !== "dropped") return false;
-    
-    const dx = player.x - gameState.spikeX;
-    const dz = player.z - gameState.spikeZ;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    return dist <= PICKUP_RADIUS;
-  }
-
   // Update tick - returns round end reason if any
   update(
     dt: number,
     gameState: GameState,
     players: Map<string, { schema: PlayerState }>
   ): { ended: boolean; reason?: string; winnerId?: string } {
+    this.cancelAbandonedActions(gameState, players);
+
     // Handle upload progress
     if (gameState.spikeState === "uploading") {
       const progress = gameState.spikeUploadProgress + (dt / UPLOAD_TIME) * 100;
@@ -270,26 +196,12 @@ export class SpikeManager {
       const progress = gameState.spikeDecryptProgress + (dt / DECRYPT_TIME) * 100;
       gameState.spikeDecryptProgress = Math.min(100, progress);
       
-      // Find who is decrypting for logging
-      let decrypterId = "";
-      for (const [sessionId, player] of players) {
-        if (player.schema.isDecrypting) {
-          decrypterId = sessionId;
-          break;
-        }
-      }
-      
-      if (gameState.spikeDecryptProgress % 10 < 1) {
-        console.log(`[SPIKE] Decrypting: ${gameState.spikeDecryptProgress.toFixed(1)}% by ${decrypterId}, detonation in ${this.detonationTimer.toFixed(1)}s`);
-      }
-
       if (gameState.spikeDecryptProgress >= 100) {
         // Decrypt complete - find who was decrypting
         for (const [sessionId, player] of players) {
           if (player.schema.isDecrypting) {
             player.schema.isDecrypting = false;
             gameState.spikeState = "decrypted";
-            console.log(`[SPIKE] Decrypt complete by ${sessionId}`);
             return {
               ended: true,
               reason: "spike_decrypted",
@@ -303,8 +215,37 @@ export class SpikeManager {
     return { ended: false };
   }
 
-  getDetonationTimer(): number {
-    return this.detonationTimer;
+  /**
+   * The server owns interaction range: an uploader or decrypter who dies or
+   * leaves the terminal radius stops, whether or not the client sent "cancel".
+   */
+  private cancelAbandonedActions(
+    gameState: GameState,
+    players: Map<string, { schema: PlayerState }>
+  ): void {
+    const terminal = this.terminals.find((t) => t.id === gameState.spikeTerminalId);
+    const stillValid = (p: PlayerState) =>
+      !p.isDead && terminal !== undefined && withinRadius(p, terminal, terminal.radius);
+
+    if (gameState.spikeState === "uploading") {
+      const carrier = players.get(gameState.spikeCarrierId)?.schema;
+      if (!carrier || !stillValid(carrier)) {
+        gameState.spikeState = "carried";
+        gameState.spikeUploadProgress = 0;
+        gameState.spikeTerminalId = "";
+        if (carrier) carrier.isUploading = false;
+      }
+    }
+
+    if (gameState.spikeState === "decrypting") {
+      let anyDecrypting = false;
+      for (const { schema } of players.values()) {
+        if (!schema.isDecrypting) continue;
+        if (stillValid(schema)) anyDecrypting = true;
+        else schema.isDecrypting = false;
+      }
+      if (!anyDecrypting) gameState.spikeState = "uploaded";
+    }
   }
 
   // Reset for new round

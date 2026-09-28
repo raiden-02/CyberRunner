@@ -1,5 +1,5 @@
 import type { ArenaDesignSpec, ArenaGameMode } from "@shared/world/arena-design-spec.js";
-import type { AgentTurnDecision, TokenUsage } from "./agent.js";
+import { addUsage, type AgentTurnDecision, type TokenUsage } from "./agent.js";
 import type { ArenaInspection } from "./inspect.js";
 import {
   PLAYTEST_ROLLOUTS,
@@ -7,7 +7,7 @@ import {
   runPlaytest,
   type ArenaPlaytestReport,
 } from "./playtest.js";
-import type { PlaytestAgentSession, PlaytestAgentStartInput, PlaytestAgentTurnRecord, PlaytestToolOutput } from "./playtest-agent.js";
+import type { PlaytestAgentSession, PlaytestAgentTurnRecord, PlaytestToolOutput } from "./playtest-agent.js";
 import {
   FINISH_DESIGN_TOOL,
   MAX_PRODUCT_DESIGN_PLANS,
@@ -15,7 +15,6 @@ import {
   MAX_PRODUCT_EDIT_ATTEMPTS,
   MAX_PRODUCT_MODEL_CALLS,
   MAX_PRODUCT_SND_PLAYTESTS,
-  PLACE_OBJECTIVE_TOOL,
   PROPOSE_DESIGN_PLAN_TOOL,
   RUN_PLAYTEST_TOOL,
   applyProductEdit,
@@ -71,19 +70,6 @@ export type ProductDesignerRunResult = {
   finalEvaluation: ArenaEvaluation;
   lastPlaytest?: ArenaPlaytestReport;
 };
-
-export type ProductStartInput = PlaytestAgentStartInput & {
-  mode: ArenaGameMode;
-};
-
-function addUsage(into: TokenUsage, extra?: TokenUsage): TokenUsage {
-  if (!extra) return into;
-  return {
-    inputTokens: (into.inputTokens ?? 0) + (extra.inputTokens ?? 0),
-    outputTokens: (into.outputTokens ?? 0) + (extra.outputTokens ?? 0),
-    totalTokens: (into.totalTokens ?? 0) + (extra.totalTokens ?? 0),
-  };
-}
 
 export async function runArenaDesigner(args: {
   spec: ArenaDesignSpec;

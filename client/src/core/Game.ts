@@ -39,6 +39,7 @@ import {
 } from "@shared/net/local-gameplay.js";
 import type { InputState } from "../input/InputManager.js";
 import type { SyncedPlayer } from "../network/synced-state.js";
+import { DEFAULT_PRIMARY_WEAPON, DEFAULT_SECONDARY_WEAPON } from "@shared/weapons/weapon-config.js";
 
 const FOV_LERP_SPEED = 8;
 
@@ -182,8 +183,8 @@ export class Game {
     this.input.onWeaponSwitch = (slot: string) => {
       if (!shouldApplyLocalWeaponSwitch(this.clientGameplayActive())) return;
 
-      const primary = this.userProfile?.primaryWeaponId || "AR_1";
-      const secondary = this.userProfile?.secondaryWeaponId || "PISTOL_1";
+      const primary = this.primaryWeaponId();
+      const secondary = this.secondaryWeaponId();
 
       let weaponId: string;
       if (slot === "primary") {
@@ -344,7 +345,7 @@ export class Game {
           this.killFeed.addKill(
             killer.displayName || "Unknown",
             victim.displayName || "Unknown",
-            killer.equippedWeapon || "AR_1",
+            killer.equippedWeapon || DEFAULT_PRIMARY_WEAPON,
             msg.isHeadshot || false,
             msg.attackerId === this.network.sessionId,
             msg.playerId === this.network.sessionId
@@ -461,25 +462,32 @@ export class Game {
     this.netgraph.setVisible(enabled);
   }
 
+  private primaryWeaponId(): string {
+    return this.userProfile?.primaryWeaponId || DEFAULT_PRIMARY_WEAPON;
+  }
+
+  private secondaryWeaponId(): string {
+    return this.userProfile?.secondaryWeaponId || DEFAULT_SECONDARY_WEAPON;
+  }
+
   public async start(action?: PlayAction): Promise<void> {
     if (this.running) return;
     this.running = true;
 
     this.renderer.applySettingsFromManager();
 
-    const primaryWeapon = this.userProfile?.primaryWeaponId || "AR_1";
+    const primaryWeaponId = this.primaryWeaponId();
     this.activeSlot = 0;
 
     this.debug.setStatus("Loading weapons...");
-    this.weaponSystem.switchWeapon(primaryWeapon);
-    this.hud.setWeapon(primaryWeapon);
+    this.weaponSystem.switchWeapon(primaryWeaponId);
+    this.hud.setWeapon(primaryWeaponId);
     this.hud.update();
 
     this.debug.setStatus("Connecting...");
 
     const displayName = this.userProfile?.displayName || "Player";
-    const primaryWeaponId = this.userProfile?.primaryWeaponId || "AR_1";
-    const secondaryWeaponId = this.userProfile?.secondaryWeaponId || "PISTOL_1";
+    const secondaryWeaponId = this.secondaryWeaponId();
     const gameMode = action?.gameMode || "deathmatch";
 
     await this.network.connect({
@@ -768,6 +776,7 @@ export class Game {
         !this.localPlayer.isDead,
       );
 
+      this.weaponSystem.syncAmmo(serverPlayer.equippedWeapon, serverPlayer.ammoInMag, serverPlayer.ammoReserve);
       this.hud.update(
         serverPlayer.ammoInMag,
         serverPlayer.ammoReserve,

@@ -26,10 +26,6 @@ export const P4B_B_GHOST_A_MEDIAN_AT_MOST = 16;
 export const P4B_C_GHOST_A_MEDIAN_AT_MOST = 18;
 export const P4B_C_GHOST_B_MEDIAN_AT_MOST = 16;
 
-export type P4BRole = "target" | "guardrail";
-
-export type P4BConstraint = EvalConstraint & { role: P4BRole };
-
 export type P4BProbe = {
   label: string;
   action: ArenaEditAction;

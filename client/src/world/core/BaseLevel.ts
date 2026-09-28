@@ -1,8 +1,3 @@
-/**
- * BASE LEVEL (Abstract)
- * Base class for all game levels.
- * Provides common utilities and defines the interface for level construction.
- */
 import * as THREE from "three";
 import { MaterialFactory, MATERIAL_PRESETS, type MaterialParams } from "./MaterialFactory.js";
 import type { NeonColorKey } from "./NeonColors.js";
@@ -10,10 +5,7 @@ import { boundaryWalls, type MapBoundsRect } from "@shared/world/map-bounds.js";
 import type { BoxObstacle } from "@shared/world/map-types.js";
 import type { GameplayMapDefinition } from "@shared/world/map-types.js";
 
-/**
- * Abstract base class for all game levels.
- * Subclasses must implement abstract methods for map-specific construction.
- */
+/** Shared construction helpers. Subclasses build the map-specific geometry. */
 export abstract class BaseLevel {
   protected scene: THREE.Scene;
   protected materialFactory: MaterialFactory;
@@ -27,10 +19,6 @@ export abstract class BaseLevel {
     this.materialFactory = new MaterialFactory();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // ABSTRACT METHODS - Must be implemented by subclasses
-  // ═══════════════════════════════════════════════════════════════
-
   /**
    * Get the map definition for this level
    */
@@ -42,10 +30,6 @@ export abstract class BaseLevel {
    * Build the level geometry. Subclasses must call this after super().
    */
   protected abstract build(): void;
-
-  // ═══════════════════════════════════════════════════════════════
-  // COMMON CONSTRUCTION METHODS
-  // ═══════════════════════════════════════════════════════════════
 
   protected createGroundPlane(
     size: number,
@@ -223,10 +207,6 @@ export abstract class BaseLevel {
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // NEON UTILITIES
-  // ═══════════════════════════════════════════════════════════════
-
   /**
    * Create a neon strip/bar
    */
@@ -282,10 +262,6 @@ export abstract class BaseLevel {
     this.addMesh(strip);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // ANIMATION SYSTEM
-  // ═══════════════════════════════════════════════════════════════
-
   /**
    * Register an object for animation (flickering, pulsing, etc.)
    */
@@ -297,10 +273,6 @@ export abstract class BaseLevel {
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // MESH MANAGEMENT
-  // ═══════════════════════════════════════════════════════════════
-
   /**
    * Add a mesh to the scene and track it
    */
@@ -308,10 +280,6 @@ export abstract class BaseLevel {
     this.scene.add(mesh);
     this.meshes.push(mesh);
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // PUBLIC API
-  // ═══════════════════════════════════════════════════════════════
 
   /**
    * Update animations. Call every frame.

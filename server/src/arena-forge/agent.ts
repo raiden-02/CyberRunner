@@ -1,4 +1,3 @@
-import { cloneArenaMap } from "./actions.js";
 import type { ArenaEditError } from "./actions.js";
 import {
   AGENT_EDIT_TOOLS,
@@ -129,7 +128,7 @@ export type AgentRunResult = {
   finalEvaluation: ArenaEvaluation;
 };
 
-function addUsage(into: TokenUsage, extra?: TokenUsage): TokenUsage {
+export function addUsage(into: TokenUsage, extra?: TokenUsage): TokenUsage {
   if (!extra) return into;
   return {
     inputTokens: (into.inputTokens ?? 0) + (extra.inputTokens ?? 0),

@@ -1,9 +1,9 @@
 import { Room, Client } from "colyseus";
 import { GameState } from "./GameState.js";
 import { PlayerState, MovementState } from "./PlayerState.js";
-import { WeaponSwitchMsg, FireInputMsg, ReloadInputMsg, DamageMsg, SpikeActionMsg, TeamSelectMsg } from "./net/messages.js";
+import type { WeaponSwitchMsg, ReloadInputMsg, DamageMsg, SpikeActionMsg, TeamSelectMsg } from "./net/messages.js";
 import type { InputMsg } from "@shared/movement/types.js";
-import { decodeInputCmd, decodeFireCmd } from "./net/BinaryCodec.js";
+import { decodeInputCmd, decodeFireCmd, type FireCmd } from "@shared/net/binary-codec.js";
 import { ServerInputQueue } from "./net/server-input-queue.js";
 import { ackSeqAfterTick } from "./net/auth-player-tick.js";
 import { RttChallengeBook } from "./net/rtt-challenge.js";
@@ -13,10 +13,11 @@ import { CAPSULE } from "@shared/physics/constants.js";
 import { buildMapColliders, createPlayerPhysics } from "@shared/world/map-physics.js";
 import { HealthSystem } from "./systems/health-system.js";
 import { WeaponSystem } from "./systems/weapon-system.js";
-import { getWeaponConfig } from "./weapons/weapon-config.js";
+import { DEFAULT_PRIMARY_WEAPON, DEFAULT_SECONDARY_WEAPON, getWeaponConfig, isValidWeapon } from "@shared/weapons/weapon-config.js";
+import { startingLives } from "./game-modes/game-mode-config.js";
 import { createHitboxes, removeHitboxes, HitboxRegistry } from "./physics/hitbox-system.js";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { calculateSpawnFacing } from "./world/maps/map-registry.js";
+import { calculateSpawnFacing } from "@shared/world/map-types.js";
 import { assertCreatedRoomMode, resolveCreatedRoomMap } from "./room-map.js";
 import { teamMaySpikeAction } from "./game-modes/spike-rules.js";
 import { isGameplayActive } from "@shared/net/gameplay-input.js";
@@ -30,7 +31,7 @@ import {
 } from "./game-modes/index.js";
 import { LagCompensation } from "./systems/lag-compensation.js";
 import { ProjectileManager } from "./systems/projectile-system.js";
-import { createPlayerRuntime, type PlayerRuntime } from "./player-runtime.js";
+import { createPlayerRuntime, equipWeapon, refillAmmo, type PlayerRuntime } from "./player-runtime.js";
 import { pickExploreSpawn } from "@shared/world/explore-map.js";
 import { pickSpawnPoint, isInSpawnProtectionZone } from "./spawn/spawn-select.js";
 import { beginRoomJoin, rollbackRoomJoin } from "./spawn/join-spawn.js";
@@ -44,6 +45,11 @@ import { MatchLifecycle } from "./match/match-lifecycle.js";
 
 const TICK_RATE = FIXED_TICK_HZ;
 const DEFAULT_MAX_PLAYERS = 8;
+const DISPLAY_NAME_MAX = 20;
+
+function loadoutWeapon(requested: string | undefined, fallback: string): string {
+  return requested && isValidWeapon(requested) ? requested : fallback;
+}
 
 export class GameRoom extends Room<GameState> {
   private running = false;
@@ -61,12 +67,7 @@ export class GameRoom extends Room<GameState> {
   private match!: MatchLifecycle;
   map!: GameplayMapDefinition;
 
-  private joinCode: string = "";
   private hostId: string = "";
-
-  private isSearchDestroyMode(): boolean {
-    return this.gameMode instanceof SearchDestroyMode;
-  }
 
   private gameplayActivity() {
     return {
@@ -100,7 +101,6 @@ export class GameRoom extends Room<GameState> {
       get hostId() { return room.hostId; },
       get gameMode() { return room.gameMode; },
       getSDMode: () => room.getSDMode(),
-      isSearchDestroyMode: () => room.isSearchDestroyMode(),
       broadcast: (type, message) => room.broadcast(type, message),
       setHostId: (id) => {
         room.hostId = id;
@@ -114,9 +114,8 @@ export class GameRoom extends Room<GameState> {
   }
 
   async onAuth(_client: Client, _options: unknown): Promise<boolean> {
-    const max = this.maxPlayers ?? DEFAULT_MAX_PLAYERS;
-    if (this.clients.length >= max) {
-      throw new Error(`Room is full (${max}/${max}). Try again later.`);
+    if (this.clients.length >= this.maxPlayers) {
+      throw new Error(`Room is full (${this.maxPlayers}/${this.maxPlayers}). Try again later.`);
     }
     return true;
   }
@@ -141,7 +140,6 @@ export class GameRoom extends Room<GameState> {
       gameMode: modeId,
       mapId: resolved.stateMapId,
     });
-    this.joinCode = roomInfo.joinCode;
     if (resolved.allowSoloStart) {
       this.getSDMode()?.getTeamManager().setAllowSoloStart(true);
     }
@@ -181,7 +179,7 @@ export class GameRoom extends Room<GameState> {
       this.breakablesById.set(idx, runtime);
     });
 
-    this.projectileManager = new ProjectileManager(this.world);
+    this.projectileManager = new ProjectileManager();
     this.match = this.bindMatch();
 
     this.running = true;
@@ -219,15 +217,7 @@ export class GameRoom extends Room<GameState> {
       }
 
       if (!newWeapon || newWeapon === player.schema.equippedWeapon) return;
-
-      player.schema.activeSlot = newSlot;
-      player.schema.equippedWeapon = newWeapon;
-
-      const config = getWeaponConfig(newWeapon);
-      if (config) {
-        player.schema.ammoInMag = config.magazineSize;
-        player.schema.ammoReserve = config.reserveMax;
-      }
+      equipWeapon(player, newWeapon, newSlot);
     });
 
     this.onMessage("fire_bin", (client, raw: Uint8Array | ArrayBuffer) => {
@@ -301,7 +291,7 @@ export class GameRoom extends Room<GameState> {
           if (player.schema.isUploading) {
             spikeManager.cancelUpload(client.sessionId, this.state, player.schema);
           } else if (player.schema.isDecrypting) {
-            spikeManager.cancelDecrypt(client.sessionId, this.state, player.schema);
+            spikeManager.cancelDecrypt(this.state, player.schema);
           }
           break;
         }
@@ -352,13 +342,7 @@ export class GameRoom extends Room<GameState> {
 
       const amount = Math.max(0, Math.min(100, Math.round(data.amount)));
 
-      const result = HealthSystem.applyDamage(
-        targetPlayer.schema,
-        amount,
-        client.sessionId,
-        data.weaponId,
-        data.damageType
-      );
+      const result = HealthSystem.applyDamage(targetPlayer.schema, amount);
 
       if (result.damaged) {
         const healthMsg = HealthSystem.createHealthChangeMessage(data.targetId, targetPlayer.schema);
@@ -405,11 +389,6 @@ export class GameRoom extends Room<GameState> {
   }
 
   onJoin(client: Client, options?: { displayName?: string; primaryWeaponId?: string; secondaryWeaponId?: string }) {
-    if (this.clients.length > this.maxPlayers) {
-      client.leave(4000, `Room is full (${this.maxPlayers}/${this.maxPlayers}).`);
-      return;
-    }
-
     if (!this.hostId) {
       this.hostId = client.sessionId;
       this.state.hostId = client.sessionId;
@@ -431,21 +410,14 @@ export class GameRoom extends Room<GameState> {
       schema.movementState = MovementState.Walking;
       schema.isSpawnProtected = true;
       schema.spawnProtectionTime = 2.5;
-      schema.displayName = options?.displayName || "Player";
-      schema.primaryWeaponId = options?.primaryWeaponId || "AR_1";
-      schema.secondaryWeaponId = options?.secondaryWeaponId || "PISTOL_1";
+      schema.displayName = options?.displayName?.trim().slice(0, DISPLAY_NAME_MAX) || "Player";
+      schema.primaryWeaponId = loadoutWeapon(options?.primaryWeaponId, DEFAULT_PRIMARY_WEAPON);
+      schema.secondaryWeaponId = loadoutWeapon(options?.secondaryWeaponId, DEFAULT_SECONDARY_WEAPON);
       schema.activeSlot = 0;
       schema.equippedWeapon = schema.primaryWeaponId;
       if (joined.teamId) schema.teamId = joined.teamId;
 
-      const weaponConfig = getWeaponConfig(schema.equippedWeapon);
-      if (weaponConfig) {
-        schema.ammoInMag = weaponConfig.magazineSize;
-        schema.ammoReserve = weaponConfig.reserveMax;
-      }
-
-      const modeConfig = this.gameMode.getConfig();
-      schema.livesRemaining = modeConfig.maxLives > 0 ? modeConfig.maxLives : 99;
+      schema.livesRemaining = startingLives(this.gameMode.getConfig().maxLives);
       schema.roundsWon = 0;
 
       this.state.players.set(client.sessionId, schema);
@@ -458,7 +430,9 @@ export class GameRoom extends Room<GameState> {
 
       const ctrl = new CharacterController(body, collider, controller);
       const hitboxes = createHitboxes(this.world, body, client.sessionId, this.hitboxRegistry);
-      this.players.set(client.sessionId, createPlayerRuntime(ctrl, schema, hitboxes));
+      const runtime = createPlayerRuntime(ctrl, schema, hitboxes);
+      refillAmmo(runtime);
+      this.players.set(client.sessionId, runtime);
     } catch (err) {
       this.state.players.delete(client.sessionId);
       rollbackRoomJoin(this.gameMode, client.sessionId);
@@ -480,7 +454,7 @@ export class GameRoom extends Room<GameState> {
       });
     }
 
-    if (this.isSearchDestroyMode()) {
+    if (this.getSDMode()) {
       this.match.broadcastLobbyState();
     }
   }
@@ -508,7 +482,7 @@ export class GameRoom extends Room<GameState> {
       this.match.transferHost();
     }
 
-    if (this.isSearchDestroyMode()) {
+    if (this.getSDMode()) {
       this.match.broadcastLobbyState();
     }
   }
@@ -545,7 +519,7 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
-  private handleFireInput(client: Client, data: FireInputMsg): void {
+  private handleFireInput(client: Client, data: FireCmd): void {
     const player = this.players.get(client.sessionId);
     if (!player) return;
 
@@ -614,6 +588,7 @@ export class GameRoom extends Room<GameState> {
         const spawnPosition = this.pickSpawnPoint(sessionId);
         const respawnResult = HealthSystem.updateRespawn(player.schema, dt, spawnPosition, canRespawn);
         if (respawnResult.respawned) {
+          refillAmmo(player);
           this.placePlayerAt(player, player.schema.x, player.schema.y, player.schema.z);
 
           const sdMode = this.getSDMode();
@@ -672,10 +647,9 @@ export class GameRoom extends Room<GameState> {
         player.schema.y = pos.y;
         player.schema.z = pos.z;
 
-        player.schema.movementState = player.ctrl.currentState();
-        player.schema.isSprinting = player.ctrl.input.sprint;
-
         const currentState = player.ctrl.currentState();
+        player.schema.movementState = currentState;
+        player.schema.isSprinting = player.ctrl.input.sprint;
         player.schema.isCrouching = (currentState === MovementState.Crouching);
         player.schema.isSliding = (currentState === MovementState.Sliding);
       }

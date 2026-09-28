@@ -2,7 +2,6 @@ import type {
   ForgeDesignTurn,
   ForgeDesignView,
   ForgeP0Summary,
-  ForgePlaytestSummary,
 } from "../api/client.js";
 
 export function forgeActivityText(view: ForgeDesignView): string {
@@ -28,16 +27,6 @@ export function formatP0Line(p0: ForgeP0Summary): string {
         ? "all S&D routes reachable"
         : `${p0.reachablePaths}/${p0.totalPaths} S&D routes reachable`;
   return `${p0.hardFailures} hard failure${p0.hardFailures === 1 ? "" : "s"}. ${routes}.`;
-}
-
-export function formatPlaytestLines(pt: ForgePlaytestSummary): string[] {
-  const pct = (n: number) => `${Math.round(n * 100)}%`;
-  return [
-    `Ghost scripted routes  A ${pt.ghost.siteChoice.A} / B ${pt.ghost.siteChoice.B}`,
-    `Mean route exposure  ${pt.ghost.meanRouteExposureFraction}`,
-    `Route concentration  ${pt.ghost.routeConcentration}`,
-    `First-contact occurrence  ${pct(pt.firstContact.occurrenceFraction)}`,
-  ];
 }
 
 export function revisionCaption(revision: number, finalRevision: number): string {
@@ -86,8 +75,3 @@ export function formatTurnCard(turn: ForgeDesignTurn, turns: ForgeDesignTurn[] =
   return lines.join("\n");
 }
 
-export function playtestLabel(view: ForgeDesignView): string {
-  if (!view.lastPlaytest) return "No playtest yet";
-  if (view.lastPlaytestIsOnFinalMap) return "Last observed playtest (on the final map)";
-  return "Last observed playtest (before later edits)";
-}

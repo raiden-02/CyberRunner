@@ -34,13 +34,6 @@ export type ResolvedRoomMap = {
   designedMode?: "deathmatch" | "search_destroy";
 };
 
-export type ResolvedRuntimeMap = {
-  map: GameplayMapDefinition;
-  mode: GameModeId;
-  purpose: LaunchPurpose;
-  designedMode?: "deathmatch" | "search_destroy";
-};
-
 function namedLaunchId(options: RoomCreateOptions): string | undefined {
   if (options.mapLaunchId && options.savedMapLaunchId && options.mapLaunchId !== options.savedMapLaunchId) {
     throw new Error("Room request names more than one map source");
@@ -205,18 +198,6 @@ export function resolveCreatedRoomMap(
   const mapId = resolveRoomMapId(options.mapId, envMapId);
   const map = getGameplayMap(mapId);
   return { map, stateMapId: map.id, allowSoloStart: false, purpose: "match" };
-}
-
-export function toResolvedRuntimeMap(
-  resolved: ResolvedRoomMap,
-  mode: GameModeId,
-): ResolvedRuntimeMap {
-  return {
-    map: resolved.map,
-    mode,
-    purpose: resolved.purpose,
-    designedMode: resolved.designedMode,
-  };
 }
 
 export function assertRoomMode(map: GameplayMapDefinition, gameMode?: string): void {

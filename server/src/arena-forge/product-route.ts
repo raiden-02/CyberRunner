@@ -1,5 +1,5 @@
 import { NavGrid, type NavCell } from "./navigation.js";
-import { isFiniteNumber, roundMeters } from "./geometry.js";
+import { roundMeters } from "./geometry.js";
 import type { ArenaMap, ArenaObjective, ArenaSpawn } from "./types.js";
 
 export const MAX_PRODUCT_ROUTE_QUERIES = 8;
@@ -120,6 +120,3 @@ export function parseTraceRouteArgs(args: unknown): { fromId: string; toId: stri
   return { fromId: rec.fromId.trim(), toId: rec.toId.trim() };
 }
 
-export function isFiniteCoordPair(x: unknown, z: unknown): boolean {
-  return typeof x === "number" && typeof z === "number" && isFiniteNumber(x) && isFiniteNumber(z);
-}

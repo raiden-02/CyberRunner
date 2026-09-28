@@ -221,15 +221,3 @@ export class SniperScopeOverlay extends BaseScopeOverlay {
     ctx.globalAlpha = 1;
   }
 }
-
-export class RedDotOverlay extends BaseScopeOverlay {
-  public shouldHideWeapon(): boolean {
-    return false;
-  }
-
-  public getActivationThreshold(): number {
-    return 1.0;
-  }
-
-  protected render(): void {}
-}

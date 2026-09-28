@@ -34,7 +34,7 @@ export type OpenAIResponsesClient = {
   };
 };
 
-function usageOf(response: { usage?: { input_tokens: number; output_tokens: number; total_tokens: number } }): TokenUsage | undefined {
+export function usageOf(response: { usage?: { input_tokens: number; output_tokens: number; total_tokens: number } }): TokenUsage | undefined {
   if (!response.usage) return undefined;
   return {
     inputTokens: response.usage.input_tokens,
@@ -43,7 +43,7 @@ function usageOf(response: { usage?: { input_tokens: number; output_tokens: numb
   };
 }
 
-function callsFrom(output: Array<{ type: string }> | undefined): AgentToolCall[] {
+export function callsFrom(output: Array<{ type: string }> | undefined): AgentToolCall[] {
   const calls: AgentToolCall[] = [];
   for (const item of output ?? []) {
     if (item.type !== "function_call") continue;

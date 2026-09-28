@@ -4,6 +4,7 @@ import { ProfileScreen } from "./screens/ProfileScreen.js";
 import { ForgeScreen } from "./screens/ForgeScreen.js";
 import { LobbyScreen, type PlayAction } from "./screens/LobbyScreen.js";
 import { SettingsScreen } from "./screens/SettingsScreen.js";
+import { DEFAULT_PRIMARY_WEAPON, DEFAULT_SECONDARY_WEAPON } from "@shared/weapons/weapon-config.js";
 
 export interface GameStartOptions {
   user: UserProfile;
@@ -135,8 +136,8 @@ export class MainMenu {
           id: "dev-user-" + Date.now(),
           displayName: "DevPlayer",
           email: "dev@test.com",
-          primaryWeaponId: "AR_1",
-          secondaryWeaponId: "PISTOL_1",
+          primaryWeaponId: DEFAULT_PRIMARY_WEAPON,
+          secondaryWeaponId: DEFAULT_SECONDARY_WEAPON,
           profileComplete: true,
         };
         this.currentUser = mockUser;

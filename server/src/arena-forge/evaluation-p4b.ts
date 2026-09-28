@@ -6,7 +6,7 @@ import {
   p4bManifestHash,
   type P4BCaseDefinition,
 } from "./eval-cases-p4b.js";
-import { formatConstraint, type EvalConstraint, type P4Arm } from "./eval-cases.js";
+import type { EvalConstraint, P4Arm } from "./eval-cases.js";
 import {
   classifyFeedbackResponsive,
   median,
@@ -504,14 +504,6 @@ export function renderP4BMarkdown(args: {
     "",
   );
   return lines.join("\n");
-}
-
-export function p4bEvalCase(def: P4BCaseDefinition) {
-  return asEvalCase(def);
-}
-
-export function formatConstraintList(constraints: EvalConstraint[]): string {
-  return constraints.map(formatConstraint).join(" | ");
 }
 
 export function initialRoleScores(evaluation: ArenaEvaluation, def: P4BCaseDefinition) {

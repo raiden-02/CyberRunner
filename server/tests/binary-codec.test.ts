@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodeFireCmd, encodeInputCmd } from "../../client/src/network/BinaryCodec.ts";
-import { decodeFireCmd, decodeInputCmd } from "../src/net/BinaryCodec.js";
+import { decodeFireCmd, decodeInputCmd, encodeFireCmd, encodeInputCmd } from "../../shared/net/binary-codec.js";
 
 describe("decodeInputCmd", () => {
   it("returns null for short payloads", () => {

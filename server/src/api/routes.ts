@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { ARENA_FORGE_PREVIEW_MAP_ID } from "@shared/world/arena-forge-preview.js";
+import { isValidWeapon } from "@shared/weapons/weapon-config.js";
 import { getDesignJobView } from "../arena-forge/design-jobs.js";
 import { getForgeQuotaStore } from "../arena-forge/forge-quota.js";
 import { admitLiveDesign, admitProductDesign, publicLiveCapability } from "../arena-forge/live-design-admission.js";
@@ -22,7 +23,7 @@ import { AuthService } from "../services/auth-service.js";
 import { UserService } from "../services/user-service.js";
 import { LobbyService } from "../services/lobby-service.js";
 import { resolveQuickPlay } from "../services/quickplay.js";
-import { requireAuth, requireProfile, requireLobbyAccess, getSessionCookieName } from "./middleware.js";
+import { requireAuth, requireLobbyAccess, getSessionCookieName } from "./middleware.js";
 import { isDatabaseEnabled } from "../db/pool.js";
 
 const router = Router();
@@ -281,12 +282,11 @@ router.patch("/me", requireAuth, async (req: Request, res: Response) => {
       }
     }
 
-    const validWeapons = ["AR_1", "SMG_1", "LMG_1", "SHOTGUN_1", "SNIPER_1", "PISTOL_1", "ROCKET_1", "GL_1"];
-    if (primaryWeaponId !== undefined && !validWeapons.includes(primaryWeaponId)) {
+    if (primaryWeaponId !== undefined && !isValidWeapon(primaryWeaponId)) {
       res.status(400).json({ error: "Invalid primary weapon ID" });
       return;
     }
-    if (secondaryWeaponId !== undefined && !validWeapons.includes(secondaryWeaponId)) {
+    if (secondaryWeaponId !== undefined && !isValidWeapon(secondaryWeaponId)) {
       res.status(400).json({ error: "Invalid secondary weapon ID" });
       return;
     }

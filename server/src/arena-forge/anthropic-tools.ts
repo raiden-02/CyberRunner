@@ -1,4 +1,4 @@
-import { PLAYTEST_FUNCTION_TOOLS, PLAYTEST_TOOL_NAMES } from "./playtest-agent.js";
+import { PLAYTEST_FUNCTION_TOOLS } from "./playtest-agent.js";
 
 export type AnthropicToolSchema = {
   name: string;
@@ -42,6 +42,3 @@ export function openaiFunctionToAnthropicTool(tool: LogicalFunctionTool): Anthro
   };
 }
 
-export function playtestToolNames(): readonly string[] {
-  return PLAYTEST_TOOL_NAMES;
-}

@@ -1,6 +1,6 @@
 import { PlayerState } from "../PlayerState.js";
-import { DamageMsg, HealthChangeMsg, BodyPartHit } from "../net/messages.js";
-import { calculateSpawnFacing } from "../world/maps/map-registry.js";
+import type { HealthChangeMsg, BodyPartHit } from "../net/messages.js";
+import { calculateSpawnFacing } from "@shared/world/map-types.js";
 
 export class HealthSystem {
   private static RESPAWN_DELAY = 3.0; // seconds
@@ -15,13 +15,7 @@ export class HealthSystem {
   /**
    * Apply damage to a player and handle death/respawn logic
    */
-  static applyDamage(
-    player: PlayerState,
-    damage: number,
-    sourceId?: string,
-    weaponId?: string,
-    damageType: "projectile" | "hitscan" | "explosion" = "hitscan"
-  ): { damaged: boolean; killed: boolean; newHealth: number } {
+  static applyDamage(player: PlayerState, damage: number): { damaged: boolean; killed: boolean; newHealth: number } {
     if (player.isDead) {
       return { damaged: false, killed: false, newHealth: player.health };
     }
@@ -60,20 +54,6 @@ export class HealthSystem {
     if (player.slowEffect > 0) {
       player.slowEffect = Math.max(0, player.slowEffect - HealthSystem.DAMAGE_SLOW_DECAY_RATE * deltaTime);
     }
-  }
-
-  /**
-   * Heal a player (cannot heal if dead)
-   */
-  static healPlayer(player: PlayerState, amount: number): { healed: boolean; newHealth: number } {
-    if (player.isDead) {
-      return { healed: false, newHealth: player.health };
-    }
-
-    const oldHealth = player.health;
-    player.health = Math.min(player.maxHealth, player.health + amount);
-    
-    return { healed: player.health > oldHealth, newHealth: player.health };
   }
 
   /**
@@ -120,25 +100,6 @@ export class HealthSystem {
     return { respawned: false };
   }
 
-  /**
-   * Create a damage message for broadcasting
-   */
-  static createDamageMessage(
-    targetId: string,
-    amount: number,
-    damageType: "projectile" | "hitscan" | "explosion",
-    sourceId?: string,
-    weaponId?: string
-  ): DamageMsg {
-    return {
-      targetId,
-      amount,
-      damageType,
-      sourceId,
-      weaponId
-    };
-  }
-
   static createHealthChangeMessage(
     playerId: string,
     player: PlayerState,
@@ -157,25 +118,5 @@ export class HealthSystem {
       attackerId,
       damage
     };
-  }
-
-  /**
-   * Calculate damage with modifiers (headshot, armor, etc.)
-   */
-  static calculateDamage(
-    baseDamage: number,
-    hitLocation: "head" | "body" | "limb" = "body",
-    headshotMultiplier: number = 2.0
-  ): number {
-    switch (hitLocation) {
-      case "head":
-        return Math.round(baseDamage * headshotMultiplier);
-      case "body":
-        return baseDamage;
-      case "limb":
-        return Math.round(baseDamage * 0.8); // 20% damage reduction for limbs
-      default:
-        return baseDamage;
-    }
   }
 }

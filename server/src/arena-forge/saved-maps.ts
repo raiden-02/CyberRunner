@@ -189,10 +189,6 @@ export class PostgresSavedMapStore implements SavedMapStore {
 let storeOverride: SavedMapStore | null = null;
 const guestStore = new MemorySavedMapStore();
 
-export function setSavedMapStoreForTests(store: SavedMapStore | null): void {
-  storeOverride = store;
-}
-
 export function getSavedMapStore(): SavedMapStore | null {
   if (storeOverride) return storeOverride;
   if (!isDatabaseEnabled()) return null;

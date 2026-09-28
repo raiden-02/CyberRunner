@@ -3,7 +3,6 @@ import { parseArenaDesignSpec, type ArenaDesignSpec } from "@shared/world/arena-
 export const NATIVE_DEMO_ID = "native-designer-demo";
 export const NATIVE_DEMO_LABEL = "Native S&D Design";
 export const NATIVE_DEMO_MAP_NAME = "Crossfire Yard";
-export const NATIVE_DEMO_SAVE_NAME = "Recorded Crossfire Yard";
 export const NATIVE_DEMO_VERSION = 1;
 
 export const NATIVE_DEMO_BRIEF =

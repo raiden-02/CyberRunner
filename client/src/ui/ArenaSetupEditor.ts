@@ -1,6 +1,5 @@
 import {
   DEATHMATCH_MAX_SPAWNS,
-  ENVELOPE_SNAP,
   parseArenaDesignSpec,
   snapWorld,
   teamClusterPoints,

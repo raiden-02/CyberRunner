@@ -1,6 +1,6 @@
 import { GameState } from "../GameState.js";
 import { PlayerState } from "../PlayerState.js";
-import { GameModeConfig, GameModeId } from "./game-mode-config.js";
+import { GameModeConfig, GameModeId, startingLives } from "./game-mode-config.js";
 
 export interface PlayerModeState {
   livesRemaining: number;
@@ -55,7 +55,7 @@ export abstract class BaseGameMode {
 
   addPlayer(sessionId: string): void {
     this.playerStates.set(sessionId, {
-      livesRemaining: this.config.maxLives || 999,
+      livesRemaining: startingLives(this.config.maxLives),
       roundKills: 0,
       roundDeaths: 0,
       roundsWon: 0,
@@ -87,7 +87,7 @@ export abstract class BaseGameMode {
     this.roundState.roundWinner = null;
 
     for (const [_, state] of this.playerStates) {
-      state.livesRemaining = this.config.maxLives || 999;
+      state.livesRemaining = startingLives(this.config.maxLives);
       state.roundKills = 0;
       state.roundDeaths = 0;
     }

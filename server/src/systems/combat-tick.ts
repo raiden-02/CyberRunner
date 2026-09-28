@@ -3,9 +3,9 @@ import { sanitizeAimDir, shotOriginFromBody } from "../net/shot-origin.js";
 import type { PlayerRuntime } from "../player-runtime.js";
 import { HealthSystem } from "./health-system.js";
 import { WeaponSystem } from "./weapon-system.js";
-import { getWeaponConfig } from "../weapons/weapon-config.js";
+import { getWeaponConfig } from "@shared/weapons/weapon-config.js";
 import type { LagCompensation } from "./lag-compensation.js";
-import type { ProjectileManager, ProjectileConfig } from "./projectile-system.js";
+import type { ProjectileManager } from "./projectile-system.js";
 import type { HitboxRegistry, BodyPart } from "../physics/hitbox-system.js";
 
 export type BreakableRuntime = {
@@ -21,8 +21,6 @@ function applyCombatHit(
   victimId: string,
   attackerId: string,
   damage: number,
-  weaponId: string,
-  damageType: "hitscan" | "explosion",
   broadcast: CombatBroadcast,
   onPlayerKill: (victimId: string, killerId: string) => void,
   bodyPart?: BodyPart,
@@ -31,13 +29,7 @@ function applyCombatHit(
   if (!hitPlayer) return;
 
   const isGodMode = hitPlayer.godMode;
-  const dmgResult = HealthSystem.applyDamage(
-    hitPlayer.schema,
-    damage,
-    attackerId,
-    weaponId,
-    damageType,
-  );
+  const dmgResult = HealthSystem.applyDamage(hitPlayer.schema, damage);
 
   if (isGodMode) {
     hitPlayer.schema.health = hitPlayer.schema.maxHealth;
@@ -142,19 +134,12 @@ export function processFiringPlayers(
 
     const weaponConfig = getWeaponConfig(player.schema.equippedWeapon);
     if (weaponConfig?.type === "projectile" && weaponConfig.projectileSpeed) {
-      const projectileConfig: ProjectileConfig = {
+      const projectileId = projectileManager.spawnProjectile(origin, aim, {
         speed: weaponConfig.projectileSpeed,
-        radius: weaponConfig.projectileRadius || 0.1,
-        length: 0.3,
-        damage: weaponConfig.damage,
         lifetime: weaponConfig.range / weaponConfig.projectileSpeed,
-        explosionRadius: weaponConfig.explosionRadius,
-        ownerType: "player",
         ownerId: sessionId,
         weaponId: weaponConfig.id,
-      };
-
-      const projectileId = projectileManager.spawnProjectile(origin, aim, projectileConfig);
+      });
       broadcast("projectile_spawned", {
         id: projectileId,
         origin,
@@ -171,8 +156,6 @@ export function processFiringPlayers(
           hit.playerId,
           sessionId,
           hit.damage,
-          player.schema.equippedWeapon,
-          "hitscan",
           broadcast,
           onPlayerKill,
           hit.bodyPart,
@@ -184,8 +167,6 @@ export function processFiringPlayers(
         shotResult.hitPlayerId,
         sessionId,
         shotResult.damage,
-        player.schema.equippedWeapon,
-        "hitscan",
         broadcast,
         onPlayerKill,
         shotResult.bodyPart,
@@ -216,78 +197,33 @@ export function updateProjectiles(
   broadcast: CombatBroadcast,
   onPlayerKill: (victimId: string, killerId: string) => void,
 ): void {
-  const { activeProjectiles, expiredProjectiles } = projectileManager.update(dt);
+  const targets = [...players].map(([id, p]) => [id, p.schema] as [string, PlayerRuntime["schema"]]);
+  const { impacts, expired } = projectileManager.step(dt, world, targets);
 
-  for (const id of expiredProjectiles) {
+  for (const id of expired) {
     broadcast("projectile_destroyed", { id, reason: "expired" });
   }
 
-  for (const [id, projectile] of activeProjectiles) {
-    const pos = projectile.getPosition();
-    const ray = new RAPIER.Ray(pos, { x: 0, y: -0.1, z: 0 });
-    const maxDist = projectile.config.radius * 2;
-    const worldHit = world.castRay(ray, maxDist, true, undefined, undefined, undefined, projectile.body);
-    const hasWorldCollision = worldHit !== null;
-
-    let hasPlayerCollision = false;
-    for (const [playerId, playerData] of players) {
-      if (playerId === projectile.config.ownerId) continue;
-      if (playerData.schema.isDead) continue;
-
-      const dx = playerData.schema.x - pos.x;
-      const dy = playerData.schema.y - pos.y;
-      const dz = playerData.schema.z - pos.z;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-      if (dist < 1.5) {
-        hasPlayerCollision = true;
-        break;
+  for (const { id, config, position } of impacts) {
+    const weaponConfig = getWeaponConfig(config.weaponId);
+    if (weaponConfig?.explosionRadius) {
+      const explosionHits = WeaponSystem.processExplosion(position, config.weaponId, players);
+      for (const hit of explosionHits) {
+        applyCombatHit(
+          players,
+          hit.playerId,
+          config.ownerId,
+          hit.damage,
+          broadcast,
+          onPlayerKill,
+        );
       }
+      broadcast("explosion", {
+        position,
+        radius: weaponConfig.explosionRadius,
+        weaponId: config.weaponId,
+      });
     }
-
-    if (hasWorldCollision || hasPlayerCollision) {
-      handleProjectileImpact(id, projectile, pos, players, broadcast, onPlayerKill);
-      projectileManager.removeProjectile(id);
-      broadcast("projectile_destroyed", { id, reason: "impact", position: pos });
-    }
-  }
-}
-
-function handleProjectileImpact(
-  _projectileId: string,
-  projectile: { config: ProjectileConfig; getPosition: () => { x: number; y: number; z: number } },
-  impactPos: { x: number; y: number; z: number },
-  players: Map<string, PlayerRuntime>,
-  broadcast: CombatBroadcast,
-  onPlayerKill: (victimId: string, killerId: string) => void,
-): void {
-  const config = projectile.config;
-
-  if (config.explosionRadius && config.explosionRadius > 0) {
-    const explosionHits = WeaponSystem.processExplosion(
-      impactPos,
-      config.ownerId,
-      config.weaponId,
-      players,
-    );
-
-    for (const hit of explosionHits) {
-      applyCombatHit(
-        players,
-        hit.playerId,
-        config.ownerId,
-        hit.damage,
-        config.weaponId,
-        "explosion",
-        broadcast,
-        onPlayerKill,
-      );
-    }
-
-    broadcast("explosion", {
-      position: impactPos,
-      radius: config.explosionRadius,
-      weaponId: config.weaponId,
-    });
+    broadcast("projectile_destroyed", { id, reason: "impact", position });
   }
 }

@@ -1,15 +1,6 @@
-/**
- * BASE LIGHTING (Abstract)
- * Base class for all map lighting configurations.
- * Provides common lighting setup and defines the interface for map-specific lighting.
- */
 import * as THREE from "three";
 import type { NeonColorKey } from "./NeonColors.js";
 import { NEON_PALETTE } from "./NeonColors.js";
-
-// ═══════════════════════════════════════════════════════════════
-// LIGHTING CONFIGURATION TYPES
-// ═══════════════════════════════════════════════════════════════
 
 export interface AmbientLightConfig {
   color: number;
@@ -57,20 +48,9 @@ export interface LightingConfig {
   fog: FogConfig;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LIGHTING RENDER LAYER
-// ═══════════════════════════════════════════════════════════════
-
 export const WEAPON_RENDER_LAYER = 1;
 
-// ═══════════════════════════════════════════════════════════════
-// BASE LIGHTING CLASS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Abstract base class for map lighting.
- * Provides common lighting setup methods.
- */
+/** Common light rig. Subclasses add map-specific accents. */
 export abstract class BaseLighting {
   protected scene: THREE.Scene;
   protected lights: THREE.Light[] = [];
@@ -105,10 +85,6 @@ export abstract class BaseLighting {
     // Override in subclasses for additional setup
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // RENDERER SETUP
-  // ═══════════════════════════════════════════════════════════════
-
   protected setupRenderer(renderer: THREE.WebGLRenderer): void {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -116,10 +92,6 @@ export abstract class BaseLighting {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // FOG
-  // ═══════════════════════════════════════════════════════════════
 
   protected setupFog(): void {
     this.scene.fog = new THREE.Fog(
@@ -130,10 +102,6 @@ export abstract class BaseLighting {
     this.scene.background = new THREE.Color(this.config.fog.color);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // AMBIENT LIGHTING
-  // ═══════════════════════════════════════════════════════════════
-
   protected setupAmbient(): void {
     const ambient = new THREE.AmbientLight(
       this.config.ambient.color,
@@ -142,10 +110,6 @@ export abstract class BaseLighting {
     this.scene.add(ambient);
     this.lights.push(ambient);
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // HEMISPHERE LIGHTING
-  // ═══════════════════════════════════════════════════════════════
 
   protected setupHemisphere(): void {
     const hemi = new THREE.HemisphereLight(
@@ -156,10 +120,6 @@ export abstract class BaseLighting {
     this.scene.add(hemi);
     this.lights.push(hemi);
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // KEY LIGHT (Main directional light with shadows)
-  // ═══════════════════════════════════════════════════════════════
 
   protected setupKeyLight(renderer: THREE.WebGLRenderer): void {
     const cfg = this.config.keyLight;
@@ -187,10 +147,6 @@ export abstract class BaseLighting {
     this.lights.push(key);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // RIM LIGHT
-  // ═══════════════════════════════════════════════════════════════
-
   protected setupRimLight(): void {
     if (!this.config.rimLight) return;
     const cfg = this.config.rimLight;
@@ -200,10 +156,6 @@ export abstract class BaseLighting {
     this.lights.push(rim);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // FILL LIGHT
-  // ═══════════════════════════════════════════════════════════════
-
   protected setupFillLight(): void {
     if (!this.config.fillLight) return;
     const cfg = this.config.fillLight;
@@ -212,10 +164,6 @@ export abstract class BaseLighting {
     this.scene.add(fill);
     this.lights.push(fill);
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // NEON ACCENT LIGHTS
-  // ═══════════════════════════════════════════════════════════════
 
   protected setupNeonAccents(): void {
     for (const neon of this.config.neonAccents) {
@@ -231,19 +179,11 @@ export abstract class BaseLighting {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // WEAPON LIGHT (For first-person weapon rendering)
-  // ═══════════════════════════════════════════════════════════════
-
   protected setupWeaponLight(): void {
     this.weaponLight = new THREE.PointLight(0xffffff, 0.8, 5, 2);
     this.weaponLight.layers.set(WEAPON_RENDER_LAYER);
     this.lights.push(this.weaponLight);
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // UTILITY METHODS
-  // ═══════════════════════════════════════════════════════════════
 
   /**
    * Create a point light from neon color palette
@@ -281,10 +221,6 @@ export abstract class BaseLighting {
     this.lights.push(light);
     return light;
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // PUBLIC API
-  // ═══════════════════════════════════════════════════════════════
 
   public getWeaponLight(): THREE.PointLight | undefined {
     return this.weaponLight;

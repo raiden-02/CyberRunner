@@ -6,8 +6,6 @@ export const SHOOT_HOUSE_VISUALS: ShootHouseVisuals = {
     { x: 24, y: 2.5, z: 0, hx: 3, hy: 2.5, hz: 8, type: "bar", windowColor: 0x4a8b8a },
     { x: 0, y: 4, z: 0, hx: 6, hy: 4, hz: 1.5, type: "billboard", windowColor: 0xd4893a },
   ],
-  catwalks: [],
-  ramps: [],
   connectors: [
     { x: -6, y: 1.5, z: -6, hx: 1.5, hy: 1.5, hz: 1.5, type: "doorway", lighting: "warm" },
     { x: -6, y: 1.5, z: 6, hx: 1.5, hy: 1.5, hz: 1.5, type: "doorway", lighting: "warm" },
@@ -15,12 +13,11 @@ export const SHOOT_HOUSE_VISUALS: ShootHouseVisuals = {
     { x: 6, y: 1.5, z: 6, hx: 1.5, hy: 1.5, hz: 1.5, type: "doorway", lighting: "cool" },
   ],
   neonSigns: [
-    { x: 0, y: 5, z: 1.6, width: 8, height: 2.5, rotationY: 0, color: "orange", flicker: false },
-    { x: 0, y: 5, z: -1.6, width: 8, height: 2.5, rotationY: Math.PI, color: "teal", flicker: false },
-    { x: 0, y: 2.5, z: -27, width: 4, height: 1, rotationY: 0, color: "orange", flicker: false },
-    { x: 0, y: 2.5, z: 27, width: 4, height: 1, rotationY: Math.PI, color: "teal", flicker: false },
+    { x: 0, y: 5, z: 1.6, width: 8, height: 2.5, rotationY: 0, color: "orange" },
+    { x: 0, y: 5, z: -1.6, width: 8, height: 2.5, rotationY: Math.PI, color: "teal" },
+    { x: 0, y: 2.5, z: -27, width: 4, height: 1, rotationY: 0, color: "orange" },
+    { x: 0, y: 2.5, z: 27, width: 4, height: 1, rotationY: Math.PI, color: "teal" },
   ],
-  props: [],
   laneLights: [
     { x: -16, y: 8, z: 0, color: 0xd4893a, intensity: 0.9, distance: 18, decay: 1.6 },
     { x: 0, y: 10, z: 0, color: 0xf0e6d4, intensity: 1.2, distance: 28, decay: 1.3 },

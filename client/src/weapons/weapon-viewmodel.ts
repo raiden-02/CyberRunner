@@ -160,7 +160,6 @@ export class WeaponViewModel {
   private getHipOffset(family: WeaponDefinition["family"]): THREE.Vector3 {
     switch (family) {
       case "SMG":
-      case "MachinePistol":
         return new THREE.Vector3(0.58, -0.52, -1.1);
       case "Pistol":
         return new THREE.Vector3(0.5, -0.48, -0.9);
@@ -186,7 +185,6 @@ export class WeaponViewModel {
   private getADSOffset(family: WeaponDefinition["family"]): THREE.Vector3 {
     switch (family) {
       case "SMG":
-      case "MachinePistol":
         return new THREE.Vector3(0, -0.2, -0.55);
       case "Pistol":
         return new THREE.Vector3(0, -0.14, -0.45);
@@ -212,17 +210,13 @@ export class WeaponViewModel {
   private getFirstPersonScale(family: WeaponDefinition["family"]): number {
     switch (family) {
       case "Pistol": return 0.75;
-      case "MachinePistol": return 0.8;
       case "SMG": return 0.88;
-      case "AssaultRifle":
-      case "DMR": return 1.0;
+      case "AssaultRifle": return 1.0;
       case "Shotgun": return 1.05;
       case "LMG": return 1.15;
       case "Sniper": return 1.1;
-      case "RocketLauncher":
-      case "Launcher": return 1.2;
+      case "RocketLauncher": return 1.2;
       case "GrenadeLauncher": return 1.05;
-      case "Melee": return 0.85;
       default: return 1.0;
     }
   }

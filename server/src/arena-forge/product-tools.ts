@@ -14,7 +14,6 @@ import {
   readIntent,
   type AgentToolOutput,
 } from "./agent-tools.js";
-import { circleInsideBounds, isFiniteNumber } from "./geometry.js";
 import {
   inspectProductClearance,
   MIN_PRODUCT_PASSAGE_METERS,
@@ -27,7 +26,7 @@ import {
   parseProductLayoutAction,
   PRODUCT_LAYOUT_TOOLS,
 } from "./product-layout.js";
-import { PLAYER_RADIUS, type ArenaEvaluation, type ArenaMap } from "./types.js";
+import type { ArenaEvaluation, ArenaMap } from "./types.js";
 import type { ArenaWorkspace } from "./workspace.js";
 
 export const PROPOSE_DESIGN_PLAN_TOOL = "propose_design_plan";
@@ -499,14 +498,3 @@ export function isProductObservationalTool(name: string): boolean {
   return name === TRACE_ROUTE_TOOL;
 }
 
-export function circleFitsEnvelope(
-  x: number,
-  z: number,
-  envelope: MapBoundsRect,
-): boolean {
-  return circleInsideBounds(x, z, PLAYER_RADIUS, envelope);
-}
-
-export function isFiniteCoord(n: unknown): n is number {
-  return typeof n === "number" && isFiniteNumber(n);
-}

@@ -2,7 +2,6 @@ import {
   aabbOverhangs,
   circleInsideRect,
   pointInsideRect,
-  resolveMapBounds,
   type BoundSide,
   type MapBoundsRect,
 } from "@shared/world/map-bounds.js";
@@ -17,9 +16,7 @@ function asRect(bounds: BoundsInput): MapBoundsRect {
   return bounds;
 }
 
-export function isFiniteNumber(n: number): boolean {
-  return Number.isFinite(n);
-}
+export { isFiniteNumber } from "@shared/world/map-bounds.js";
 
 export function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
@@ -80,10 +77,6 @@ export function solidBoundOverhangs(
     solid.z + solid.hz,
     asRect(bounds),
   );
-}
-
-export function mapBoundsOf(map: { bounds?: MapBoundsRect; boundsHalfSize: number }): MapBoundsRect {
-  return resolveMapBounds(map);
 }
 
 /**
